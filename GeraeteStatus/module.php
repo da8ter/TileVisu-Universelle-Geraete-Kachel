@@ -1,1219 +1,1212 @@
-<?php
-class UniversalDeviceTile extends IPSModule
-{
-    // Variablen-Zugriff und Status-Variable-ID
-    private $statusId = 0;
-    
-    /**
-     * Icon-Mapping Tabelle (IP-Symcon zu FontAwesome)
-     * @var array|null
-     */
-    protected $iconMapping = null;
-    
-    public function Create()
-    {
-        // Nie diese Zeile löschen!
-        parent::Create();
+<!DOCTYPE html>
+<html>
 
-        // Alter Gerätestatus (immer oben angezeigt)
-        $this->RegisterPropertyInteger('Status', 0);
-        $this->RegisterPropertyString('ProfilAssoziazionen', '[]');
-        $this->RegisterPropertyInteger('StatusFontSize', 12);
-        $this->RegisterPropertyBoolean('StatusShowIcon', true);
-        $this->RegisterPropertyBoolean('StatusShowLabel', true);
-        $this->RegisterPropertyBoolean('StatusShowValue', true);
-        $this->RegisterPropertyString('StatusLabel', '');
+<head>
+    <meta charset="UTF-8">
+    <script src="/icons.js" crossorigin="anonymous"></script>
 
-        // Neue universelle Variablenliste für konfigurierbare Variablen
-        $this->RegisterPropertyString('VariablesList', '[]');
-        
-        // Zentrale Fortschrittsbalken-Konfiguration
-        $this->RegisterPropertyInteger('ProgressBarHeight', 25);
-        $this->RegisterPropertyInteger('ProgressBarBorderRadius', 6);
-        $this->RegisterPropertyInteger('ProgressBarBackgroundColor', 8947848); // rgba(135, 135, 135, 0.3)
-        $this->RegisterPropertyInteger('ProgressBarBackgroundOpacity', 30);
-        $this->RegisterPropertyBoolean('ProgressBarShowText', true);
-        $this->RegisterPropertyInteger('ProgressBarTextPadding', 12);
-        
-        // Bildkonfiguration
-        $this->RegisterPropertyInteger("Bildauswahl", 0);
-        $this->RegisterPropertyFloat("BildBreite", 20);
-        $this->RegisterPropertyInteger("Bild_An", 0);
-        $this->RegisterPropertyInteger("Bild_Aus", 0);
-        $this->RegisterPropertyBoolean('BG_Off', 1);
-        $this->RegisterPropertyInteger("bgImage", 0);
-        $this->RegisterPropertyFloat('Bildtransparenz', 0.7);
-        $this->RegisterPropertyInteger('Kachelhintergrundfarbe', -1);
-        $this->RegisterPropertyInteger('ElementSpacing', 5); // Standardwert für Element-Abstand
-        
-        // Debug-Steuerung
-        $this->RegisterPropertyBoolean('DebugEnabled', false);
+    <style>
+        /* Grundlegende Stildefinitionen für die neue dynamische Variablenliste */
 
-        // Visualisierungstyp auf 1 setzen, da wir HTML anbieten möchten
-        $this->SetVisualizationType(1);
-        
-        // Lade das Icon-Mapping
-        $this->LoadIconMapping();
-    }
-    
-    /**
-     * Zentrale Debug-Funktion - alle Debug-Ausgaben laufen über diese Funktion
-     * @param string $message Debug-Nachricht
-     * @param string $category Optional: Kategorie für bessere Übersicht (default: 'TileVisu DEBUG')
-     */
-    private function DebugLog($message, $category = 'TileVisu DEBUG') {
-        if ($this->ReadPropertyBoolean('DebugEnabled')) {
-            IPS_LogMessage($category, $message);
-            $this->SendDebug($category, $message, 0);
+        :root {
+            --bildbreite: 40%;
+            --bildtransparenz: 1;
+            --hintergrundfarbe: rgba(255, 255, 255, 0.95);
+            --element-spacing: 8px; /* Einheitlicher vertikaler Abstand zwischen allen Elementen */
         }
-    }
 
-    public function ApplyChanges()
-    {
-        parent::ApplyChanges();
-        
-        // DEBUG TEST: Sofortige Debug-Ausgabe beim Laden
-        $this->DebugLog('DEBUG TEST: Module loaded successfully!', 'ApplyChanges');
-        
-        // Stelle sicher, dass das Icon-Mapping geladen ist
-        $this->LoadIconMapping();
-        
-        // Dynamische Referenzen und Nachrichten für konfigurierte Variablen
-        $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
-        
-        // Sammle alle Variablen-IDs
-        $ids = [$this->ReadPropertyInteger('bgImage')];
-        
-        // Füge Status-Variable hinzu
-        $statusId = $this->ReadPropertyInteger('Status');
-        if ($statusId > 0) {
-            $ids[] = $statusId;
+        html {
+            background-color: var(--hintergrundfarbe);
+            overflow: hidden;
+        }
+
+        body:before {
+            content: '';
+            display: block;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background-repeat: no-repeat;
+            background-size: cover;
+            opacity: var(--bildtransparenz);
+            background: var(--background-image, none) center / cover no-repeat;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .visible {
+            display: block;
+        }
+
+        .main_container {
+            width: 100%;
+            max-width: 100%;
+            display: flex;
+            flex-wrap: nowrap;
+            font-size: 12px;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .div1 {
+            width: var(--bildbreite);
+            box-sizing: border-box;
+            border-right: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding: 0px 2.5% 5px 0px;
+        }
+
+        .div1 img {
+            width: 100%;
+        }
+
+        .div2 {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0px 5px 5px 2.5%;
+            margin: 0px 0px 0px 0px;
+            border-radius: 0px;
+        }
+
+        /* Styles für dynamische Variablen */
+        .variables-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .variable-item {
+            margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung aller Inhalte */
+            justify-content: flex-start; /* Horizontale Ausrichtung */
+            width: 100%;
+            min-height: 15px; /* Reduzierte Mindesthöhe für kompaktere Darstellung */
         }
         
-        if (is_array($variablesList)) {
-            foreach ($variablesList as $variable) {
-                if (isset($variable['Variable']) && $variable['Variable'] > 0) {
-                    $ids[] = $variable['Variable'];
-                }
-                // Registriere auch SecondVariable falls vorhanden
-                if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
-                    $ids[] = $variable['SecondVariable'];
-                }
+        /* Für gruppierte Variablen: Kein width: 100% damit sie nebeneinander passen */
+        .variable-group-item .variable-item {
+            width: auto;
+            margin-bottom: 0;
+            margin-top: 0;
+        }
+        
+        /* AUSNAHME: Progress-Balken brauchen volle Breite, auch in Gruppen */
+        .variable-group-item .variable-item .progress-container {
+            width: 100%;
+        }
+        
+        /* AUSNAHME: Progress-Bar-Container brauchen volle Breite */
+        .variable-group-item .variable-progress {
+            width: 100%;
+            min-width: 100%;
+        }
+        
+        /* Für gruppierte Variablen: Kein min-width bei Labels für kompakte Darstellung */
+        .variable-group-item .variable-label {
+            min-width: auto;
+        }
+
+        .variable-icon {
+            margin-right: 5px;
+            display: inline-block;
+            vertical-align: baseline;
+            flex-shrink: 0;
+        }
+
+        .variable-label {
+            font-weight: bold;
+            min-width: 0px;  /* Feste Breite für Labels */
+            flex-shrink: 0;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Labels */
+        }
+
+        .variable-value {
+            flex-grow: 1;
+            text-align: left;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Values */
+        }
+
+        /* Fortschrittsbalken-Styles - verwende zentrale Konfiguration */
+        .progress-container {
+            margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            width: 100%;
+            height: var(--progress-bar-height, 20px);
+            background-color: var(--progress-bar-bg-color, rgba(135, 135, 135, 0.3));
+            border-radius: var(--progress-bar-border-radius, 10px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: var(--progress-bar-border-radius, 10px) 0 0 var(--progress-bar-border-radius, 10px);
+            transition: width 0.3s ease;
+            background: linear-gradient(to right, var(--progress-color1), var(--progress-color2));
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 1px;
+            left: 0;
+            right: 0;
+            bottom: -1px;
+            z-index: 2;
+            color: #ffffff;
+            display: var(--progress-bar-show-text, flex);
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 var(--progress-bar-text-padding, 12px);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .progress-main-text {
+            flex: 1;
+            text-align: left;
+            margin-right: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .progress-second-variable {
+            flex-shrink: 0;
+            text-align: right;
+            margin-left: 8px;
+        }
+
+        /* Spezielle Ausrichtung für Icons in Progress-Balken */
+        .progress-text .variable-icon {
+            vertical-align: text-bottom;
+            align-self: center;
+            display: inline-flex;
+            align-items: center;
+            transform: translateY(-1px); /* Icon 1px höher */
+        }
+
+        .no-wrap {
+            white-space: nowrap;
+        }
+
+        /* Spezielle Styles für verschiedene Variablentypen */
+        .variable-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Text-Variablen: 5px mehr Top- und Bottom-Margin als andere Darstellungen */
+        .variable-text {
+            margin: calc(var(--element-spacing, 8px) ) 0;
+        }
+        
+        /* Optionale Grenzlinie unter Textvariablen */
+        .variable-item.with-border-line {
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-bottom: 0px;
+            margin-bottom: 0px;
+        }
+        
+        /* Für Gruppen mit Grenzlinie */
+        .variable-group.with-border-line {
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-bottom: 0px;
+            margin-bottom: 0px;
+        }
+        
+        /* Spezifische Regel für gruppierte Text-Variablen: Überschreibt die 0-Margin-Regel */
+        .variable-group-item .variable-item.text-variable {
+            margin-bottom: 0px; /* +5px mehr Abstand auch für gruppierte */
+            margin-top: 0px; /* +5px mehr Abstand auch für gruppierte */
+        }
+
+        .variable-progress {
+            width: 100%;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Progress-Balken */
+        }
+
+        .variable-button-container {
+            margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            margin-top: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Button-Container */
+            width: 100%;
+        }
+
+        /* Button-Styles für Bool-Variablen */
+        .variable-button {
+            display: inline-flex;
+            align-items: center;
+            height: var(--progress-bar-height, 20px);
+            padding: 0 12px;
+            border: 2px solid #ccc;
+            border-radius: var(--progress-bar-border-radius, 10px);
+            background-color: #f8f9fa;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: inherit;
+            font-weight: 500;
+            user-select: none;
+            min-width: 80px;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .variable-button:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .variable-button.active {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            color: white;
+        }
+
+        .variable-button.active:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+        }
+
+        .variable-button.inactive {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+
+        .variable-button.inactive:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+        }
+
+        /* Status-Bereich Styles */
+        .status-container {
+            margin-bottom: var(--element-spacing, 8px);
+            padding: 5px 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+        }
+
+        .status-label {
+            font-weight: bold;
+            margin-right: 0px;
+        }
+
+        .status-value {
+            color: var(--status-color, #000000);
+        }
+
+        .status-icon {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+        }
+    </style>
+
+    <script>
+        // Globale Debug-Steuerung für Frontend
+        let debugEnabled = false; // Wird über handleMessage gesetzt
+        
+        /**
+         * Zentrale Debug-Funktion für Frontend - alle Debug-Ausgaben laufen über diese Funktion
+         * @param {string} message Debug-Nachricht
+         * @param {string} category Optional: Kategorie für bessere Übersicht
+         */
+        function debugLog(message, category = 'TileVisu Frontend') {
+            if (debugEnabled) {
+                console.log(`[${category}] ${message}`);
             }
         }
         
-        // Entferne alle alten Referenzen
-        $refs = $this->GetReferenceList();
-        foreach($refs as $ref) {
-            $this->UnregisterReference($ref);
-        }
+        // Icons werden direkt vom Server gemappt, wir müssen nur noch die richtigen CSS-Klassen hinzufügen
         
-        // Registriere neue Referenzen
-        foreach ($ids as $id) {
-            if ($id > 0) {
-                $this->RegisterReference($id);
-            }
-        }
-
-        // Aktualisiere registrierte Nachrichten
-        foreach ($this->GetMessageList() as $senderID => $messageIDs)
-        {
-            foreach ($messageIDs as $messageID)
-            {
-                $this->UnregisterMessage($senderID, $messageID);
-            }
-        }
-
-        // Registriere Nachrichten für Status-Variable
-        if ($statusId > 0) {
-            $this->RegisterMessage($statusId, VM_UPDATE);
-        }
-        
-        // Registriere Nachrichten für konfigurierte Variablen
-        if (is_array($variablesList)) {
-            foreach ($variablesList as $variable) {
-                if (isset($variable['Variable']) && $variable['Variable'] > 0) {
-                    $this->RegisterMessage($variable['Variable'], VM_UPDATE);
-                }
-                // Registriere auch SecondVariable falls vorhanden
-                if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
-                    $this->RegisterMessage($variable['SecondVariable'], VM_UPDATE);
-                }
-            }
-        }
-
-        // Schicke eine komplette Update-Nachricht an die Darstellung, da sich ja Parameter geändert haben können
-        $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
-    }
-
-    public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
-    {
-        $this->DebugLog('DEBUG TEST: MessageSink called! SenderID: ' . $SenderID . ', Message: ' . $Message, 'MessageSink');
-        $this->SendDebug('MessageSink', 'DEBUG TEST: MessageSink called! SenderID: ' . $SenderID . ', Message: ' . $Message, 0);
-        
-        // Verarbeitung der Status-Variable
-        $statusId = $this->ReadPropertyInteger('Status');
-        if ($statusId > 0 && $SenderID === $statusId) {
-            switch ($Message) {
-            case VM_UPDATE:
-            $updateData = [
-                'status' => GetValueFormatted($statusId),
-                'statusValue' => GetValue($statusId),
-                'statusFontSize' => $this->ReadPropertyInteger('StatusFontSize'),
-                'statusShowIcon' => $this->ReadPropertyBoolean('StatusShowIcon'),
-                'statusShowLabel' => $this->ReadPropertyBoolean('StatusShowLabel'),
-                'statusShowValue' => $this->ReadPropertyBoolean('StatusShowValue'),
-                'statusLabel' => $this->ReadPropertyString('StatusLabel'),
-                'statusIcon' => $this->GetIcon($statusId)
-            ];
-            
-            // Verwende Profilassoziationen für Status-Update
-            $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-            if (is_array($profilAssoziationen)) {
-                $currentValue = GetValue($statusId);
-                foreach ($profilAssoziationen as $assoziation) {
-                    if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentValue) {
-                        $updateData['statusBildauswahl'] = $assoziation['Bildauswahl'] ?? 'wm_aus';
-                        $statusColor = $assoziation['StatusColor'] ?? -1;
-                        $updateData['statusColor'] = ($statusColor === -1 || $statusColor === '-1') ? '' : '#' . sprintf('%06X', $statusColor);
-                        $updateData['isStatusColorTransparent'] = ($statusColor === -1 || $statusColor === '-1');
-                        break;
-                    }
-                }
-            }
-            
-            $this->UpdateVisualizationValue(json_encode($updateData));
-                    break;
-            }
-        }
-
-    // Dynamische Verarbeitung der konfigurierten Variablen
-$variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
-    
-    if (is_array($variablesList)) {
-        foreach ($variablesList as $index => $variable) {
-            // Prüfe Haupt-Variable
-            if (isset($variable['Variable']) && $SenderID === $variable['Variable']) {
-                switch ($Message) {
-                    case VM_UPDATE:
-                        $this->SendDebug('MessageSink', 'Main variable update detected for index: ' . $index . ', variable ID: ' . $variable['Variable'], 0);
-                        
-                        // Sende vollständige Update-Nachricht für diese Variable
-                        $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
-                        break;
-                }
-            }
-            // Prüfe SecondVariable
-            elseif (isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable']) {
-                switch ($Message) {
-                    case VM_UPDATE:
-                        $this->SendDebug('MessageSink', 'SecondVariable update detected for index: ' . $index . ', SecondVariable ID: ' . $variable['SecondVariable'], 0);
-                        
-                        // Sende vollständige Update-Nachricht für diese Variable (enthält auch SecondVariable-Daten)
-                        $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
-                        break;
-                }
-            }
-        }
-    }
-}
-
-
-    /**
-     * Verarbeitet RequestAction-Aufrufe vom Frontend
-     * @param string $Ident Der Identifier der Aktion
-     * @param mixed $value Der Wert der Aktion
-     */
-    public function RequestAction($Ident, $value) {
-        // Prüfe zuerst auf spezielle Aktionen
-        if ($Ident === 'UpdateDisplayTypeFields') {
-            $this->UDST_UpdateDisplayTypeFields($value);
-            return;
-        }
-        
-        // Nachrichten von der HTML-Darstellung schicken immer den Ident passend zur Eigenschaft und im Wert die Differenz, welche auf die Variable gerechnet werden soll
-        $variableID = $Ident;
-        if (!IPS_VariableExists($variableID)) {
-            $this->SendDebug('Error in RequestAction', 'Variable to be updated does not exist', 0);
-            return;
-        }
-            // Umschalten des Werts der Variable
-        $currentValue = GetValue($variableID);
-        //SetValue($variableID, !$currentValue);
-        RequestAction($variableID, !$currentValue);
-    }
-
-
-    public function GetVisualizationTile()
-    {
-        // Füge ein Skript hinzu, um beim Laden, analog zu Änderungen bei Laufzeit, die Werte zu setzen
-        $initialHandling = '<script>handleMessage(' . json_encode($this->GetFullUpdateMessage()) . ')</script>';
-        $bildauswahl = $this->ReadPropertyInteger('Bildauswahl');
-
-
-
-        if($bildauswahl == '0') {
-            $assets = '<script>';
-            $assets .= 'window.assets = {};' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_aus = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp')) . '";' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_an = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp')) . '";' . PHP_EOL;
-            $assets .= '</script>';
-        }
-        elseif($bildauswahl == '1') {
-            $assets = '<script>';
-            $assets .= 'window.assets = {};' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_aus = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_aus.webp')) . '";' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_an = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_an.webp')) . '";' . PHP_EOL;
-            $assets .= '</script>';
-        }
-        else {
-
-        // Prüfe vorweg, ob ein Bild ausgewählt wurde
-        $imageID_Bild_An = $this->ReadPropertyInteger('Bild_An');
-        if (IPS_MediaExists($imageID_Bild_An)) {
-            $image = IPS_GetMedia($imageID_Bild_An);
-            if ($image['MediaType'] === MEDIATYPE_IMAGE) {
-                $imageFile = explode('.', $image['MediaFile']);
-                $imageContent = '';
-                // Falls ja, ermittle den Anfang der src basierend auf dem Dateitypen
-                switch (end($imageFile)) {
-                    case 'bmp':
-                        $imageContent = 'data:image/bmp;base64,';
-                        break;
-
-                    case 'jpg':
-                    case 'jpeg':
-                        $imageContent = 'data:image/jpeg;base64,';
-                        break;
-
-                    case 'gif':
-                        $imageContent = 'data:image/gif;base64,';
-                        break;
-
-                    case 'png':
-                        $imageContent = 'data:image/png;base64,';
-                        break;
-
-                    case 'ico':
-                        $imageContent = 'data:image/x-icon;base64,';
-                        break;
-
-                    case 'webp':
-                        $imageContent = 'data:image/webp;base64,';
-                        break;
-                }
-
-                // Nur fortfahren, falls Inhalt gesetzt wurde. Ansonsten ist das Bild kein unterstützter Dateityp
-                if ($imageContent) {
-                    // Hänge base64-codierten Inhalt des Bildes an
-                    $imageContent .= IPS_GetMediaContent($imageID_Bild_An);
-                }
-
-            }
-        }
-        else {
-            $imageContent = 'data:image/png;base64,';
-
-            $imageContent .= base64_encode(file_get_contents(__DIR__ . '/../imgs/transparent.webp'));
-
-            
-        } 
-
-                // Prüfe vorweg, ob ein Bild ausgewählt wurde
-                $imageID_Bild_Aus = $this->ReadPropertyInteger('Bild_Aus');
-                if (IPS_MediaExists($imageID_Bild_Aus)) {
-                    $image2 = IPS_GetMedia($imageID_Bild_Aus);
-                    if ($image2['MediaType'] === MEDIATYPE_IMAGE) {
-                        $imageFile2 = explode('.', $image2['MediaFile']);
-                        $imageContent2 = '';
-                        // Falls ja, ermittle den Anfang der src basierend auf dem Dateitypen
-                        switch (end($imageFile2)) {
-                            case 'bmp':
-                                $imageContent2 = 'data:image/bmp;base64,';
-                                break;
-        
-                            case 'jpg':
-                            case 'jpeg':
-                                $imageContent2 = 'data:image/jpeg;base64,';
-                                break;
-        
-                            case 'gif':
-                                $imageContent2 = 'data:image/gif;base64,';
-                                break;
-        
-                            case 'png':
-                                $imageContent2 = 'data:image/png;base64,';
-                                break;
-        
-                            case 'ico':
-                                $imageContent2 = 'data:image/x-icon;base64,';
-                                break;
-
-                            case 'webp':
-                                $imageContent2 = 'data:image/webp;base64,';
-                                break;
-                        }
-        
-                        // Nur fortfahren, falls Inhalt gesetzt wurde. Ansonsten ist das Bild kein unterstützter Dateityp
-                        if ($imageContent2) {
-                            // Hänge base64-codierten Inhalt des Bildes an
-                            $imageContent2 .= IPS_GetMediaContent($imageID_Bild_Aus);
-                        }
-        
-                    }
-                }
-                else {
-                    $imageContent2 = 'data:image/png;base64,';
-
-                    $imageContent2 .= base64_encode(file_get_contents(__DIR__ . '/../imgs/transparent.webp'));
-
-                    
-                }  
-
-            $assets = '<script>';
-            $assets .= 'window.assets = {};' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_aus = "' . $imageContent2 . '";' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_an = "' . $imageContent . '";' . PHP_EOL;
-            $assets .= '</script>';
-        }
-
-
-         // Formulardaten lesen und Statusmapping Array für Bild und Farbe erstellen
-        $assoziationsArray = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-        $statusMappingImage = [];
-        $statusMappingColor = [];
-        foreach ($assoziationsArray as $item) {
-            $statusMappingImage[$item['AssoziationValue']] = $item['Bildauswahl'];
-                      
-            $statusMappingColor[$item['AssoziationValue']] = $item['StatusColor'] === -1 ? "" : sprintf('%06X', $item['StatusColor']);
-
-        // StatusBalken wurde entfernt - wird nicht mehr verwendet
-
-        }
-
-        $statusImagesJson = json_encode($statusMappingImage);
-        $statusColorJson = json_encode($statusMappingColor);
-        $images = '<script type="text/javascript">';
-        $images .= 'var statusImages = ' . $statusImagesJson . ';';
-        $images .= 'var statusColor = ' . $statusColorJson . ';';
-        $images .= '</script>';
-
-
-
-
-        // Füge statisches HTML aus Datei hinzu
-        $module = file_get_contents(__DIR__ . '/module.html');
-
-        // Gebe alles zurück.
-        // Wichtig: $initialHandling nach hinten, da die Funktion handleMessage erst im HTML definiert wird
-        return $module . $images . $assets . $initialHandling;
-    }
-
-
-
-    // Generiere eine Nachricht, die alle Elemente in der HTML-Darstellung aktualisiert
-    private function GetFullUpdateMessage() {
-        $result = [];
-        $this->DebugLog('DEBUG TEST: GetFullUpdateMessage called!', 'GetFullUpdateMessage');
-        $this->DebugLog('Starting update message generation', 'GetFullUpdateMessage');
-
-        // Status-Daten (werden immer oben angezeigt)
-        $statusId = $this->ReadPropertyInteger('Status');
-        if ($statusId > 0 && IPS_VariableExists($statusId)) {
-            $result['status'] = GetValueFormatted($statusId);
-            $result['statusValue'] = GetValue($statusId);
-            $result['statusFontSize'] = $this->ReadPropertyInteger('StatusFontSize');
-            
-            // Neue Status-Konfigurationsoptionen
-            $result['statusShowIcon'] = $this->ReadPropertyBoolean('StatusShowIcon');
-            $result['statusShowLabel'] = $this->ReadPropertyBoolean('StatusShowLabel');
-            $result['statusShowValue'] = $this->ReadPropertyBoolean('StatusShowValue');
-            $result['statusLabel'] = $this->ReadPropertyString('StatusLabel');
-            
-            // Status-Icon ermitteln
-            $statusIcon = $this->GetIcon($statusId);
-            $result['statusIcon'] = $statusIcon;
-            
-            // Verwende Profilassoziationen für Status-Konfiguration
-            $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-            if (is_array($profilAssoziationen)) {
-                $currentValue = GetValue($statusId);
-                foreach ($profilAssoziationen as $assoziation) {
-                    if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentValue) {
-                        $result['statusBildauswahl'] = $assoziation['Bildauswahl'] ?? 'wm_aus';
-                        $statusColor = $assoziation['StatusColor'] ?? -1;
-                        $result['statusColor'] = ($statusColor === -1 || $statusColor === '-1') ? '' : '#' . sprintf('%06X', $statusColor);
-                        $result['isStatusColorTransparent'] = ($statusColor === -1 || $statusColor === '-1');
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Lade die konfigurierte Variablenliste
-        $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
-        $this->SendDebug('GetFullUpdateMessage', 'Variables list: ' . json_encode($variablesList), 0);
-        
-        // Sammle Informationen für jede konfigurierte Variable (Array-Reihenfolge durch changeOrder)
-        if (is_array($variablesList)) {
-            $variables = [];
-            foreach ($variablesList as $index => $variable) {
-                if (isset($variable['Variable']) && $variable['Variable'] > 0 && IPS_VariableExists($variable['Variable'])) {
-                    $this->SendDebug('GetFullUpdateMessage', 'Processing variable ID: ' . $variable['Variable'], 0);
-                    // Verwende Variablennamen als Fallback wenn kein Label gesetzt ist
-                    $label = $variable['Label'] ?? '';
-                    if (empty($label)) {
-                        $variableObject = IPS_GetObject($variable['Variable']);
-                        $label = $variableObject['ObjectName'];
-                    }
-                    
-                    $icon = $this->GetIcon($variable['Variable']);
-                    $variableInfo = IPS_GetVariable($variable['Variable']);
-                    
-                    // Extrahiere Button-Farben aus Profil/Darstellung für Bool-Variablen
-                    $buttonColors = $this->GetButtonColors($variable['Variable']);
-                    
-                    // Extrahiere Min/Max-Werte aus Variablenprofil für Progress-Balken
-                    $progressMinMax = $this->GetProgressMinMax($variable['Variable']);
-                    
-                    $variableData = [
-                        'id' => $variable['Variable'],
-                        'label' => $label,
-                        'displayType' => $variable['DisplayType'] ?? 'text',
-                        'variableType' => $variableInfo['VariableType'], // Für Button-Validierung
-                        'group' => $variable['Group'] ?? 'keine Gruppe', // Group-Information für Frontend-Gruppierung
-                        'showIcon' => ($variable['ShowIcon'] ?? true) && !empty($icon) && $icon !== 'Transparent',
-                        'showLabel' => $variable['ShowLabel'] ?? true,
-                        'showValue' => $variable['ShowValue'] ?? true,
-                        'fontSize' => $variable['FontSize'] ?? 12,
-                        'textColor' => isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000',
-                        'isTextColorTransparent' => isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215),
-                        'progressColor1' => isset($variable['ProgressColor1']) ? '#' . sprintf('%06X', $variable['ProgressColor1']) : '#4CAF50',
-                        'progressColor2' => isset($variable['ProgressColor2']) ? '#' . sprintf('%06X', $variable['ProgressColor2']) : '#2196F3',
-                        'buttonColorActive' => $buttonColors['active'],
-                        'buttonColorInactive' => $buttonColors['inactive'],
-                        'buttonWidth' => $variable['ButtonWidth'] ?? 120,
-                        'showBorderLine' => $variable['ShowBorderLine'] ?? false,
-                        'progressMin' => $progressMinMax['min'],
-                        'progressMax' => $progressMinMax['max'],
-                        'formattedValue' => GetValueFormatted($variable['Variable']),
-                        'rawValue' => GetValue($variable['Variable']),
-                        'icon' => $icon
-                    ];
-                    
-                    // Zweite Variable für Progress-Bars hinzufügen
-                    if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0 && IPS_VariableExists($variable['SecondVariable'])) {
-                        // Icon für zweite Variable ermitteln (vollständige Icon-Suche wie bei Hauptvariablen)
-                        $secondIcon = $this->GetIcon($variable['SecondVariable']);
-                        $this->SendDebug('GetFullUpdateMessage', 'Second variable icon search result: ' . $secondIcon . ' for variable ID: ' . $variable['SecondVariable'], 0);
-                        
-                        // Label für zweite Variable ermitteln
-                        $secondLabel = !empty($variable['SecondVariableLabel']) ? $variable['SecondVariableLabel'] : IPS_GetName($variable['SecondVariable']);
-                        
-                        $variableData['secondVariable'] = [
-                            'id' => $variable['SecondVariable'],
-                            'label' => $secondLabel,
-                            'formattedValue' => GetValueFormatted($variable['SecondVariable']),
-                            'rawValue' => GetValue($variable['SecondVariable']),
-                            'icon' => $secondIcon,
-                            'showIcon' => ($variable['SecondVariableShowIcon'] ?? true) && !empty($secondIcon) && $secondIcon !== 'Transparent',
-                            'showLabel' => $variable['SecondVariableShowLabel'] ?? true,
-                            'showValue' => $variable['SecondVariableShowValue'] ?? true
-                        ];
-                        $this->SendDebug('GetFullUpdateMessage', 'Second variable added: ' . $variable['SecondVariable'] . ' with config: ' . json_encode($variableData['secondVariable']), 0);
-                    }
-                    
-                    // Spezielle Behandlung für Zeitwerte
-                    if (is_string($variableData['rawValue']) && preg_match('/^(\d{2}):(\d{2}):(\d{2})$/', $variableData['rawValue'], $matches)) {
-                        $hours = (int)$matches[1];
-                        $minutes = (int)$matches[2];
-                        $seconds = (int)$matches[3];
-                        $variableData['timeInSeconds'] = $hours * 3600 + $minutes * 60 + $seconds;
-                    }
-                    
-                    $this->SendDebug('GetFullUpdateMessage', 'Variable data: ' . json_encode($variableData), 0);
-                    $variables[] = $variableData;
-                }
+        // Bereite ein Icon für die Verwendung im Frontend vor
+        function prepareIconForDisplay(iconName) {
+            // Wenn kein Icon oder leerer String, nichts zurückgeben
+            if (!iconName || iconName === 'Transparent' || iconName === '') {
+                return '';
             }
             
-            $result['variables'] = $variables;
-        }
-        
-        // Zentrale Fortschrittsbalken-Konfiguration
-        $result['progressBarConfig'] = [
-            'height' => $this->ReadPropertyInteger('ProgressBarHeight'),
-            'borderRadius' => $this->ReadPropertyInteger('ProgressBarBorderRadius'),
-            'backgroundColor' => '#' . sprintf('%06X', $this->ReadPropertyInteger('ProgressBarBackgroundColor')),
-            'backgroundOpacity' => $this->ReadPropertyInteger('ProgressBarBackgroundOpacity') / 100,
-            'showText' => $this->ReadPropertyBoolean('ProgressBarShowText'),
-            'textPadding' => $this->ReadPropertyInteger('ProgressBarTextPadding')
-        ];
-        
-        // Bild-Konfiguration
-        $result['BildBreite'] = $this->ReadPropertyFloat('BildBreite');
-        $result['bildtransparenz'] = $this->ReadPropertyFloat('Bildtransparenz');
-        $result['kachelhintergrundfarbe'] = '#' . sprintf('%06X', $this->ReadPropertyInteger('Kachelhintergrundfarbe'));
-        
-        // Element-Spacing-Konfiguration
-        $result['elementSpacing'] = $this->ReadPropertyInteger('ElementSpacing');
-        
-        // Debug-Konfiguration für Frontend
-        $result['debugEnabled'] = $this->ReadPropertyBoolean('DebugEnabled');
-
-            // Hintergrundbild verarbeiten
-        $imageID = $this->ReadPropertyInteger('bgImage');
-        if (IPS_MediaExists($imageID)) {
-            $image = IPS_GetMedia($imageID);
-            if ($image['MediaType'] === MEDIATYPE_IMAGE) {
-                $imageFile = explode('.', $image['MediaFile']);
-                $imageContent = '';
-                // Falls ja, ermittle den Anfang der src basierend auf dem Dateitypen
-                switch (end($imageFile)) {
-                    case 'bmp':
-                        $imageContent = 'data:image/bmp;base64,';
-                        break;
-
-                    case 'jpg':
-                    case 'jpeg':
-                        $imageContent = 'data:image/jpeg;base64,';
-                        break;
-
-                    case 'gif':
-                        $imageContent = 'data:image/gif;base64,';
-                        break;
-
-                    case 'png':
-                        $imageContent = 'data:image/png;base64,';
-                        break;
-
-                    case 'ico':
-                        $imageContent = 'data:image/x-icon;base64,';
-                        break;
-
-                    case 'webp':
-                        $imageContent = 'data:image/webp;base64,';
-                        break;
-                }
-
-                // Nur fortfahren, falls Inhalt gesetzt wurde. Ansonsten ist das Bild kein unterstützter Dateityp
-                if ($imageContent) {
-                    // Hänge base64-codierten Inhalt des Bildes an
-                    $imageContent .= IPS_GetMediaContent($imageID);
-                    $result['image1'] = $imageContent;
-                }
-            }
-        }
-        else{
-            $imageContent = 'data:image/png;base64,';
-            $imageContent .= base64_encode(file_get_contents(__DIR__ . '/../imgs/kachelhintergrund1.png'));
-
-            if ($this->ReadPropertyBoolean('BG_Off')) {
-                $result['image1'] = $imageContent;
-            }
-        }
-        
-        // Füge Instance-ID für RequestAction-Aufrufe hinzu
-        $result['instanceid'] = $this->InstanceID;
-        
-        return json_encode($result);
-    }
-
-    public function UpdateList(int $StatusID)
-    {
-        $listData = []; // Hier sammeln Sie die Daten für Ihre Liste
-    
-        $id = $StatusID;
-
-        // Prüfen, ob die übergebene ID einer existierenden Variable entspricht
-        if (IPS_VariableExists($id)) {
-            // Auslesen des Variablenprofils
-            $variable = IPS_GetVariable($id);
-            $profileName = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+            // Das Icon wurde bereits auf dem Server gemappt, wir müssen nur sicherstellen
+            // dass das richtige Präfix vorhanden ist
+            let iconClass = iconName;
             
-            if ($profileName != '') {
-                $profile = IPS_GetVariableProfile($profileName);
-    
-                // Durchlaufen der Profilassoziationen
-                foreach ($profile['Associations'] as $association) {
-                    $listData[] = [
-                        'AssoziationName' => $association['Name'],
-                        'AssoziationValue' => $association['Value'],
-                        'Bildauswahl' => 'wm_aus',
-                        'StatusColor' => '-1'
-                    ];
-                }
-            }
-        }
-    
-        // Konvertieren Sie Ihre Liste in JSON und aktualisieren Sie das Konfigurationsformular
-        $jsonListData = json_encode($listData);
-        $this->UpdateFormField('ProfilAssoziazionen', 'values', $jsonListData);
-    }
-    
-    
-
-
-
-
-
-    private function CheckAndGetValueFormatted($property) {
-        $id = $this->ReadPropertyInteger($property);
-        if (IPS_VariableExists($id)) {
-            return GetValueFormatted($id);
-        }
-        return false;
-    }
-
-
-    private function GetColor($id) {
-        $variable = IPS_GetVariable($id);
-        $Value = GetValue($id);
-        $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-
-        if ($profile && IPS_VariableProfileExists($profile)) {
-            $p = IPS_GetVariableProfile($profile);
-            
-            foreach ($p['Associations'] as $association) {
-                if (isset($association['Value'], $association['Color']) && $association['Value'] == $Value) {
-                    return $association['Color'] === -1 ? "" : sprintf('%06X', $association['Color']);
-                    
-                }
-            }
-        }
-        return "";
-    }
-
-
-    private function GetColorRGB($hexcolor) {
-        $transparenz = $this->ReadPropertyFloat('InfoMenueTransparenz');
-        if($hexcolor != "-1")
-        {
-                $hexColor = sprintf('%06X', $hexcolor);
-                // Prüft, ob der Hex-Farbwert gültig ist
-                if (strlen($hexColor) == 6) {
-                    $r = hexdec(substr($hexColor, 0, 2));
-                    $g = hexdec(substr($hexColor, 2, 2));
-                    $b = hexdec(substr($hexColor, 4, 2));
-                    return "rgba($r, $g, $b, $transparenz)";
-                } else {
-                    // Fallback für ungültige Eingaben
-                    return $hexColor;
-                }
-        }
-        else {
-            return "";
-        }
-    }
-
-    private function GetIcon($id) {
-        $variable = IPS_GetVariable($id);
-        $Value = GetValue($id);
-        $icon = "";
-        
-        // Debug-Ausgabe für Variable
-        $this->DebugLog('GetIcon called for Variable ID: ' . $id . ' (Name: ' . IPS_GetObject($id)['ObjectName'] . '), Value: ' . $Value, 'GetIcon');
-        $this->DebugLog('Starting icon search for Variable ID: ' . $id . ' (Name: ' . IPS_GetObject($id)['ObjectName'] . '), Value: ' . $Value, 'GetIcon');
-        
-        // Vollständige Variable und Objekt Info
-        $this->DebugLog('COMPLETE VARIABLE INFO: ' . json_encode($variable, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), 'GetIcon');
-        $obj = IPS_GetObject($id);
-        $this->DebugLog('COMPLETE OBJECT INFO: ' . json_encode($obj, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), 'GetIcon');
-        
-        // Prüfe VariableCustomPresentation für Icon
-        if ($icon == "" && !empty($variable['VariableCustomPresentation'])) {
-            $customPresentation = $variable['VariableCustomPresentation'];
-            if (isset($customPresentation['ICON']) && $customPresentation['ICON'] != "") {
-                $icon = $customPresentation['ICON'];
-                $this->DebugLog('Found icon in VariableCustomPresentation: ' . $icon, 'GetIcon');
-            } elseif (isset($customPresentation['Icon']) && $customPresentation['Icon'] != "") {
-                // Fallback für kleingeschriebenes 'icon' Schlüsselwort
-                $icon = $customPresentation['Icon'];
-                $this->DebugLog('Found icon in VariableCustomPresentation (lowercase): ' . $icon);
-            }
-        }
-        
-        // Wenn noch kein Icon gefunden wurde, prüfe Darstellung/Visualisierung und Profile
-        if ($icon == "") {
-            // Zuerst prüfen ob die Variable eine neue Darstellung/Visualisierung hat
-            if (function_exists('IPS_GetVariableVisualization')) {
-                try {
-                    $visualization = IPS_GetVariableVisualization($id);
-                    $this->DebugLog('Variable ID ' . $id . ': Checking visualization...');
-                    $this->DebugLog('Checking visualization for variable...');
-                    $this->DebugLog('Variable ID ' . $id . ': VISUALIZATION CONTENT: ' . json_encode($visualization));
-                    $this->DebugLog('COMPLETE VISUALIZATION CONTENT: ' . json_encode($visualization, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-                    if ($visualization && isset($visualization['ValueMappings'])) {
-                        $this->DebugLog('Found ValueMappings: ' . json_encode($visualization['ValueMappings']));
-                        // Suche nach passendem Icon in den ValueMappings
-                        foreach ($visualization['ValueMappings'] as $mapping) {
-                            if (isset($mapping['Value']) && $mapping['Value'] == $Value && isset($mapping['Icon']) && $mapping['Icon'] != "") {
-                                $icon = $mapping['Icon'];
-                                $this->DebugLog('Found icon in ValueMappings: ' . $icon);
-                                break;
-                            }
-                        }
-                        
-                        // Falls kein spezifisches Icon gefunden, verwende Default-Icon der Darstellung
-                        if ($icon == "" && isset($visualization['Icon']) && $visualization['Icon'] != "") {
-                            $icon = $visualization['Icon'];
-                            $this->DebugLog('Using default visualization icon: ' . $icon);
-                        }
-                    } else {
-                        $this->DebugLog('Variable ID ' . $id . ': No visualization or ValueMappings found');
-                        $this->DebugLog('No visualization or ValueMappings found');
-                    }
-                } catch (Exception $e) {
-                    $this->DebugLog('Error getting visualization: ' . $e->getMessage());
-                    // Falls IPS_GetVariableVisualization fehlschlägt, verwende Fallback zu Profilen
-                }
-            } else {
-                $this->DebugLog('Variable ID ' . $id . ': IPS_GetVariableVisualization function NOT AVAILABLE');
-                $this->DebugLog('IPS_GetVariableVisualization function not available');
+            // Füge fa-light Präfix hinzu wenn nötig
+            if (!iconClass.startsWith('fa-')) {
+                iconClass = 'fa-light fa-' + iconClass;
+            } else if (!iconClass.startsWith('fa-light ')) {
+                iconClass = 'fa-light ' + iconClass;
             }
             
-            // Fallback zu klassischen Variablenprofilen wenn kein Icon über Darstellung gefunden
-            if ($icon == "") {
-                $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-                $this->DebugLog('Checking profile: ' . ($profile ?: 'none'));
+            debugLog('Prepared icon for display: ' + iconName + ' → ' + iconClass, 'prepareIconForDisplay');
+            return iconClass;
+        }
+        
+        // Hilfsfunktion zur Bestimmung der Textfarbe
+        function getTextColor(variable) {
+            // Verwende --content-color wenn TextColor transparent ist, ansonsten die konfigurierte Farbe
+            if (variable.isTextColorTransparent) {
+                return 'var(--content-color)';
+            }
+            return variable.textColor;
+        }
+
+        function updateProgressBarStyles(config) {
+            debugLog('Updating progress bar styles with config:', config);
+            const root = document.documentElement;
+            
+            // Setze CSS-Variablen für die zentrale Konfiguration
+            root.style.setProperty('--progress-bar-height', config.height + 'px');
+            root.style.setProperty('--progress-bar-border-radius', config.borderRadius + 'px');
+            
+            // Konvertiere Hintergrundfarbe zu rgba mit Transparenz
+            const bgColor = config.backgroundColor;
+            const opacity = config.backgroundOpacity;
+            
+            // Extrahiere RGB-Werte aus Hex-Farbe
+            const r = parseInt(bgColor.substr(1, 2), 16);
+            const g = parseInt(bgColor.substr(3, 2), 16);
+            const b = parseInt(bgColor.substr(5, 2), 16);
+            const rgbaColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            
+            root.style.setProperty('--progress-bar-bg-color', rgbaColor);
+            root.style.setProperty('--progress-bar-bg-opacity', '1'); // Opacity bereits in rgba enthalten
+            root.style.setProperty('--progress-bar-text-padding', config.textPadding + 'px');
+            root.style.setProperty('--progress-bar-show-text', config.showText ? 'flex' : 'none');
+        }
+
+        function handleMessage(data) {
+            debugLog('handleMessage called with raw data: ' + data, 'handleMessage');
+            const decodedData = JSON.parse(data);
+            debugLog('Decoded data: ' + JSON.stringify(decodedData), 'handleMessage');
+            const root = document.documentElement;
+            
+            // Setze InstanceID für RequestAction-Aufrufe
+            if (decodedData.instanceid) {
+                window.InstanceID = decodedData.instanceid;
+                debugLog('Set window.InstanceID to: ' + window.InstanceID, 'handleMessage');
+            }
+
+            // Verarbeite die neuen Parameter
+            for (const parameter in decodedData) {
+                const value = decodedData[parameter];
+                debugLog('Processing parameter: ' + parameter + ' with value: ' + value, 'handleMessage');
                 
-                if ($profile && IPS_VariableProfileExists($profile)) {
-                    $p = IPS_GetVariableProfile($profile);
-                    $this->DebugLog('Variable ID ' . $id . ': Found profile "' . $profile . '"');
-                    $this->DebugLog('Variable ID ' . $id . ': PROFILE CONTENT: ' . json_encode($p));
-                    $this->DebugLog('COMPLETE PROFILE CONTENT: ' . json_encode($p, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-                    $this->DebugLog('Profile associations: ' . json_encode($p['Associations']));
-
-                    foreach ($p['Associations'] as $association) {
-                        if (isset($association['Value']) && $association['Icon'] != "" && $association['Value'] == $Value) {
-                            $icon = $association['Icon'];
-                            $this->DebugLog('Found icon in profile associations: ' . $icon);
-                            break;
-                        }
-                    }
-
-                    if ($icon == "" && isset($p['Icon']) && $p['Icon'] != "") {
-                        $icon = $p['Icon'];
-                        $this->DebugLog('Using default profile icon: ' . $icon);
-                    }
-                } else {
-                    $this->DebugLog('No custom profile exists');
-                }
-            }
-            
-            // Finaler Fallback wenn nichts gefunden wurde
-            if ($icon == "") {
-                $icon = "Transparent";
-                $this->DebugLog('Variable ID ' . $id . ': No icon found anywhere, using Transparent as final fallback');
-                $this->DebugLog('No icon found anywhere, using Transparent as final fallback');
-            }
-        }
-        
-
-
-        // Icon-Mapping zu FontAwesome durchführen
-        $mappedIcon = $this->MapIconToFontAwesome($icon);
-        
-        // Debug-Ausgabe
-        $this->DebugLog('GetIcon RESULT - Variable ID: ' . $id . ', Original Icon: "' . $icon . '", Mapped Icon: "' . $mappedIcon . '"');
-        $this->DebugLog('Final result - Variable ID: ' . $id . ', Original Icon: ' . $icon . ', Mapped Icon: ' . $mappedIcon);
-        
-        return $mappedIcon;
-    }
-    
-    /**
-     * Lädt das Icon-Mapping aus der JSON-Datei
-     */
-    private function LoadIconMapping() {
-        $mappingFile = __DIR__ . '/assets/iconMapping.json';
-        
-        // Debug: Prüfe, ob die Datei existiert
-        $this->DebugLog('Attempting to load icon mapping from: ' . $mappingFile);
-        
-        if (file_exists($mappingFile)) {
-            $this->DebugLog('Icon mapping file exists');
-            $json = file_get_contents($mappingFile);
-            
-            if ($json !== false) {
-                $this->DebugLog('Icon mapping file content loaded, length: ' . strlen($json));
-                $this->iconMapping = json_decode($json, true);
-                
-                if ($this->iconMapping === null) {
-                    $this->DebugLog('JSON decode error: ' . json_last_error_msg());
-                    $this->iconMapping = [];
-                } else {
-                    $this->DebugLog('Icon mapping loaded successfully. Total icons: ' . count($this->iconMapping));
-                    
-                    // Debug: Prüfe spezifisch, ob das Euro-Icon vorhanden ist
-                    if (isset($this->iconMapping['Euro'])) {
-                        $this->DebugLog('Euro icon mapping found: Euro → ' . $this->iconMapping['Euro']);
-                    } else {
-                        $this->DebugLog('Euro icon mapping NOT found in loaded mappings!');
-                    }
-                    
-                    // Debug: Zeige einige Beispiel-Mappings
-                    $examples = array_slice($this->iconMapping, 0, 5, true);
-                    $debugExamples = [];
-                    foreach ($examples as $key => $value) {
-                        $debugExamples[] = $key . ' → ' . $value;
-                    }
-                    $this->DebugLog('Icon mapping examples: ' . implode(', ', $debugExamples));
-                }
-            } else {
-                $this->DebugLog('Failed to read icon mapping file: ' . $mappingFile);
-                $this->iconMapping = [];
-            }
-        } else {
-            $this->DebugLog('Icon mapping file not found: ' . $mappingFile);
-            $this->iconMapping = [];
-        }
-    }
-    
-    /**
-     * Wandelt ein IP-Symcon Icon-Name in den entsprechenden FontAwesome-Namen um
-     * @param string $iconName Der Original-Icon-Name
-     * @return string Der gemappte FontAwesome-Name oder der Original-Name falls kein Mapping gefunden
-     */
-    private function MapIconToFontAwesome($iconName) {
-        // Wenn kein Icon oder "Transparent", leeren String zurückgeben
-        if (empty($iconName) || $iconName === 'Transparent') {
-            return '';
-        }
-        
-        
-        // Prüfe zuerst die direkte Mapping-Tabelle
-        if (isset($directMappings[$iconName])) {
-            $mappedName = $directMappings[$iconName];
-            $this->DebugLog('Found in direct mapping table: ' . $iconName . ' → ' . $mappedName);
-            return $mappedName;
-        }
-        
-        // Entferne fa-Präfix falls vorhanden, um den Basis-Namen zu erhalten
-        $baseName = $iconName;
-        $hadFaPrefix = false;
-        if (strpos($iconName, 'fa-') === 0) {
-            $baseName = substr($iconName, 3);
-            $hadFaPrefix = true;
-            $this->DebugLog('Removed fa- prefix from icon: ' . $iconName . ' → ' . $baseName);
-        }
-        
-        // Prüfe direkte Mapping-Tabelle mit dem Basis-Namen
-        if (isset($directMappings[$baseName])) {
-            $mappedName = $directMappings[$baseName];
-            if ($hadFaPrefix && strpos($mappedName, 'fa-') !== 0) {
-                $mappedName = 'fa-' . $mappedName;
-            }
-            $this->DebugLog('Found basename in direct mapping table: ' . $baseName . ' → ' . $mappedName);
-            return $mappedName;
-        }
-        
-        // Versuche den Basis-Namen in der JSON-Mapping-Tabelle zu finden
-        if ($this->iconMapping !== null) {
-            // Stellen sicher, dass die Mapping-Tabelle neu geladen wird, falls sie leer ist
-            if (empty($this->iconMapping)) {
-                $this->LoadIconMapping();
-                $this->DebugLog('Reloaded icon mapping table');
-            }
-            
-            if (isset($this->iconMapping[$baseName])) {
-                $mappedName = $this->iconMapping[$baseName];
-                $this->DebugLog('Mapped icon from JSON: ' . $baseName . ' → ' . $mappedName);
-                
-                // Wenn ursprünglich ein fa-Präfix vorhanden war, füge es wieder hinzu
-                if ($hadFaPrefix && strpos($mappedName, 'fa-') !== 0) {
-                    $mappedName = 'fa-' . $mappedName;
-                    $this->DebugLog('Re-added fa- prefix: ' . $mappedName);
-                }
-                
-                return $mappedName;
-            }
-        } else {
-            $this->DebugLog('Icon mapping table is NULL, trying to load it now');
-            $this->LoadIconMapping();
-        }
-        
-        // Debug-Ausgabe zur Überprüfung des Mappings
-        if ($this->iconMapping !== null) {
-            $this->DebugLog('Icon mapping table has ' . count($this->iconMapping) . ' entries');
-            if ($baseName === 'Euro') {
-                $this->DebugLog('Special check for Euro icon: ' . (isset($this->iconMapping['Euro']) ? 'Found in mapping' : 'NOT found in mapping'));
-            }
-        } else {
-            $this->DebugLog('Icon mapping table could not be loaded');
-        }
-        
-        // Fallback zurück zum Original
-        $this->DebugLog('No mapping found for icon: ' . $iconName . ', returning original');
-        return $iconName;
-    }
-    
-    /**
-     * Extrahiert Button-Farben aus Variablen-Profil oder Darstellung
-     * @param int $variableId Die Variable-ID
-     * @return array Array mit 'active' und 'inactive' Farben
-     */
-    private function GetButtonColors($variableId) {
-        $defaultColors = [
-            'active' => '#28a745',   // Grün für aktiv/true
-            'inactive' => '#dc3545'  // Rot für inaktiv/false
-        ];
-        
-        if (!IPS_VariableExists($variableId)) {
-            return $defaultColors;
-        }
-        
-        $variable = IPS_GetVariable($variableId);
-        
-        // Nur für Bool-Variablen
-        if ($variable['VariableType'] !== VARIABLETYPE_BOOLEAN) {
-            return $defaultColors;
-        }
-        
-        $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-        
-        if (empty($profile) || !IPS_VariableProfileExists($profile)) {
-            return $defaultColors;
-        }
-        
-        $profileData = IPS_GetVariableProfile($profile);
-        $colors = $defaultColors;
-        
-        // Durchsuche Associations nach Bool-Werten
-        if (isset($profileData['Associations']) && is_array($profileData['Associations'])) {
-            foreach ($profileData['Associations'] as $association) {
-                if (isset($association['Value']) && isset($association['Color'])) {
-                    $color = $association['Color'];
-                    if ($color !== -1) {
-                        $hexColor = '#' . sprintf('%06X', $color);
+                switch (parameter.toLowerCase()) {
+                    case 'debugenabled':
+                        debugEnabled = value;
+                        debugLog('Debug mode ' + (value ? 'enabled' : 'disabled'), 'Debug System');
+                        break;
+                    case 'elementspacing':
+                        // Setze CSS-Variable für element-spacing
+                        root.style.setProperty('--element-spacing', value + 'px');
+                        debugLog('Set element-spacing to: ' + value + 'px', 'handleMessage');
+                        break;
                         
-                        if ($association['Value'] == 1 || $association['Value'] === true) {
-                            $colors['active'] = $hexColor;
-                        } elseif ($association['Value'] == 0 || $association['Value'] === false) {
-                            $colors['inactive'] = $hexColor;
+                    case 'status':
+                    case 'statusvalue':
+                    case 'statuscolor':
+                    case 'statusbildauswahl':
+                    case 'statusschriftgroesse':
+                        renderStatus(decodedData);
+                        break;
+                    case 'variables':
+                        renderVariables(value);
+                        break;
+                    case 'progressbarconfig':
+                        updateProgressBarStyles(value);
+                        // Nach Progress-Config-Update, re-render Variables wenn nötig
+                        if (window.lastVariablesData) {
+                            renderVariables(window.lastVariablesData);
                         }
-                    }
-                }
-            }
-        }
-        
-        // Prüfe auch Darstellung/Visualisierung
-        $objectId = $variableId;
-        if (IPS_ObjectExists($objectId)) {
-            $object = IPS_GetObject($objectId);
-            if (isset($object['ObjectVisualization']) && !empty($object['ObjectVisualization'])) {
-                $visualization = json_decode($object['ObjectVisualization'], true);
-                if (is_array($visualization) && isset($visualization['ValueMappings'])) {
-                    foreach ($visualization['ValueMappings'] as $mapping) {
-                        if (isset($mapping['Value']) && isset($mapping['Color'])) {
-                            $color = $mapping['Color'];
-                            if (!empty($color) && $color !== 'transparent') {
-                                if ($mapping['Value'] == 1 || $mapping['Value'] === true) {
-                                    $colors['active'] = $color;
-                                } elseif ($mapping['Value'] == 0 || $mapping['Value'] === false) {
-                                    $colors['inactive'] = $color;
+                        break;
+                    case 'bildbreite':
+                        root.style.setProperty('--bildbreite', value + '%');
+                        const div1 = document.getElementById('div1');
+                        const div2 = document.getElementById('div2');
+                        if (value !== 0) {
+                            div1.className = 'div1';
+                        } else {
+                            div1.className = 'hidden';
+                            div2.style.padding = '0px 5px 5px 0px';
+                        }
+                        break;
+                    case 'bildtransparenz':
+                        root.style.setProperty('--bildtransparenz', value);
+                        break;
+                    case 'kachelhintergrundfarbe':
+                        if (value === '#FFFFFFFFFFFFFFFF') {
+                            root.style.setProperty('--hintergrundfarbe', 'rgba(0, 0, 0, 0)');
+                        } else {
+                            root.style.setProperty('--hintergrundfarbe', value);
+                        }
+                        break;
+                    case 'image1':
+                        const mainDiv = document.querySelector('body');
+                        mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
+                        break;
+                    default:
+                        debugLog('Processing parameter: ' + parameter + ' with value: ' + value, 'handleMessage');
+                        // Prüfe auf Variable-Updates (Parameter endet mit '_value')
+                        if (parameter.endsWith('_value')) {
+                            debugLog('Variable value update detected: ' + parameter + ' = ' + value, 'handleMessage');
+                            
+                            // Extrahiere Variable-ID aus Parameter (z.B. 'var_3_value' -> 'var_3')
+                            const varKey = parameter.replace('_value', '');
+                            debugLog('Looking for button with variable key:', varKey);
+                            
+                            // Aktualisiere rawValue im Cache
+                            if (window.variableDataCache) {
+                                const targetVariableId = window.varKeyToIdMapping?.[varKey];
+                                if (targetVariableId && window.variableDataCache[targetVariableId]) {
+                                    window.variableDataCache[targetVariableId].rawValue = value;
+                                    debugLog('Updated raw value in cache for variable:', targetVariableId);
                                 }
                             }
+                            
+                            // Aktualisiere die entsprechende Variable (Button oder Text)
+                            updateVariable(varKey, value, 'rawValue');
                         }
+                        // Prüfe auf formatierte Werte (Parameter ist z.B. 'var_3')
+                        else {
+                            debugLog('  - startsWith("var_"):', parameter.startsWith('var_'));
+                            debugLog('  - endsWith("_value"):', parameter.endsWith('_value'));
+                            debugLog('  - !endsWith("_value"):', !parameter.endsWith('_value'));
+                            debugLog('  - both conditions:', parameter.startsWith('var_') && !parameter.endsWith('_value'));
+                            if (parameter.startsWith('var_') && !parameter.endsWith('_value')) {
+                                debugLog('Formatted value update detected:', parameter, '=', value);
+                            
+                            // Aktualisiere formatierte Werte im Cache
+                            if (window.variableDataCache) {
+                                const targetVariableId = window.varKeyToIdMapping?.[parameter];
+                                if (targetVariableId && window.variableDataCache[targetVariableId]) {
+                                    window.variableDataCache[targetVariableId].formattedValue = value;
+                                    debugLog('Updated formatted value in cache for variable:', targetVariableId);
+                                    
+                                    // Aktualisiere Variable-Darstellung mit neuem formatiertem Wert
+                                    updateVariable(parameter, value, 'formattedValue');
+                                }
+                            }
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        // Universelle Variable-Update-Funktion für gruppierte und einzelne Variablen
+        function updateVariable(varKey, newValue, updateType = 'rawValue') {
+            debugLog('updateVariable called with varKey:', varKey, 'newValue:', newValue, 'updateType:', updateType);
+            
+            // Finde Variable-ID aus Mapping
+            if (!window.varKeyToIdMapping || !window.varKeyToIdMapping[varKey]) {
+                debugLog('No mapping found for varKey:', varKey);
+                debugLog('Available mappings:', window.varKeyToIdMapping);
+                return;
+            }
+            
+            const targetVariableId = window.varKeyToIdMapping[varKey];
+            debugLog('Target variable ID for', varKey, ':', targetVariableId);
+            
+            // Finde Variable-Daten aus Cache
+            if (!window.variableDataCache || !window.variableDataCache[targetVariableId]) {
+                debugLog('Variable not found in cache for ID:', targetVariableId);
+                return;
+            }
+            
+            const variable = window.variableDataCache[targetVariableId];
+            debugLog('Found variable in cache:', variable.id, 'label:', variable.label, 'displayType:', variable.displayType);
+            
+            // Update cache based on updateType
+            if (updateType === 'rawValue') {
+                variable.rawValue = newValue;
+            } else if (updateType === 'formattedValue') {
+                variable.formattedValue = newValue;
+            }
+            
+            // Finde das DOM-Element für diese Variable
+            const variableElement = document.querySelector(`[data-variable-id="${targetVariableId}"]`);
+            
+            if (variable.displayType === 'button' && variableElement) {
+                // Button-Update
+                updateButtonDisplay(variableElement, variable);
+            } else {
+                // Text-Variable-Update (auch in Gruppen)
+                updateTextDisplay(targetVariableId, variable);
+            }
+        }
+        
+        // Hilfsfunktion für Button-Display-Update
+        function updateButtonDisplay(buttonElement, variable) {
+            debugLog('Updating button display for variable:', variable.id);
+            
+            // Aktualisiere Bool-Wert-Erkennung
+            const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+            debugLog('Button color update - isActive:', isActive, 'for value:', variable.rawValue);
+            
+            // Verwende Progress-Farben für Button-Status (Progress Color 1 für true, Progress Color 2 für false)
+            const activeColor = variable.progressColor1 || 'var(--accent-color)';
+            const inactiveColor = variable.progressColor2 || '#dc3545';
+            const currentColor = isActive ? activeColor : inactiveColor;
+            
+            // Aktualisiere Button-Style
+            buttonElement.style.backgroundColor = currentColor;
+            buttonElement.style.borderColor = currentColor;
+            
+            // Button-Inhalt zusammenstellen
+            let buttonText = '';
+            let iconHtml = '';
+            
+            // Icon-Verarbeitung für Button-Update
+            if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                const iconClass = prepareIconForDisplay(variable.icon);
+                if (iconClass) {
+                    iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                }
+            }
+            
+            let textParts = [];
+            if (variable.showIcon && iconHtml) {
+                textParts.push(iconHtml);
+            }
+            if (variable.showLabel) {
+                textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
+            }
+            if (variable.showValue) {
+                textParts.push(variable.formattedValue);
+            }
+            if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
+            }
+            
+            buttonText = textParts.join(' ');
+            if (variable.showIcon && !variable.showLabel && !variable.showValue && iconHtml) {
+                buttonText = iconHtml.replace('margin-right: 6px;', '');
+            }
+            
+            buttonElement.innerHTML = buttonText;
+            debugLog('Button updated successfully for variable:', variable.id);
+        }
+        
+        // Hilfsfunktion für Text- und Progress-Display-Update
+        function updateTextDisplay(targetVariableId, variable) {
+            debugLog('Updating display for variable:', variable.id, 'displayType:', variable.displayType);
+            
+            const container = document.getElementById('variables-container');
+            if (!container) return;
+            
+            if (variable.displayType === 'progress') {
+                // Progress-Bar-Update
+                updateProgressDisplay(targetVariableId, variable);
+            } else {
+                // Text-Variable-Update
+                updateTextVariableDisplay(targetVariableId, variable);
+            }
+        }
+        
+        // Hilfsfunktion für Progress-Bar-Update
+        function updateProgressDisplay(targetVariableId, variable) {
+            debugLog('Updating progress bar for variable:', variable.id);
+            
+            // Finde Progress-Container mit der entsprechenden Variable-ID
+            const progressContainer = document.querySelector(`[data-variable-id="${targetVariableId}"].progress-container`);
+            
+            if (!progressContainer) {
+                debugLog('Progress container not found for variable ID:', targetVariableId);
+                return;
+            }
+            
+            debugLog('Found progress container for variable:', variable.id);
+            
+            // Aktualisiere Progress-Bar-Breite
+            const progressBar = progressContainer.querySelector('.progress-bar');
+            if (progressBar) {
+                // Berechne Prozentsatz basierend auf Min/Max-Werten
+                const rawValue = parseFloat(variable.rawValue) || 0;
+                const minValue = parseFloat(variable.progressMin) || 0;
+                const maxValue = parseFloat(variable.progressMax) || 100;
+                
+                // Stelle sicher, dass maxValue > minValue
+                const range = maxValue - minValue;
+                let progressPercent = 0;
+                
+                if (range > 0) {
+                    progressPercent = Math.max(0, Math.min(100, ((rawValue - minValue) / range) * 100));
+                }
+                
+                progressBar.style.width = progressPercent + '%';
+                debugLog('Updated progress bar for variable', variable.id + ':', {
+                    rawValue: rawValue,
+                    minValue: minValue,
+                    maxValue: maxValue,
+                    progressPercent: progressPercent.toFixed(1) + '%'
+                });
+            }
+            
+            // Aktualisiere Progress-Text
+            const progressTextContainer = progressContainer.querySelector('.progress-text');
+            if (progressTextContainer) {
+                updateProgressText(progressTextContainer, variable);
+            }
+        }
+        
+        // Hilfsfunktion für Progress-Text-Update
+        function updateProgressText(progressTextContainer, variable) {
+            debugLog('Updating progress text for variable:', variable.id);
+            
+            // Progress-Bar Inhalt basierend auf Konfiguration
+            let progressIconHtml = '';
+            if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                const iconClass = prepareIconForDisplay(variable.icon);
+                if (iconClass) {
+                    progressIconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                }
+            }
+            
+            let progressTextParts = [];
+            
+            if (variable.showIcon && progressIconHtml) {
+                progressTextParts.push(progressIconHtml);
+            }
+            
+            if (variable.showLabel && variable.label) {
+                progressTextParts.push(variable.label + ':');
+            }
+            
+            if (variable.showValue) {
+                progressTextParts.push(variable.formattedValue);
+            }
+            
+            // Falls nichts konfiguriert ist, zeige Wert als Fallback
+            if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                progressTextParts.push(variable.formattedValue);
+            }
+            
+            const progressText = progressTextParts.join(' ');
+            
+            // Aktualisiere den Haupt-Text
+            const mainText = progressTextContainer.querySelector('.progress-main-text');
+            if (mainText) {
+                mainText.innerHTML = progressText;
+                debugLog('Updated progress main text to:', progressText);
+            }
+            
+            // Aktualisiere zweite Variable falls vorhanden
+            if (variable.secondVariable) {
+                const secondVariableSpan = progressTextContainer.querySelector('.progress-second-variable');
+                if (secondVariableSpan) {
+                    let secondVariableParts = [];
+                    
+                    // Icon für zweite Variable
+                    if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
+                        const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
+                        if (secondIconClass) {
+                            secondVariableParts.push(`<i class="${secondIconClass}" style="margin-right: 4px;"></i>`);
+                        }
+                    }
+                    
+                    // Label für zweite Variable
+                    if (variable.secondVariable.showLabel && variable.secondVariable.label) {
+                        secondVariableParts.push(variable.secondVariable.label + ':');
+                    }
+                    
+                    // Wert für zweite Variable
+                    if (variable.secondVariable.showValue) {
+                        secondVariableParts.push(variable.secondVariable.formattedValue);
+                    }
+                    
+                    // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                    if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
+                        secondVariableParts.push(variable.secondVariable.formattedValue);
+                    }
+                    
+                    if (secondVariableParts.length > 0) {
+                        secondVariableSpan.innerHTML = secondVariableParts.join(' ');
+                        debugLog('Updated progress second variable text to:', secondVariableParts.join(' '));
                     }
                 }
             }
         }
         
-
-
-        $this->DebugLog('Button colors for variable ' . $variableId . ': active=' . $colors['active'] . ', inactive=' . $colors['inactive']);
-        
-        return $colors;
-    }
-    
-    /**
-     * Extrahiert Min/Max-Werte aus Variablen-Profil oder Darstellung für Progress-Balken
-     * @param int $variableId Die Variable-ID
-     * @return array Array mit 'min' und 'max' Werten
-     */
-    private function GetProgressMinMax($variableId) {
-        $defaultMinMax = [
-            'min' => 0,
-            'max' => 100
-        ];
-        
-        if (!IPS_VariableExists($variableId)) {
-            $this->DebugLog('Variable ' . $variableId . ' does not exist - using default MinMax');
-            return $defaultMinMax;
-        }
-        
-        $variable = IPS_GetVariable($variableId);
-        $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-        
-        // VORAB-PRÜFUNG: Hat die Variable überhaupt ein Profil oder eine Darstellung?
-        $hasProfile = !empty($profile) && IPS_VariableProfileExists($profile);
-        
-        $hasPresentation = false;
-        if (IPS_ObjectExists($variableId)) {
-            $object = IPS_GetObject($variableId);
-            $hasPresentation = isset($object['ObjectVisualization']) && !empty($object['ObjectVisualization']);
-        }
-        
-        // WICHTIG: Prüfe auch VariableCustomPresentation (neue IP-Symcon Darstellungen)
-        $hasCustomPresentation = isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation']);
-        
-        // Wenn weder Profil noch Darstellung noch Custom Presentation vorhanden: Standard-Fallback verwenden
-        if (!$hasProfile && !$hasPresentation && !$hasCustomPresentation) {
-            $this->DebugLog('Variable ' . $variableId . ' has no profile, presentation or custom presentation - using default MinMax (0-100)');
-            return $defaultMinMax;
-        }
-        
-        $this->DebugLog('Variable ' . $variableId . ' validation: hasProfile=' . ($hasProfile ? 'true' : 'false') . ', hasPresentation=' . ($hasPresentation ? 'true' : 'false') . ', hasCustomPresentation=' . ($hasCustomPresentation ? 'true' : 'false'));
-        
-        // ERSTE PRIORITÄT: Prüfe VariableCustomPresentation (neue IP-Symcon Darstellungen)
-        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
-            $customPresentation = $variable['VariableCustomPresentation'];
-            $this->DebugLog('Found VariableCustomPresentation: ' . json_encode($customPresentation, JSON_UNESCAPED_UNICODE));
+        // Hilfsfunktion für Text-Variable-Update
+        function updateTextVariableDisplay(targetVariableId, variable) {
+            debugLog('Updating text variable for variable:', variable.id);
             
-            if (isset($customPresentation['MIN']) && isset($customPresentation['MAX'])) {
-                if (is_numeric($customPresentation['MIN']) && is_numeric($customPresentation['MAX'])) {
-                    $minMax = [
-                        'min' => floatval($customPresentation['MIN']),
-                        'max' => floatval($customPresentation['MAX'])
-                    ];
-                    
-                    $this->DebugLog('✓ SUCCESS: Progress MinMax from VariableCustomPresentation for variable ' . $variableId . ': min=' . $minMax['min'] . ', max=' . $minMax['max']);
-                    return $minMax;
-                } else {
-                    $this->DebugLog('✗ VariableCustomPresentation MIN/MAX not numeric: MIN=' . json_encode($customPresentation['MIN']) . ', MAX=' . json_encode($customPresentation['MAX']));
+            const container = document.getElementById('variables-container');
+            if (!container) return;
+            
+            // Suche nach variable-label und variable-value Elementen
+            const variableItems = container.querySelectorAll('.variable-item');
+            
+            variableItems.forEach(item => {
+                // Prüfe ob dieses Item die gesuchte Variable enthält
+                const labelSpans = item.querySelectorAll('.variable-label');
+                const valueSpans = item.querySelectorAll('.variable-value');
+                
+                // Suche nach dem Label-Text der Variable
+                let found = false;
+                labelSpans.forEach(labelSpan => {
+                    if (labelSpan.textContent.includes(variable.label)) {
+                        found = true;
+                    }
+                });
+                
+                if (found) {
+                    // Aktualisiere die Value-Spans in diesem Item
+                    valueSpans.forEach(valueSpan => {
+                        if (valueSpan.classList.contains('variable-text')) {
+                            valueSpan.textContent = variable.formattedValue;
+                            debugLog('Updated text value for variable:', variable.id, 'to:', variable.formattedValue);
+                        }
+                    });
                 }
-            } else {
-                $hasMin = isset($customPresentation['MIN']) ? 'YES (' . json_encode($customPresentation['MIN']) . ')' : 'NO';
-                $hasMax = isset($customPresentation['MAX']) ? 'YES (' . json_encode($customPresentation['MAX']) . ')' : 'NO';
-                $this->DebugLog('✗ VariableCustomPresentation missing MIN/MAX: MIN=' . $hasMin . ', MAX=' . $hasMax);
-            }
-        } else {
-            $this->DebugLog('No VariableCustomPresentation found for variable ' . $variableId);
+            });
         }
-        
-        // ZWEITE PRIORITÄT: Versuche Profil-Min/Max zu verwenden
-        if (!empty($profile) && IPS_VariableProfileExists($profile)) {
-            $profileData = IPS_GetVariableProfile($profile);
+
+        function renderStatus(data) {
+            debugLog('renderStatus called with data:', data);
+            const statusContainer = document.getElementById('status-container');
+            const root = document.documentElement;
             
-            $this->DebugLog('Checking profile "' . $profile . '" for variable ' . $variableId);
-            $this->DebugLog('Complete profile data: ' . json_encode($profileData, JSON_UNESCAPED_UNICODE));
-            
-            if (isset($profileData['MinValue']) && isset($profileData['MaxValue'])) {
-                $minMax = [
-                    'min' => floatval($profileData['MinValue']),
-                    'max' => floatval($profileData['MaxValue'])
-                ];
+            // Zeige Status-Container nur wenn Status vorhanden ist
+            if (data.status) {
+                debugLog('Rendering status:', data.status);
+                statusContainer.style.display = 'block';
+                // Bestimme Status-Farbe: verwende --content-color wenn transparent, ansonsten konfigurierte Farbe
+                const statusColor = data.isStatusColorTransparent ? 'var(--content-color)' : (data.statusColor || 'var(--content-color)');
+                statusContainer.style.setProperty('--status-color', statusColor);
+                statusContainer.style.fontSize = (data.statusFontSize || 12) + 'px';
                 
-                $this->DebugLog('✓ SUCCESS: Progress MinMax from profile "' . $profile . '" for variable ' . $variableId . ': min=' . $minMax['min'] . ', max=' . $minMax['max']);
-                return $minMax;
-            } else {
-                $hasMinValue = isset($profileData['MinValue']) ? 'YES' : 'NO';
-                $hasMaxValue = isset($profileData['MaxValue']) ? 'YES' : 'NO';
-                $this->DebugLog('✗ Profile "' . $profile . '" missing MinMax values: MinValue=' . $hasMinValue . ', MaxValue=' . $hasMaxValue);
-            }
-        } else if (!empty($profile)) {
-            $this->DebugLog('✗ Profile "' . $profile . '" does not exist or is invalid');
-        }
-        
-        // Fallback: Prüfe Darstellung/Visualisierung
-        $objectId = $variableId;
-        if (IPS_ObjectExists($objectId)) {
-            $object = IPS_GetObject($objectId);
-            $this->DebugLog('Checking object visualization for variable ' . $variableId);
-            
-            if (isset($object['ObjectVisualization']) && !empty($object['ObjectVisualization'])) {
-                $visualization = json_decode($object['ObjectVisualization'], true);
+                let statusContent = '';
                 
-                $this->DebugLog('Complete visualization data: ' . json_encode($visualization, JSON_UNESCAPED_UNICODE));
+                // Status-Inhalt basierend auf Konfiguration zusammenstellen (wie bei Textvariablen)
+                let statusParts = [];
                 
-                if (is_array($visualization)) {
-                    // Erweiterte Suche nach Min/Max in allen möglichen Feldern
-                    $possibleMinFields = ['MinValue', 'MinimalerWert', 'Minimum', 'Min', 'minValue', 'min'];
-                    $possibleMaxFields = ['MaxValue', 'MaximalerWert', 'Maximum', 'Max', 'maxValue', 'max'];
-                    
-                    $foundMin = null;
-                    $foundMax = null;
-                    $minFieldName = null;
-                    $maxFieldName = null;
-                    
-                    // Suche alle möglichen Min-Felder
-                    foreach ($possibleMinFields as $field) {
-                        if (isset($visualization[$field]) && is_numeric($visualization[$field])) {
-                            $foundMin = floatval($visualization[$field]);
-                            $minFieldName = $field;
-                            $this->DebugLog('🔍 Found Min field "' . $field . '" with value: ' . $foundMin);
-                            break;
-                        }
+                // Icon für Status-Bereich (wenn konfiguriert)
+                if (data.statusShowIcon && data.statusIcon && data.statusIcon !== 'Transparent') {
+                    const iconClass = prepareIconForDisplay(data.statusIcon);
+                    if (iconClass) {
+                        statusParts.push(`<i class="${iconClass}" style="color: var(--status-color); margin-right: 4px;"></i>`);
+                        debugLog('Status icon rendered:', data.statusIcon, '→', iconClass);
                     }
+                }
+                
+                // Label für Status-Bereich (wenn konfiguriert)
+                if (data.statusShowLabel) {
+                    const label = data.statusLabel || 'Status'; // Fallback zu "Status" wenn kein Custom Label
+                    statusParts.push(`<span class="status-label" style="color: var(--status-color);">${label}:</span>`);
+                }
+                
+                // Wert für Status-Bereich (wenn konfiguriert)
+                if (data.statusShowValue) {
+                    statusParts.push(`<span class="status-value" style="color: var(--status-color);">${data.status}</span>`);
+                }
+                
+                // Fallback: Falls nichts konfiguriert ist, zeige Wert
+                if (!data.statusShowIcon && !data.statusShowLabel && !data.statusShowValue) {
+                    statusParts.push(`<span class="status-value" style="color: var(--status-color);">${data.status}</span>`);
+                }
+                
+                statusContent = statusParts.join(' ');
+                
+                // Gerätebild wird separat im div1 Container angezeigt, nicht im Status
+                if (data.statusBildauswahl) {
+                    const imageUrl = window.assets[`img_${data.statusBildauswahl}`];
+                    debugLog('Looking for image:', data.statusBildauswahl, 'Found URL:', imageUrl);
+                    const deviceImgContainer = document.getElementById('div1');
+                    const deviceImg = document.getElementById('image');
                     
-                    // Suche alle möglichen Max-Felder
-                    foreach ($possibleMaxFields as $field) {
-                        if (isset($visualization[$field]) && is_numeric($visualization[$field])) {
-                            $foundMax = floatval($visualization[$field]);
-                            $maxFieldName = $field;
-                            $this->DebugLog('🔍 Found Max field "' . $field . '" with value: ' . $foundMax);
-                            break;
-                        }
-                    }
-                    
-                    // Verwende gefundene Min/Max-Werte
-                    if ($foundMin !== null && $foundMax !== null) {
-                        $minMax = [
-                            'min' => $foundMin,
-                            'max' => $foundMax
-                        ];
-                        
-                        $this->DebugLog('✓ SUCCESS: Progress MinMax from visualization for variable ' . $variableId . ': min=' . $minMax['min'] . ', max=' . $minMax['max'] . ' (using fields: "' . $minFieldName . '", "' . $maxFieldName . '")');
-                        return $minMax;
+                    if (imageUrl && deviceImg && deviceImgContainer) {
+                        deviceImg.src = imageUrl;
+                        deviceImgContainer.classList.remove('hidden');
+                        deviceImgContainer.classList.add('div1');
+                        debugLog('Device image added:', imageUrl);
                     } else {
-                        $hasMinValue = isset($visualization['MinValue']) ? 'YES (' . $visualization['MinValue'] . ')' : 'NO';
-                        $hasMaxValue = isset($visualization['MaxValue']) ? 'YES (' . $visualization['MaxValue'] . ')' : 'NO';
-                        $this->DebugLog('✗ Visualization missing direct MinMax: MinValue=' . $hasMinValue . ', MaxValue=' . $hasMaxValue);
+                        debugLog('No image URL found for:', data.statusBildauswahl);
+                        if (deviceImgContainer) {
+                            deviceImgContainer.classList.add('hidden');
+                            deviceImgContainer.classList.remove('div1');
+                        }
+                    }
+                }
+                
+                statusContainer.innerHTML = statusContent;
+            } else {
+                statusContainer.style.display = 'none';
+            }
+        }
+
+        function renderVariables(variables) {
+            if (!variables || !Array.isArray(variables)) return;
+            
+            const container = document.getElementById('variables-container');
+            if (!container) return;
+            
+            // Cache die Variablen-Daten für spätere Re-Rendering
+            window.cachedVariables = variables;
+            
+            // Erstelle Mapping zwischen var_X und Variable-ID
+            window.varKeyToIdMapping = {};
+            window.variableDataCache = {};
+            
+            debugLog('renderVariables called with:', variables);
+            
+            // Track welche Gruppen bereits gerendert wurden
+            const renderedGroups = new Set();
+            let content = '';
+            
+            // Gehe durch Variablen in ORIGINALER REIHENFOLGE
+            variables.forEach((variable, index) => {
+                // Erstelle Mapping (var_0, var_1, var_2, etc.)
+                const varKey = 'var_' + index;
+                window.varKeyToIdMapping[varKey] = variable.id;
+                window.variableDataCache[variable.id] = variable;
+                debugLog('Mapping created: ' + varKey + ' → ' + variable.id, 'renderVariables');
+                debugLog('Processing variable: ' + JSON.stringify(variable), 'renderVariables');
+                debugLog('  - displayType: ' + variable.displayType, 'renderVariables');
+                debugLog('  - group: ' + variable.group, 'renderVariables');
+                
+                // Prüfe ob Variable gruppiert ist - ABER: Progress-Balken werden nie gruppiert
+                if (variable.group && variable.group !== 'keine Gruppe' && variable.group.trim() !== '' && variable.displayType !== 'progress') {
+                    // Nur rendern wenn Gruppe noch nicht gerendert wurde
+                    if (!renderedGroups.has(variable.group)) {
+                        renderedGroups.add(variable.group);
+                        
+                        // Sammle alle Variablen dieser Gruppe - OHNE Progress-Balken
+                        const groupVariables = variables.filter(v => 
+                            v.group === variable.group && v.group !== 'keine Gruppe' && v.group.trim() !== '' && v.displayType !== 'progress'
+                        );
+                        
+                        debugLog('Rendering group: ' + variable.group + ' with ' + groupVariables.length + ' variables', 'renderVariables');
+                        
+                        // Prüfe ob eine Variable in der Gruppe showBorderLine aktiviert hat
+                        const groupHasBorderLine = groupVariables.some(v => v.showBorderLine && v.displayType === 'text');
+                        const groupCssClasses = groupHasBorderLine ? 'variable-group with-border-line' : 'variable-group';
+                        
+                        content += `
+                            <div class="${groupCssClasses}" style="margin-bottom: var(--element-spacing, 8px); margin-top: var(--element-spacing, 8px);">
+                                <div class="variable-group-items" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+                        `;
+                        
+                        groupVariables.forEach(groupVar => {
+                            content += `<div class="variable-group-item">`;
+                            content += renderSingleVariable(groupVar, true); // true = isGrouped
+                            content += `</div>`;
+                        });
+                        
+                        content += `
+                                </div>
+                            </div>
+                        `;
+                    }
+                    // Andernfalls überspringen (Gruppe bereits gerendert)
+                } else {
+                    // Ungrouped variable - sofort rendern
+                    content += renderSingleVariable(variable);
+                }
+            });
+            
+            debugLog('Rendered groups:', Array.from(renderedGroups));
+            container.innerHTML = content;
+        }
+        
+        // Hilfsfunktion zum Rendern einer einzelnen Variable
+        function renderSingleVariable(variable, isGrouped = false) {
+            let content = '';
+            
+            // Spezialbehandlung für Progress-Balken: Niemals inline, auch nicht in Gruppen
+            const isProgressBar = variable.displayType === 'progress';
+            
+            // Wrapper-Stil je nach Kontext (grouped oder ungrouped) - Progress-Balken immer full-width
+            const wrapperStyle = (isGrouped && !isProgressBar) ? 
+                `display: inline-flex; align-items: center; margin: 0; white-space: nowrap; font-size: ${variable.fontSize}px; color: ${getTextColor(variable)};` : 
+                `font-size: ${variable.fontSize}px; color: ${getTextColor(variable)};`;
+                
+            // CSS-Klassen für Variable zusammenstellen
+            let cssClasses = 'variable-item';
+            if (variable.displayType === 'text') {
+                cssClasses += ' text-variable';
+            }
+            // Füge border-line Klasse hinzu wenn konfiguriert UND NICHT gruppiert
+            // Bei gruppierten Variablen zeigt nur die Gruppe die Linie, nicht die einzelnen Variablen
+            if (variable.showBorderLine && variable.displayType === 'text' && !isGrouped) {
+                cssClasses += ' with-border-line';
+            }
+                
+            content += `<div class="${cssClasses}" style="${wrapperStyle}">`;
+
+                // Wert je nach Darstellungstyp hinzufügen
+                if (variable.displayType === 'progress') {
+                    // Fortschrittsbalken - nutze zentrale Konfiguration
+                    // Berechne Prozentsatz basierend auf Min/Max-Werten
+                    const rawValue = parseFloat(variable.rawValue) || 0;
+                    const minValue = parseFloat(variable.progressMin) || 0;
+                    const maxValue = parseFloat(variable.progressMax) || 100;
+                    
+                    // Stelle sicher, dass maxValue > minValue
+                    const range = maxValue - minValue;
+                    let progressValue = 0;
+                    
+                    if (range > 0) {
+                        progressValue = Math.max(0, Math.min(100, ((rawValue - minValue) / range) * 100));
                     }
                     
-                    // Fallback: Extrahiere Min/Max aus ValueMappings
-                    if (isset($visualization['ValueMappings']) && is_array($visualization['ValueMappings'])) {
-                        $this->DebugLog('Checking ValueMappings (' . count($visualization['ValueMappings']) . ' entries)');
+                    debugLog('Progress bar calculation for variable', variable.id + ':', {
+                        rawValue: rawValue,
+                        minValue: minValue,
+                        maxValue: maxValue,
+                        progressPercent: progressValue.toFixed(1) + '%'
+                    });
+                    
+                    // Progress-Bar Inhalt basierend auf Konfiguration
+                    let progressIconHtml = '';
+                    if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                        const iconClass = prepareIconForDisplay(variable.icon);
+                        if (iconClass) {
+                            progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`;
+                        }
+                    }
+                    
+                    let progressTextParts = [];
+                    
+                    if (variable.showIcon && progressIconHtml) {
+                        progressTextParts.push(progressIconHtml);
+                    }
+                    
+                    if (variable.showLabel && variable.label) {
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.label}:&nbsp;</span>`);
+                    }
+                    
+                    if (variable.showValue) {
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                    }
+                    
+                    // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                    if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                    }
+                    
+                    const progressText = progressTextParts.join('');
+                    
+                    // Zweite Variable für rechte Seite vorbereiten
+                    let secondVariableText = '';
+                    if (variable.secondVariable) {
+                        let secondVariableParts = [];
                         
-                        $values = [];
-                        foreach ($visualization['ValueMappings'] as $index => $mapping) {
-                            if (isset($mapping['Value']) && is_numeric($mapping['Value'])) {
-                                $value = floatval($mapping['Value']);
-                                $values[] = $value;
-                                $this->DebugLog('  ValueMapping[' . $index . ']: Value=' . $value . (isset($mapping['Caption']) ? ' (Caption: "' . $mapping['Caption'] . '")' : ''));
-                            } else {
-                                $this->DebugLog('  ValueMapping[' . $index . ']: Skipped - no numeric Value (' . json_encode($mapping, JSON_UNESCAPED_UNICODE) . ')');
+                        // Icon für zweite Variable
+                        if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
+                            const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
+                            if (secondIconClass) {
+                                secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
                             }
                         }
                         
-                        if (count($values) > 0) {
-                            $minMax = [
-                                'min' => min($values),
-                                'max' => max($values)
-                            ];
-                            
-                            $this->DebugLog('✓ SUCCESS: Progress MinMax from ValueMappings for variable ' . $variableId . ': min=' . $minMax['min'] . ', max=' . $minMax['max'] . ' (from ' . count($values) . ' values: ' . implode(', ', $values) . ')');
-                            return $minMax;
-                        } else {
-                            $this->DebugLog('✗ No numeric values found in ValueMappings');
+                        // Label für zweite Variable
+                        if (variable.secondVariable.showLabel && variable.secondVariable.label) {
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.secondVariable.label}:&nbsp;</span>`);
                         }
+                        
+                        // Wert für zweite Variable
+                        if (variable.secondVariable.showValue) {
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                        }
+                        
+                        // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                        if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                        }
+                        
+                        if (secondVariableParts.length > 0) {
+                            secondVariableText = `<span class="progress-second-variable">${secondVariableParts.join(' ')}</span>`;
+                            debugLog('Second variable for progress bar:', variable.secondVariable.id, '→', secondVariableParts.join(' '));
+                        }
+                    }
+                    
+                    // Berechne dynamische Progress-Bar-Höhe basierend auf fontSize
+                    // Verwende --progress-bar-height als Minimum (Standard: 20px)
+                    const minHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--progress-bar-height')) || 20;
+                    const dynamicHeight = Math.max(minHeight, variable.fontSize * 1.7);
+                    
+                    content += `
+                        <div class="variable-progress">
+                            <div class="progress-container" data-variable-id="${variable.id}" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; height: ${dynamicHeight}px;">
+                                <div class="progress-bar" style="width: ${progressValue}%;"></div>
+                                <div class="progress-text">
+                                    <span class="progress-main-text">${progressText}</span>
+                                    ${secondVariableText}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (variable.displayType === 'button') {
+                    // Button nur für Bool-Variablen (VARIABLETYPE_BOOLEAN = 0)
+                    if (variable.variableType === 0) {
+                        // Erweiterte Bool-Wert-Erkennung
+                        const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+                        
+                        // Verwende Progress-Farben für Button-Status (Progress Color 1 für true, Progress Color 2 für false)
+                        const activeColor = variable.progressColor1 || '#28a745';
+                        const inactiveColor = variable.progressColor2 || '#dc3545';
+                        const currentColor = isActive ? activeColor : inactiveColor;
+                        
+                        // Button-Inhalt basierend auf allgemeiner Konfiguration
+                        const buttonWidth = variable.buttonWidth || 120;
+                        
+                        let buttonText = '';
+                        let iconHtml = '';
+                        
+                        // Icon-Verarbeitung für Button
+                        if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                            const iconClass = prepareIconForDisplay(variable.icon);
+                            if (iconClass) {
+                                iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                            }
+                        }
+                        
+                        // Button-Inhalt basierend auf allgemeiner Konfiguration zusammenstellen
+                        let textParts = [];
+                        
+                        if (variable.showIcon && iconHtml) {
+                            textParts.push(iconHtml);
+                        }
+                        
+                        if (variable.showLabel) {
+                            if (variable.showValue) {
+                                // Doppelpunkt nur wenn auch Value angezeigt wird - Label fett
+                                textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}:&nbsp;</span>`);
+                            } else {
+                                // Kein Doppelpunkt wenn nur Label - Label fett
+                                textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}</span>`);
+                            }
+                        }
+                        
+                        if (variable.showValue) {
+                            textParts.push(`<span style="font-weight: normal;">${variable.formattedValue}</span>`);
+                        }
+                        
+                        // Falls keine Checkbox aktiviert ist, zeige Label als Fallback (ohne Doppelpunkt) - fett
+                        if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                            textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}</span>`);
+                        }
+                        
+                        buttonText = textParts.join(' ');
+                        
+                        // Spezielle Behandlung für nur Icon (ohne Abstand)
+                        if (variable.showIcon && !variable.showLabel && !variable.showValue && iconHtml) {
+                            buttonText = iconHtml.replace('margin-right: 6px;', '');
+                        }
+                        
+                        // Debug-Ausgaben
+                        debugLog('Button Debug for variable: ' + variable.id, 'renderSingleVariable');
+                        debugLog('  - showIcon: ' + variable.showIcon, 'renderSingleVariable');
+                        debugLog('  - showLabel: ' + variable.showLabel, 'renderSingleVariable');
+                        debugLog('  - showValue: ' + variable.showValue, 'renderSingleVariable');
+                        debugLog('  - buttonWidth: ' + buttonWidth, 'renderSingleVariable');
+                        debugLog('  - isActive: ' + isActive, 'renderSingleVariable');
+                        debugLog('  - activeColor: ' + activeColor, 'renderSingleVariable');
+                        debugLog('  - inactiveColor: ' + inactiveColor, 'renderSingleVariable');
+                        debugLog('  - currentColor: ' + currentColor, 'renderSingleVariable');
+                        debugLog('  - buttonText: ' + buttonText, 'renderSingleVariable');
+                        
+                        content += `
+                            <div class="variable-button-container">
+                                <button class="variable-button" 
+                                        onclick="requestAction('${variable.id}', 1); debugLog('Button clicked for variable: ${variable.id}');" 
+                                        data-variable-id="${variable.id}"
+                                        style="background-color: ${currentColor} !important; border-color: ${currentColor} !important; color: ${getTextColor(variable)} !important; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                    ${buttonText}
+                                </button>
+                            </div>
+                        `;
+                        
+                        debugLog('  - FINAL: Button rendered with color:', currentColor, 'width:', buttonWidth + 'px');
                     } else {
-                        $hasValueMappings = isset($visualization['ValueMappings']) ? 'YES (not array)' : 'NO';
-                        $this->DebugLog('✗ No usable ValueMappings found: ' . $hasValueMappings);
+                        // Fallback für Nicht-Bool-Variablen: Zeige als Text mit Konfiguration
+                        console.warn('Button display type only supported for boolean variables. Variable', variable.id, 'is type', variable.variableType);
+                        
+                        let textParts = [];
+                        
+                        if (variable.showLabel && variable.label) {
+                            textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${variable.label}:&nbsp;</span>`);
+                        }
+                        
+                        if (variable.showValue) {
+                            textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                        }
+                        
+                        // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                        if (!variable.showLabel && !variable.showValue) {
+                            textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                        }
+                        
+                        content += `<div class="variable-item">
+                            ${textParts.join(' ')}
+                        </div>`;
                     }
                 } else {
-                    $this->DebugLog('✗ Visualization data is not a valid array');
+                    // Bei Textdarstellung: Label und Wert basierend auf Konfiguration
+                    let textParts = [];
+                    
+                    // Icon für Text-Variablen
+                    if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                        const iconClass = prepareIconForDisplay(variable.icon);
+                        if (iconClass) {
+                            textParts.push(`<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
+                            debugLog(`Text variable icon rendered: ${variable.label}: ${variable.icon} → ${iconClass}`);
+                        }
+                    }
+                    
+                    if (variable.showLabel && variable.label) {
+                        textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${variable.label}:&nbsp;</span>`);
+                    }
+                    
+                    if (variable.showValue) {
+                        textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                    }
+                    
+                    // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                    if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                        textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                    }
+                    
+                    content += textParts.join('');
                 }
-            } else {
-                $this->DebugLog('✗ No ObjectVisualization found for variable ' . $variableId);
-            }
-        } else {
-            $this->DebugLog('✗ Object ' . $variableId . ' does not exist');
+
+                content += `</div>`; // Schließe variable-item div
+                
+            return content;
         }
-        
-        $this->DebugLog('Variable ' . $variableId . ' has profile/presentation but no usable MinMax values found - using default MinMax (0-100)');
-        return $defaultMinMax;
-    }
-    
-    
-}
-?>
+
+    </script>
+
+
+</head>
+
+<body>
+    <div class="main_container">
+        <div id="div1" class="hidden">
+            <img id="image" alt="Device Image">
+        </div>
+        <div class="div2" id="div2">
+            <div id="status-container" class="status-container" style="display: none;">
+                <!-- Status wird hier angezeigt -->
+            </div>
+            <div id="variables-container">
+                <!-- Dynamische Variablen werden hier eingefügt -->
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
