@@ -318,9 +318,9 @@
             
             // Füge fa-light Präfix hinzu wenn nötig
             if (!iconClass.startsWith('fa-')) {
-                iconClass = 'fa-light fa-' + iconClass;
+                iconClass = 'fa-fw fa-light fa-' + iconClass;
             } else if (!iconClass.startsWith('fa-light ')) {
-                iconClass = 'fa-light ' + iconClass;
+                iconClass = 'fa-fw fa-light ' + iconClass;
             }
             
             debugLog('Prepared icon for display: ' + iconName + ' → ' + iconClass, 'prepareIconForDisplay');
@@ -356,7 +356,10 @@
             
             root.style.setProperty('--progress-bar-bg-color', rgbaColor);
             root.style.setProperty('--progress-bar-bg-opacity', '1'); // Opacity bereits in rgba enthalten
-            root.style.setProperty('--progress-bar-text-padding', config.textPadding + 'px');
+            // Dynamisches Padding basierend auf Textgröße: Padding = fontSize / 2
+            const fontSize = parseInt(getComputedStyle(document.documentElement).fontSize) || 12;
+            const dynamicPadding = Math.max(4, Math.round(fontSize / 1)); // Minimum 4px
+            root.style.setProperty('--progress-bar-text-padding', dynamicPadding + 'px');
             root.style.setProperty('--progress-bar-show-text', config.showText ? 'flex' : 'none');
         }
 
@@ -1008,9 +1011,12 @@
                     }
                     
                   
+                    // Berechne individuelles Padding basierend auf Variable-Textgröße
+                    const individualPadding = Math.max(4, Math.round(variable.fontSize / 2)); // Minimum 4px
+                    
                     content += `
                         <div class="variable-progress">
-                            <div class="progress-container" data-variable-id="${variable.id}" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; ">
+                            <div class="progress-container" data-variable-id="${variable.id}" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; --progress-bar-text-padding: ${individualPadding}px;">
                                 <div class="progress-bar" style="width: ${progressValue}%;"></div>
                                 <div class="progress-text">
                                     <span class="progress-main-text">${progressText}</span>
