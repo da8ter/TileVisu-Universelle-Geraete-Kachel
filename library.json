@@ -1,0 +1,12 @@
+{
+    "id": "{8DAA1BBE-F8E3-8E26-1CFB-7BED58D0AAB5}",
+    "name": "Universal Device Tile",
+    "author": "Stephan Sprick",
+    "url": "https://github.com/da8ter/TileVisu-Kachelsammlung.git",
+    "compatibility": {
+        "version": "7.2"
+    },
+    "version": "1.0.0",
+    "build": 0,
+    "date": 0
+}

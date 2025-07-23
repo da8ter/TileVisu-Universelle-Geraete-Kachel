@@ -1,0 +1,12 @@
+{
+    "id": "{480F194A-5104-2F41-6CE8-8444D96D67BE}",
+    "name": "Universal Device Tile",
+    "type": 3,
+    "vendor": "",
+    "aliases": [],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "UDST",
+    "url": "https://github.com/da8ter/TileVisu-Geraete-Status-Kachel/blob/main/GeraeteStatus/README.md"
+}

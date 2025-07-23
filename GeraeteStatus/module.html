@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <script src="/icons.js" crossorigin="anonymous"></script>
+
+    <style>
+        /* Grundlegende Stildefinitionen für die neue dynamische Variablenliste */
+
+        :root {
+            --bildbreite: 40%;
+            --bildtransparenz: 1;
+            --hintergrundfarbe: rgba(255, 255, 255, 0.95);
+            --element-spacing: 8px; /* Einheitlicher vertikaler Abstand zwischen allen Elementen */
+        }
+
+        html {
+            background-color: var(--hintergrundfarbe);
+            overflow: hidden;
+        }
+
+        body:before {
+            content: '';
+            display: block;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background-repeat: no-repeat;
+            background-size: cover;
+            opacity: var(--bildtransparenz);
+            background: var(--background-image, none) center / cover no-repeat;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .visible {
+            display: block;
+        }
+
+        .main_container {
+            width: 100%;
+            max-width: 100%;
+            display: flex;
+            flex-wrap: nowrap;
+            font-size: 12px;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .div1 {
+            width: var(--bildbreite);
+            box-sizing: border-box;
+            border-right: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding: 0px 2.5% 5px 0px;
+        }
+
+        .div1 img {
+            width: 100%;
+        }
+
+        .div2 {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0px 5px 5px 2.5%;
+            margin: 0px 0px 0px 0px;
+            border-radius: 0px;
+        }
+
+        /* Styles für dynamische Variablen */
+        .variables-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .variable-item {
+            margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung aller Inhalte */
+            justify-content: flex-start; /* Horizontale Ausrichtung */
+            width: 100%;
+            min-height: 15px; /* Reduzierte Mindesthöhe für kompaktere Darstellung */
+        }
+        
+        /* Für gruppierte Variablen: Kein width: 100% damit sie nebeneinander passen */
+        .variable-group-item .variable-item {
+            width: auto;
+            margin-bottom: 0;
+            margin-top: 0;
+        }
+        
+        /* AUSNAHME: Progress-Balken brauchen volle Breite, auch in Gruppen */
+        .variable-group-item .variable-item .progress-container {
+            width: 100%;
+        }
+        
+        /* AUSNAHME: Progress-Bar-Container brauchen volle Breite */
+        .variable-group-item .variable-progress {
+            width: 100%;
+            min-width: 100%;
+        }
+        
+        /* Für gruppierte Variablen: Kein min-width bei Labels für kompakte Darstellung */
+        .variable-group-item .variable-label {
+            min-width: auto;
+        }
+
+        .variable-icon {
+            margin-right: 5px;
+            display: inline-block;
+            vertical-align: baseline;
+            flex-shrink: 0;
+        }
+
+        .variable-label {
+            font-weight: bold;
+            min-width: 0px;  /* Feste Breite für Labels */
+            flex-shrink: 0;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Labels */
+        }
+
+        .variable-value {
+            flex-grow: 1;
+            text-align: left;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Values */
+        }
+
+        /* Fortschrittsbalken-Styles - verwende zentrale Konfiguration */
+        .progress-container {
+            margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            width: 100%;
+            height: var(--progress-bar-height, 20px);
+            background-color: var(--progress-bar-bg-color, rgba(135, 135, 135, 0.3));
+            border-radius: var(--progress-bar-border-radius, 10px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: var(--progress-bar-border-radius, 10px) 0 0 var(--progress-bar-border-radius, 10px);
+            transition: width 0.3s ease;
+            background: linear-gradient(to right, var(--progress-color1), var(--progress-color2));
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 1px;
+            left: 0;
+            right: 0;
+            bottom: -1px;
+            z-index: 2;
+            color: #ffffff;
+            display: var(--progress-bar-show-text, flex);
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 var(--progress-bar-text-padding, 12px);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .progress-main-text {
+            flex: 1;
+            text-align: left;
+            margin-right: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .progress-second-variable {
+            flex-shrink: 0;
+            text-align: right;
+            margin-left: 8px;
+        }
+
+        /* Spezielle Ausrichtung für Icons in Progress-Balken */
+        .progress-text .variable-icon {
+            vertical-align: text-bottom;
+            align-self: center;
+            display: inline-flex;
+            align-items: center;
+            transform: translateY(-1px); /* Icon 1px höher */
+        }
+
+        .no-wrap {
+            white-space: nowrap;
+        }
+
+        /* Spezielle Styles für verschiedene Variablentypen */
+        .variable-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Text-Variablen: 5px mehr Top- und Bottom-Margin als andere Darstellungen */
+        .variable-text {
+            margin: calc(var(--element-spacing, 8px) ) 0;
+        }
+        
+        /* Optionale Grenzlinie unter Textvariablen */
+        .variable-item.with-border-line {
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-bottom: 0px;
+            margin-bottom: 0px;
+        }
+        
+        /* Für Gruppen mit Grenzlinie */
+        .variable-group.with-border-line {
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-bottom: 0px;
+            margin-bottom: 0px;
+        }
+        
+        /* Spezifische Regel für gruppierte Text-Variablen: Überschreibt die 0-Margin-Regel */
+        .variable-group-item .variable-item.text-variable {
+            margin-bottom: 0px; /* +5px mehr Abstand auch für gruppierte */
+            margin-top: 0px; /* +5px mehr Abstand auch für gruppierte */
+        }
+
+        .variable-progress {
+            width: 100%;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Progress-Balken */
+        }
+
+        .variable-button-container {
+            margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            margin-top: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Button-Container */
+            width: 100%;
+        }
+
+        /* Button-Styles für Bool-Variablen */
+        .variable-button {
+            display: inline-flex;
+            align-items: center;
+            height: var(--progress-bar-height, 20px);
+            padding: 0 12px;
+            border: 2px solid #ccc;
+            border-radius: var(--progress-bar-border-radius, 10px);
+            background-color: #f8f9fa;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: inherit;
+            font-weight: 500;
+            user-select: none;
+            min-width: 80px;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .variable-button:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .variable-button.active {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            color: white;
+        }
+
+        .variable-button.active:hover {
+            background-color: #218838;
+            border-color: #1e7e34;
+        }
+
+        .variable-button.inactive {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+
+        .variable-button.inactive:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+        }
+
+        /* Status-Bereich Styles */
+        .status-container {
+            margin-bottom: var(--element-spacing, 8px);
+            padding: 5px 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+        }
+
+        .status-label {
+            font-weight: bold;
+            margin-right: 0px;
+        }
+
+        .status-value {
+            color: var(--status-color, #000000);
+        }
+
+        .status-icon {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+        }
+    </style>
+
+    <script>
+        // Globale Debug-Steuerung für Frontend
+        let debugEnabled = false; // Wird über handleMessage gesetzt
+        
+        /**
+         * Zentrale Debug-Funktion für Frontend - alle Debug-Ausgaben laufen über diese Funktion
+         * @param {string} message Debug-Nachricht
+         * @param {string} category Optional: Kategorie für bessere Übersicht
+         */
+        function debugLog(message, category = 'TileVisu Frontend') {
+            if (debugEnabled) {
+                console.log(`[${category}] ${message}`);
+            }
+        }
+        
+        // Icons werden direkt vom Server gemappt, wir müssen nur noch die richtigen CSS-Klassen hinzufügen
+        
+        // Bereite ein Icon für die Verwendung im Frontend vor
+        function prepareIconForDisplay(iconName) {
+            // Wenn kein Icon oder leerer String, nichts zurückgeben
+            if (!iconName || iconName === 'Transparent' || iconName === '') {
+                return '';
+            }
+            
+            // Das Icon wurde bereits auf dem Server gemappt, wir müssen nur sicherstellen
+            // dass das richtige Präfix vorhanden ist
+            let iconClass = iconName;
+            
+            // Füge fa-light Präfix hinzu wenn nötig
+            if (!iconClass.startsWith('fa-')) {
+                iconClass = 'fa-light fa-' + iconClass;
+            } else if (!iconClass.startsWith('fa-light ')) {
+                iconClass = 'fa-light ' + iconClass;
+            }
+            
+            debugLog('Prepared icon for display: ' + iconName + ' → ' + iconClass, 'prepareIconForDisplay');
+            return iconClass;
+        }
+        
+        // Hilfsfunktion zur Bestimmung der Textfarbe
+        function getTextColor(variable) {
+            // Verwende --content-color wenn TextColor transparent ist, ansonsten die konfigurierte Farbe
+            if (variable.isTextColorTransparent) {
+                return 'var(--content-color)';
+            }
+            return variable.textColor;
+        }
+
+        function updateProgressBarStyles(config) {
+            debugLog('Updating progress bar styles with config:', config);
+            const root = document.documentElement;
+            
+            // Setze CSS-Variablen für die zentrale Konfiguration
+            root.style.setProperty('--progress-bar-height', config.height + 'px');
+            root.style.setProperty('--progress-bar-border-radius', config.borderRadius + 'px');
+            
+            // Konvertiere Hintergrundfarbe zu rgba mit Transparenz
+            const bgColor = config.backgroundColor;
+            const opacity = config.backgroundOpacity;
+            
+            // Extrahiere RGB-Werte aus Hex-Farbe
+            const r = parseInt(bgColor.substr(1, 2), 16);
+            const g = parseInt(bgColor.substr(3, 2), 16);
+            const b = parseInt(bgColor.substr(5, 2), 16);
+            const rgbaColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            
+            root.style.setProperty('--progress-bar-bg-color', rgbaColor);
+            root.style.setProperty('--progress-bar-bg-opacity', '1'); // Opacity bereits in rgba enthalten
+            root.style.setProperty('--progress-bar-text-padding', config.textPadding + 'px');
+            root.style.setProperty('--progress-bar-show-text', config.showText ? 'flex' : 'none');
+        }
+
+        function handleMessage(data) {
+            debugLog('handleMessage called with raw data: ' + data, 'handleMessage');
+            const decodedData = JSON.parse(data);
+            debugLog('Decoded data: ' + JSON.stringify(decodedData), 'handleMessage');
+            const root = document.documentElement;
+            
+            // Setze InstanceID für RequestAction-Aufrufe
+            if (decodedData.instanceid) {
+                window.InstanceID = decodedData.instanceid;
+                debugLog('Set window.InstanceID to: ' + window.InstanceID, 'handleMessage');
+            }
+
+            // Verarbeite die neuen Parameter
+            for (const parameter in decodedData) {
+                const value = decodedData[parameter];
+                debugLog('Processing parameter: ' + parameter + ' with value: ' + value, 'handleMessage');
+                
+                switch (parameter.toLowerCase()) {
+                    case 'debugenabled':
+                        debugEnabled = value;
+                        debugLog('Debug mode ' + (value ? 'enabled' : 'disabled'), 'Debug System');
+                        break;
+                    case 'elementspacing':
+                        // Setze CSS-Variable für element-spacing
+                        root.style.setProperty('--element-spacing', value + 'px');
+                        debugLog('Set element-spacing to: ' + value + 'px', 'handleMessage');
+                        break;
+                        
+                    case 'status':
+                    case 'statusvalue':
+                    case 'statuscolor':
+                    case 'statusbildauswahl':
+                    case 'statusschriftgroesse':
+                        renderStatus(decodedData);
+                        break;
+                    case 'variables':
+                        renderVariables(value);
+                        break;
+                    case 'progressbarconfig':
+                        updateProgressBarStyles(value);
+                        // Nach Progress-Config-Update, re-render Variables wenn nötig
+                        if (window.lastVariablesData) {
+                            renderVariables(window.lastVariablesData);
+                        }
+                        break;
+                    case 'bildbreite':
+                        root.style.setProperty('--bildbreite', value + '%');
+                        const div1 = document.getElementById('div1');
+                        const div2 = document.getElementById('div2');
+                        if (value !== 0) {
+                            div1.className = 'div1';
+                        } else {
+                            div1.className = 'hidden';
+                            div2.style.padding = '0px 5px 5px 0px';
+                        }
+                        break;
+                    case 'bildtransparenz':
+                        root.style.setProperty('--bildtransparenz', value);
+                        break;
+                    case 'kachelhintergrundfarbe':
+                        if (value === '#FFFFFFFFFFFFFFFF') {
+                            root.style.setProperty('--hintergrundfarbe', 'rgba(0, 0, 0, 0)');
+                        } else {
+                            root.style.setProperty('--hintergrundfarbe', value);
+                        }
+                        break;
+                    case 'image1':
+                        const mainDiv = document.querySelector('body');
+                        mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
+                        break;
+                    default:
+                        debugLog('Processing parameter: ' + parameter + ' with value: ' + value, 'handleMessage');
+                        // Prüfe auf Variable-Updates (Parameter endet mit '_value')
+                        if (parameter.endsWith('_value')) {
+                            debugLog('Variable value update detected: ' + parameter + ' = ' + value, 'handleMessage');
+                            
+                            // Extrahiere Variable-ID aus Parameter (z.B. 'var_3_value' -> 'var_3')
+                            const varKey = parameter.replace('_value', '');
+                            debugLog('Looking for button with variable key:', varKey);
+                            
+                            // Aktualisiere rawValue im Cache
+                            if (window.variableDataCache) {
+                                const targetVariableId = window.varKeyToIdMapping?.[varKey];
+                                if (targetVariableId && window.variableDataCache[targetVariableId]) {
+                                    window.variableDataCache[targetVariableId].rawValue = value;
+                                    debugLog('Updated raw value in cache for variable:', targetVariableId);
+                                }
+                            }
+                            
+                            // Aktualisiere die entsprechende Variable (Button oder Text)
+                            updateVariable(varKey, value, 'rawValue');
+                        }
+                        // Prüfe auf formatierte Werte (Parameter ist z.B. 'var_3')
+                        else {
+                            debugLog('  - startsWith("var_"):', parameter.startsWith('var_'));
+                            debugLog('  - endsWith("_value"):', parameter.endsWith('_value'));
+                            debugLog('  - !endsWith("_value"):', !parameter.endsWith('_value'));
+                            debugLog('  - both conditions:', parameter.startsWith('var_') && !parameter.endsWith('_value'));
+                            if (parameter.startsWith('var_') && !parameter.endsWith('_value')) {
+                                debugLog('Formatted value update detected:', parameter, '=', value);
+                            
+                            // Aktualisiere formatierte Werte im Cache
+                            if (window.variableDataCache) {
+                                const targetVariableId = window.varKeyToIdMapping?.[parameter];
+                                if (targetVariableId && window.variableDataCache[targetVariableId]) {
+                                    window.variableDataCache[targetVariableId].formattedValue = value;
+                                    debugLog('Updated formatted value in cache for variable:', targetVariableId);
+                                    
+                                    // Aktualisiere Variable-Darstellung mit neuem formatiertem Wert
+                                    updateVariable(parameter, value, 'formattedValue');
+                                }
+                            }
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+
+        // Universelle Variable-Update-Funktion für gruppierte und einzelne Variablen
+        function updateVariable(varKey, newValue, updateType = 'rawValue') {
+            debugLog('updateVariable called with varKey:', varKey, 'newValue:', newValue, 'updateType:', updateType);
+            
+            // Finde Variable-ID aus Mapping
+            if (!window.varKeyToIdMapping || !window.varKeyToIdMapping[varKey]) {
+                debugLog('No mapping found for varKey:', varKey);
+                debugLog('Available mappings:', window.varKeyToIdMapping);
+                return;
+            }
+            
+            const targetVariableId = window.varKeyToIdMapping[varKey];
+            debugLog('Target variable ID for', varKey, ':', targetVariableId);
+            
+            // Finde Variable-Daten aus Cache
+            if (!window.variableDataCache || !window.variableDataCache[targetVariableId]) {
+                debugLog('Variable not found in cache for ID:', targetVariableId);
+                return;
+            }
+            
+            const variable = window.variableDataCache[targetVariableId];
+            debugLog('Found variable in cache:', variable.id, 'label:', variable.label, 'displayType:', variable.displayType);
+            
+            // Update cache based on updateType
+            if (updateType === 'rawValue') {
+                variable.rawValue = newValue;
+            } else if (updateType === 'formattedValue') {
+                variable.formattedValue = newValue;
+            }
+            
+            // Finde das DOM-Element für diese Variable
+            const variableElement = document.querySelector(`[data-variable-id="${targetVariableId}"]`);
+            
+            if (variable.displayType === 'button' && variableElement) {
+                // Button-Update
+                updateButtonDisplay(variableElement, variable);
+            } else {
+                // Text-Variable-Update (auch in Gruppen)
+                updateTextDisplay(targetVariableId, variable);
+            }
+        }
+        
+        // Hilfsfunktion für Button-Display-Update
+        function updateButtonDisplay(buttonElement, variable) {
+            debugLog('Updating button display for variable:', variable.id);
+            
+            // Aktualisiere Bool-Wert-Erkennung
+            const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+            debugLog('Button color update - isActive:', isActive, 'for value:', variable.rawValue);
+            
+            // Verwende Progress-Farben für Button-Status (Progress Color 1 für true, Progress Color 2 für false)
+            const activeColor = variable.progressColor1 || 'var(--accent-color)';
+            const inactiveColor = variable.progressColor2 || '#dc3545';
+            const currentColor = isActive ? activeColor : inactiveColor;
+            
+            // Aktualisiere Button-Style
+            buttonElement.style.backgroundColor = currentColor;
+            buttonElement.style.borderColor = currentColor;
+            
+            // Button-Inhalt zusammenstellen
+            let buttonText = '';
+            let iconHtml = '';
+            
+            // Icon-Verarbeitung für Button-Update
+            if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                const iconClass = prepareIconForDisplay(variable.icon);
+                if (iconClass) {
+                    iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                }
+            }
+            
+            let textParts = [];
+            if (variable.showIcon && iconHtml) {
+                textParts.push(iconHtml);
+            }
+            if (variable.showLabel) {
+                textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
+            }
+            if (variable.showValue) {
+                textParts.push(variable.formattedValue);
+            }
+            if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
+            }
+            
+            buttonText = textParts.join(' ');
+            if (variable.showIcon && !variable.showLabel && !variable.showValue && iconHtml) {
+                buttonText = iconHtml.replace('margin-right: 6px;', '');
+            }
+            
+            buttonElement.innerHTML = buttonText;
+            debugLog('Button updated successfully for variable:', variable.id);
+        }
+        
+        // Hilfsfunktion für Text- und Progress-Display-Update
+        function updateTextDisplay(targetVariableId, variable) {
+            debugLog('Updating display for variable:', variable.id, 'displayType:', variable.displayType);
+            
+            const container = document.getElementById('variables-container');
+            if (!container) return;
+            
+            if (variable.displayType === 'progress') {
+                // Progress-Bar-Update
+                updateProgressDisplay(targetVariableId, variable);
+            } else {
+                // Text-Variable-Update
+                updateTextVariableDisplay(targetVariableId, variable);
+            }
+        }
+        
+        // Hilfsfunktion für Progress-Bar-Update
+        function updateProgressDisplay(targetVariableId, variable) {
+            debugLog('Updating progress bar for variable:', variable.id);
+            
+            // Finde Progress-Container mit der entsprechenden Variable-ID
+            const progressContainer = document.querySelector(`[data-variable-id="${targetVariableId}"].progress-container`);
+            
+            if (!progressContainer) {
+                debugLog('Progress container not found for variable ID:', targetVariableId);
+                return;
+            }
+            
+            debugLog('Found progress container for variable:', variable.id);
+            
+            // Aktualisiere Progress-Bar-Breite
+            const progressBar = progressContainer.querySelector('.progress-bar');
+            if (progressBar) {
+                // Berechne Prozentsatz basierend auf Min/Max-Werten
+                const rawValue = parseFloat(variable.rawValue) || 0;
+                const minValue = parseFloat(variable.progressMin) || 0;
+                const maxValue = parseFloat(variable.progressMax) || 100;
+                
+                // Stelle sicher, dass maxValue > minValue
+                const range = maxValue - minValue;
+                let progressPercent = 0;
+                
+                if (range > 0) {
+                    progressPercent = Math.max(0, Math.min(100, ((rawValue - minValue) / range) * 100));
+                }
+                
+                progressBar.style.width = progressPercent + '%';
+                debugLog('Updated progress bar for variable', variable.id + ':', {
+                    rawValue: rawValue,
+                    minValue: minValue,
+                    maxValue: maxValue,
+                    progressPercent: progressPercent.toFixed(1) + '%'
+                });
+            }
+            
+            // Aktualisiere Progress-Text
+            const progressTextContainer = progressContainer.querySelector('.progress-text');
+            if (progressTextContainer) {
+                updateProgressText(progressTextContainer, variable);
+            }
+        }
+        
+        // Hilfsfunktion für Progress-Text-Update
+        function updateProgressText(progressTextContainer, variable) {
+            debugLog('Updating progress text for variable:', variable.id);
+            
+            // Progress-Bar Inhalt basierend auf Konfiguration
+            let progressIconHtml = '';
+            if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                const iconClass = prepareIconForDisplay(variable.icon);
+                if (iconClass) {
+                    progressIconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                }
+            }
+            
+            let progressTextParts = [];
+            
+            if (variable.showIcon && progressIconHtml) {
+                progressTextParts.push(progressIconHtml);
+            }
+            
+            if (variable.showLabel && variable.label) {
+                progressTextParts.push(variable.label + ':');
+            }
+            
+            if (variable.showValue) {
+                progressTextParts.push(variable.formattedValue);
+            }
+            
+            // Falls nichts konfiguriert ist, zeige Wert als Fallback
+            if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                progressTextParts.push(variable.formattedValue);
+            }
+            
+            const progressText = progressTextParts.join(' ');
+            
+            // Aktualisiere den Haupt-Text
+            const mainText = progressTextContainer.querySelector('.progress-main-text');
+            if (mainText) {
+                mainText.innerHTML = progressText;
+                debugLog('Updated progress main text to:', progressText);
+            }
+            
+            // Aktualisiere zweite Variable falls vorhanden
+            if (variable.secondVariable) {
+                const secondVariableSpan = progressTextContainer.querySelector('.progress-second-variable');
+                if (secondVariableSpan) {
+                    let secondVariableParts = [];
+                    
+                    // Icon für zweite Variable
+                    if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
+                        const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
+                        if (secondIconClass) {
+                            secondVariableParts.push(`<i class="${secondIconClass}" style="margin-right: 4px;"></i>`);
+                        }
+                    }
+                    
+                    // Label für zweite Variable
+                    if (variable.secondVariable.showLabel && variable.secondVariable.label) {
+                        secondVariableParts.push(variable.secondVariable.label + ':');
+                    }
+                    
+                    // Wert für zweite Variable
+                    if (variable.secondVariable.showValue) {
+                        secondVariableParts.push(variable.secondVariable.formattedValue);
+                    }
+                    
+                    // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                    if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
+                        secondVariableParts.push(variable.secondVariable.formattedValue);
+                    }
+                    
+                    if (secondVariableParts.length > 0) {
+                        secondVariableSpan.innerHTML = secondVariableParts.join(' ');
+                        debugLog('Updated progress second variable text to:', secondVariableParts.join(' '));
+                    }
+                }
+            }
+        }
+        
+        // Hilfsfunktion für Text-Variable-Update
+        function updateTextVariableDisplay(targetVariableId, variable) {
+            debugLog('Updating text variable for variable:', variable.id);
+            
+            const container = document.getElementById('variables-container');
+            if (!container) return;
+            
+            // Suche nach variable-label und variable-value Elementen
+            const variableItems = container.querySelectorAll('.variable-item');
+            
+            variableItems.forEach(item => {
+                // Prüfe ob dieses Item die gesuchte Variable enthält
+                const labelSpans = item.querySelectorAll('.variable-label');
+                const valueSpans = item.querySelectorAll('.variable-value');
+                
+                // Suche nach dem Label-Text der Variable
+                let found = false;
+                labelSpans.forEach(labelSpan => {
+                    if (labelSpan.textContent.includes(variable.label)) {
+                        found = true;
+                    }
+                });
+                
+                if (found) {
+                    // Aktualisiere die Value-Spans in diesem Item
+                    valueSpans.forEach(valueSpan => {
+                        if (valueSpan.classList.contains('variable-text')) {
+                            valueSpan.textContent = variable.formattedValue;
+                            debugLog('Updated text value for variable:', variable.id, 'to:', variable.formattedValue);
+                        }
+                    });
+                }
+            });
+        }
+
+        function renderStatus(data) {
+            debugLog('renderStatus called with data:', data);
+            const statusContainer = document.getElementById('status-container');
+            const root = document.documentElement;
+            
+            // Zeige Status-Container nur wenn Status vorhanden ist
+            if (data.status) {
+                debugLog('Rendering status:', data.status);
+                statusContainer.style.display = 'block';
+                statusContainer.style.setProperty('--status-color', data.statusColor || '#000000');
+                statusContainer.style.fontSize = (data.statusFontSize || 12) + 'px';
+                
+                let statusContent = '';
+                
+                // Status-Inhalt basierend auf Konfiguration zusammenstellen (wie bei Textvariablen)
+                let statusParts = [];
+                
+                // Icon für Status-Bereich (wenn konfiguriert)
+                if (data.statusShowIcon && data.statusIcon && data.statusIcon !== 'Transparent') {
+                    const iconClass = prepareIconForDisplay(data.statusIcon);
+                    if (iconClass) {
+                        statusParts.push(`<i class="${iconClass}" style="color: var(--status-color); margin-right: 4px;"></i>`);
+                        debugLog('Status icon rendered:', data.statusIcon, '→', iconClass);
+                    }
+                }
+                
+                // Label für Status-Bereich (wenn konfiguriert)
+                if (data.statusShowLabel) {
+                    const label = data.statusLabel || 'Status'; // Fallback zu "Status" wenn kein Custom Label
+                    statusParts.push(`<span class="status-label" style="color: var(--status-color);">${label}:</span>`);
+                }
+                
+                // Wert für Status-Bereich (wenn konfiguriert)
+                if (data.statusShowValue) {
+                    statusParts.push(`<span class="status-value" style="color: var(--status-color);">${data.status}</span>`);
+                }
+                
+                // Fallback: Falls nichts konfiguriert ist, zeige Wert
+                if (!data.statusShowIcon && !data.statusShowLabel && !data.statusShowValue) {
+                    statusParts.push(`<span class="status-value" style="color: var(--status-color);">${data.status}</span>`);
+                }
+                
+                statusContent = statusParts.join(' ');
+                
+                // Gerätebild wird separat im div1 Container angezeigt, nicht im Status
+                if (data.statusBildauswahl) {
+                    const imageUrl = window.assets[`img_${data.statusBildauswahl}`];
+                    debugLog('Looking for image:', data.statusBildauswahl, 'Found URL:', imageUrl);
+                    const deviceImgContainer = document.getElementById('div1');
+                    const deviceImg = document.getElementById('image');
+                    
+                    if (imageUrl && deviceImg && deviceImgContainer) {
+                        deviceImg.src = imageUrl;
+                        deviceImgContainer.classList.remove('hidden');
+                        deviceImgContainer.classList.add('div1');
+                        debugLog('Device image added:', imageUrl);
+                    } else {
+                        debugLog('No image URL found for:', data.statusBildauswahl);
+                        if (deviceImgContainer) {
+                            deviceImgContainer.classList.add('hidden');
+                            deviceImgContainer.classList.remove('div1');
+                        }
+                    }
+                }
+                
+                statusContainer.innerHTML = statusContent;
+            } else {
+                statusContainer.style.display = 'none';
+            }
+        }
+
+        function renderVariables(variables) {
+            if (!variables || !Array.isArray(variables)) return;
+            
+            const container = document.getElementById('variables-container');
+            if (!container) return;
+            
+            // Cache die Variablen-Daten für spätere Re-Rendering
+            window.cachedVariables = variables;
+            
+            // Erstelle Mapping zwischen var_X und Variable-ID
+            window.varKeyToIdMapping = {};
+            window.variableDataCache = {};
+            
+            debugLog('renderVariables called with:', variables);
+            
+            // Track welche Gruppen bereits gerendert wurden
+            const renderedGroups = new Set();
+            let content = '';
+            
+            // Gehe durch Variablen in ORIGINALER REIHENFOLGE
+            variables.forEach((variable, index) => {
+                // Erstelle Mapping (var_0, var_1, var_2, etc.)
+                const varKey = 'var_' + index;
+                window.varKeyToIdMapping[varKey] = variable.id;
+                window.variableDataCache[variable.id] = variable;
+                debugLog('Mapping created: ' + varKey + ' → ' + variable.id, 'renderVariables');
+                debugLog('Processing variable: ' + JSON.stringify(variable), 'renderVariables');
+                debugLog('  - displayType: ' + variable.displayType, 'renderVariables');
+                debugLog('  - group: ' + variable.group, 'renderVariables');
+                
+                // Prüfe ob Variable gruppiert ist - ABER: Progress-Balken werden nie gruppiert
+                if (variable.group && variable.group !== 'keine Gruppe' && variable.group.trim() !== '' && variable.displayType !== 'progress') {
+                    // Nur rendern wenn Gruppe noch nicht gerendert wurde
+                    if (!renderedGroups.has(variable.group)) {
+                        renderedGroups.add(variable.group);
+                        
+                        // Sammle alle Variablen dieser Gruppe - OHNE Progress-Balken
+                        const groupVariables = variables.filter(v => 
+                            v.group === variable.group && v.group !== 'keine Gruppe' && v.group.trim() !== '' && v.displayType !== 'progress'
+                        );
+                        
+                        debugLog('Rendering group: ' + variable.group + ' with ' + groupVariables.length + ' variables', 'renderVariables');
+                        
+                        // Prüfe ob eine Variable in der Gruppe showBorderLine aktiviert hat
+                        const groupHasBorderLine = groupVariables.some(v => v.showBorderLine && v.displayType === 'text');
+                        const groupCssClasses = groupHasBorderLine ? 'variable-group with-border-line' : 'variable-group';
+                        
+                        content += `
+                            <div class="${groupCssClasses}" style="margin-bottom: var(--element-spacing, 8px); margin-top: var(--element-spacing, 8px);">
+                                <div class="variable-group-items" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+                        `;
+                        
+                        groupVariables.forEach(groupVar => {
+                            content += `<div class="variable-group-item">`;
+                            content += renderSingleVariable(groupVar, true); // true = isGrouped
+                            content += `</div>`;
+                        });
+                        
+                        content += `
+                                </div>
+                            </div>
+                        `;
+                    }
+                    // Andernfalls überspringen (Gruppe bereits gerendert)
+                } else {
+                    // Ungrouped variable - sofort rendern
+                    content += renderSingleVariable(variable);
+                }
+            });
+            
+            debugLog('Rendered groups:', Array.from(renderedGroups));
+            container.innerHTML = content;
+        }
+        
+        // Hilfsfunktion zum Rendern einer einzelnen Variable
+        function renderSingleVariable(variable, isGrouped = false) {
+            let content = '';
+            
+            // Spezialbehandlung für Progress-Balken: Niemals inline, auch nicht in Gruppen
+            const isProgressBar = variable.displayType === 'progress';
+            
+            // Wrapper-Stil je nach Kontext (grouped oder ungrouped) - Progress-Balken immer full-width
+            const wrapperStyle = (isGrouped && !isProgressBar) ? 
+                `display: inline-flex; align-items: center; margin: 0; white-space: nowrap; font-size: ${variable.fontSize}px; color: ${getTextColor(variable)};` : 
+                `font-size: ${variable.fontSize}px; color: ${getTextColor(variable)};`;
+                
+            // CSS-Klassen für Variable zusammenstellen
+            let cssClasses = 'variable-item';
+            if (variable.displayType === 'text') {
+                cssClasses += ' text-variable';
+            }
+            // Füge border-line Klasse hinzu wenn konfiguriert UND NICHT gruppiert
+            // Bei gruppierten Variablen zeigt nur die Gruppe die Linie, nicht die einzelnen Variablen
+            if (variable.showBorderLine && variable.displayType === 'text' && !isGrouped) {
+                cssClasses += ' with-border-line';
+            }
+                
+            content += `<div class="${cssClasses}" style="${wrapperStyle}">`;
+
+                // Wert je nach Darstellungstyp hinzufügen
+                if (variable.displayType === 'progress') {
+                    // Fortschrittsbalken - nutze zentrale Konfiguration
+                    // Berechne Prozentsatz basierend auf Min/Max-Werten
+                    const rawValue = parseFloat(variable.rawValue) || 0;
+                    const minValue = parseFloat(variable.progressMin) || 0;
+                    const maxValue = parseFloat(variable.progressMax) || 100;
+                    
+                    // Stelle sicher, dass maxValue > minValue
+                    const range = maxValue - minValue;
+                    let progressValue = 0;
+                    
+                    if (range > 0) {
+                        progressValue = Math.max(0, Math.min(100, ((rawValue - minValue) / range) * 100));
+                    }
+                    
+                    debugLog('Progress bar calculation for variable', variable.id + ':', {
+                        rawValue: rawValue,
+                        minValue: minValue,
+                        maxValue: maxValue,
+                        progressPercent: progressValue.toFixed(1) + '%'
+                    });
+                    
+                    // Progress-Bar Inhalt basierend auf Konfiguration
+                    let progressIconHtml = '';
+                    if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                        const iconClass = prepareIconForDisplay(variable.icon);
+                        if (iconClass) {
+                            progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`;
+                        }
+                    }
+                    
+                    let progressTextParts = [];
+                    
+                    if (variable.showIcon && progressIconHtml) {
+                        progressTextParts.push(progressIconHtml);
+                    }
+                    
+                    if (variable.showLabel && variable.label) {
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.label}:&nbsp;</span>`);
+                    }
+                    
+                    if (variable.showValue) {
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                    }
+                    
+                    // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                    if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                    }
+                    
+                    const progressText = progressTextParts.join('');
+                    
+                    // Zweite Variable für rechte Seite vorbereiten
+                    let secondVariableText = '';
+                    if (variable.secondVariable) {
+                        let secondVariableParts = [];
+                        
+                        // Icon für zweite Variable
+                        if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
+                            const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
+                            if (secondIconClass) {
+                                secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
+                            }
+                        }
+                        
+                        // Label für zweite Variable
+                        if (variable.secondVariable.showLabel && variable.secondVariable.label) {
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.secondVariable.label}:&nbsp;</span>`);
+                        }
+                        
+                        // Wert für zweite Variable
+                        if (variable.secondVariable.showValue) {
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                        }
+                        
+                        // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                        if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                        }
+                        
+                        if (secondVariableParts.length > 0) {
+                            secondVariableText = `<span class="progress-second-variable">${secondVariableParts.join(' ')}</span>`;
+                            debugLog('Second variable for progress bar:', variable.secondVariable.id, '→', secondVariableParts.join(' '));
+                        }
+                    }
+                    
+                    // Berechne dynamische Progress-Bar-Höhe basierend auf fontSize
+                    // Verwende --progress-bar-height als Minimum (Standard: 20px)
+                    const minHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--progress-bar-height')) || 20;
+                    const dynamicHeight = Math.max(minHeight, variable.fontSize * 1.7);
+                    
+                    content += `
+                        <div class="variable-progress">
+                            <div class="progress-container" data-variable-id="${variable.id}" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; height: ${dynamicHeight}px;">
+                                <div class="progress-bar" style="width: ${progressValue}%;"></div>
+                                <div class="progress-text">
+                                    <span class="progress-main-text">${progressText}</span>
+                                    ${secondVariableText}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (variable.displayType === 'button') {
+                    // Button nur für Bool-Variablen (VARIABLETYPE_BOOLEAN = 0)
+                    if (variable.variableType === 0) {
+                        // Erweiterte Bool-Wert-Erkennung
+                        const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+                        
+                        // Verwende Progress-Farben für Button-Status (Progress Color 1 für true, Progress Color 2 für false)
+                        const activeColor = variable.progressColor1 || '#28a745';
+                        const inactiveColor = variable.progressColor2 || '#dc3545';
+                        const currentColor = isActive ? activeColor : inactiveColor;
+                        
+                        // Button-Inhalt basierend auf allgemeiner Konfiguration
+                        const buttonWidth = variable.buttonWidth || 120;
+                        
+                        let buttonText = '';
+                        let iconHtml = '';
+                        
+                        // Icon-Verarbeitung für Button
+                        if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                            const iconClass = prepareIconForDisplay(variable.icon);
+                            if (iconClass) {
+                                iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                            }
+                        }
+                        
+                        // Button-Inhalt basierend auf allgemeiner Konfiguration zusammenstellen
+                        let textParts = [];
+                        
+                        if (variable.showIcon && iconHtml) {
+                            textParts.push(iconHtml);
+                        }
+                        
+                        if (variable.showLabel) {
+                            if (variable.showValue) {
+                                // Doppelpunkt nur wenn auch Value angezeigt wird - Label fett
+                                textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}:&nbsp;</span>`);
+                            } else {
+                                // Kein Doppelpunkt wenn nur Label - Label fett
+                                textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}</span>`);
+                            }
+                        }
+                        
+                        if (variable.showValue) {
+                            textParts.push(`<span style="font-weight: normal;">${variable.formattedValue}</span>`);
+                        }
+                        
+                        // Falls keine Checkbox aktiviert ist, zeige Label als Fallback (ohne Doppelpunkt) - fett
+                        if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                            textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}</span>`);
+                        }
+                        
+                        buttonText = textParts.join(' ');
+                        
+                        // Spezielle Behandlung für nur Icon (ohne Abstand)
+                        if (variable.showIcon && !variable.showLabel && !variable.showValue && iconHtml) {
+                            buttonText = iconHtml.replace('margin-right: 6px;', '');
+                        }
+                        
+                        // Debug-Ausgaben
+                        debugLog('Button Debug for variable: ' + variable.id, 'renderSingleVariable');
+                        debugLog('  - showIcon: ' + variable.showIcon, 'renderSingleVariable');
+                        debugLog('  - showLabel: ' + variable.showLabel, 'renderSingleVariable');
+                        debugLog('  - showValue: ' + variable.showValue, 'renderSingleVariable');
+                        debugLog('  - buttonWidth: ' + buttonWidth, 'renderSingleVariable');
+                        debugLog('  - isActive: ' + isActive, 'renderSingleVariable');
+                        debugLog('  - activeColor: ' + activeColor, 'renderSingleVariable');
+                        debugLog('  - inactiveColor: ' + inactiveColor, 'renderSingleVariable');
+                        debugLog('  - currentColor: ' + currentColor, 'renderSingleVariable');
+                        debugLog('  - buttonText: ' + buttonText, 'renderSingleVariable');
+                        
+                        content += `
+                            <div class="variable-button-container">
+                                <button class="variable-button" 
+                                        onclick="requestAction('${variable.id}', 1); debugLog('Button clicked for variable: ${variable.id}');" 
+                                        data-variable-id="${variable.id}"
+                                        style="background-color: ${currentColor} !important; border-color: ${currentColor} !important; color: ${getTextColor(variable)} !important; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                    ${buttonText}
+                                </button>
+                            </div>
+                        `;
+                        
+                        debugLog('  - FINAL: Button rendered with color:', currentColor, 'width:', buttonWidth + 'px');
+                    } else {
+                        // Fallback für Nicht-Bool-Variablen: Zeige als Text mit Konfiguration
+                        console.warn('Button display type only supported for boolean variables. Variable', variable.id, 'is type', variable.variableType);
+                        
+                        let textParts = [];
+                        
+                        if (variable.showLabel && variable.label) {
+                            textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${variable.label}:&nbsp;</span>`);
+                        }
+                        
+                        if (variable.showValue) {
+                            textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                        }
+                        
+                        // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                        if (!variable.showLabel && !variable.showValue) {
+                            textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                        }
+                        
+                        content += `<div class="variable-item">
+                            ${textParts.join(' ')}
+                        </div>`;
+                    }
+                } else {
+                    // Bei Textdarstellung: Label und Wert basierend auf Konfiguration
+                    let textParts = [];
+                    
+                    // Icon für Text-Variablen
+                    if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                        const iconClass = prepareIconForDisplay(variable.icon);
+                        if (iconClass) {
+                            textParts.push(`<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
+                            debugLog(`Text variable icon rendered: ${variable.label}: ${variable.icon} → ${iconClass}`);
+                        }
+                    }
+                    
+                    if (variable.showLabel && variable.label) {
+                        textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${variable.label}:&nbsp;</span>`);
+                    }
+                    
+                    if (variable.showValue) {
+                        textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                    }
+                    
+                    // Falls nichts konfiguriert ist, zeige Wert als Fallback
+                    if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                        textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                    }
+                    
+                    content += textParts.join('');
+                }
+
+                content += `</div>`; // Schließe variable-item div
+                
+            return content;
+        }
+
+    </script>
+
+
+</head>
+
+<body>
+    <div class="main_container">
+        <div id="div1" class="hidden">
+            <img id="image" alt="Device Image">
+        </div>
+        <div class="div2" id="div2">
+            <div id="status-container" class="status-container" style="display: none;">
+                <!-- Status wird hier angezeigt -->
+            </div>
+            <div id="variables-container">
+                <!-- Dynamische Variablen werden hier eingefügt -->
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
