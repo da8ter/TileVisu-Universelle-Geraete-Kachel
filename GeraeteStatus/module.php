@@ -175,7 +175,8 @@ class UniversalDeviceTile extends IPSModule
                     if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentValue) {
                         $updateData['statusBildauswahl'] = $assoziation['Bildauswahl'] ?? 'wm_aus';
                         $statusColor = $assoziation['StatusColor'] ?? -1;
-                        $updateData['statusColor'] = ($statusColor === -1 || $statusColor === '-1') ? '#000000' : '#' . sprintf('%06X', $statusColor);
+                        $updateData['statusColor'] = ($statusColor === -1 || $statusColor === '-1') ? '' : '#' . sprintf('%06X', $statusColor);
+                        $updateData['isStatusColorTransparent'] = ($statusColor === -1 || $statusColor === '-1');
                         break;
                     }
                 }
@@ -441,7 +442,8 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                     if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentValue) {
                         $result['statusBildauswahl'] = $assoziation['Bildauswahl'] ?? 'wm_aus';
                         $statusColor = $assoziation['StatusColor'] ?? -1;
-                        $result['statusColor'] = ($statusColor === -1 || $statusColor === '-1') ? '#000000' : '#' . sprintf('%06X', $statusColor);
+                        $result['statusColor'] = ($statusColor === -1 || $statusColor === '-1') ? '' : '#' . sprintf('%06X', $statusColor);
+                        $result['isStatusColorTransparent'] = ($statusColor === -1 || $statusColor === '-1');
                         break;
                     }
                 }
