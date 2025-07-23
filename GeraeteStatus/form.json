@@ -42,7 +42,7 @@
             },
             {
               "type": "SelectColor",
-              "allowTransparent": false,
+              "allowTransparent": true,
               "name": "Kachelhintergrundfarbe",
               "caption": "Tile background color"
             },
