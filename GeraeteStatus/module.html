@@ -855,31 +855,30 @@
                 }
                 
                 statusContent = statusParts.join(' ');
-                
-                // Gerätebild wird separat im div1 Container angezeigt, nicht im Status
-                if (data.statusBildauswahl) {
-                    const imageUrl = window.assets[`img_${data.statusBildauswahl}`];
-                    debugLog('Looking for image:', data.statusBildauswahl, 'Found URL:', imageUrl);
-                    const deviceImgContainer = document.getElementById('div1');
-                    const deviceImg = document.getElementById('image');
-                    
-                    if (imageUrl && deviceImg && deviceImgContainer) {
-                        deviceImg.src = imageUrl;
-                        deviceImgContainer.classList.remove('hidden');
-                        deviceImgContainer.classList.add('div1');
-                        debugLog('Device image added:', imageUrl);
-                    } else {
-                        debugLog('No image URL found for:', data.statusBildauswahl);
-                        if (deviceImgContainer) {
-                            deviceImgContainer.classList.add('hidden');
-                            deviceImgContainer.classList.remove('div1');
-                        }
-                    }
-                }
-                
                 statusContainer.innerHTML = statusContent;
             } else {
                 statusContainer.style.display = 'none';
+            }
+            
+            // Gerätebild wird separat im div1 Container angezeigt - IMMER prüfen, auch ohne Status
+            if (data.statusBildauswahl) {
+                const imageUrl = window.assets[`img_${data.statusBildauswahl}`];
+                debugLog('Looking for image:', data.statusBildauswahl, 'Found URL:', imageUrl);
+                const deviceImgContainer = document.getElementById('div1');
+                const deviceImg = document.getElementById('image');
+                
+                if (imageUrl && deviceImg && deviceImgContainer) {
+                    deviceImg.src = imageUrl;
+                    deviceImgContainer.classList.remove('hidden');
+                    deviceImgContainer.classList.add('div1');
+                    debugLog('Device image added:', imageUrl);
+                } else {
+                    debugLog('No image URL found for:', data.statusBildauswahl);
+                    if (deviceImgContainer) {
+                        deviceImgContainer.classList.add('hidden');
+                        deviceImgContainer.classList.remove('div1');
+                    }
+                }
             }
         }
 

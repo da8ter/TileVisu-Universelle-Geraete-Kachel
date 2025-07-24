@@ -223,6 +223,10 @@ class UniversalDeviceTile extends IPSModule
     private function GenerateAssets($bildauswahl) {
         $assets = [];
         
+        // Prüfe ob keine Statusvariable konfiguriert ist - dann brauchen wir Fallback-Assets
+        $statusId = $this->ReadPropertyInteger('Status');
+        $needsFallbackAssets = ($statusId <= 0 || !IPS_VariableExists($statusId));
+        
         if($bildauswahl == 0) {
             // Waschmaschine - Option 0 soll Waschmaschinen-Bilder zeigen
             $assets['img_wm_aus'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp'));
@@ -259,6 +263,14 @@ class UniversalDeviceTile extends IPSModule
                 }
             }
         }
+        
+        // Fallback: Wenn keine Statusvariable konfiguriert ist und noch kein img_wm_an Asset vorhanden, 
+        // lade Standard-Waschmaschinen-Asset als Fallback
+        if ($needsFallbackAssets && !isset($assets['img_wm_an']) && $bildauswahl != 3) {
+            $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp'));
+            $this->DebugLog('Added fallback asset img_wm_an for missing status variable', 'GenerateAssets');
+        }
+        
         // Bei bildauswahl == 3 ("kein Bild") werden keine Assets benötigt
         
         return $assets;
@@ -591,6 +603,9 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                     }
                 }
             }
+        } else {
+            // Fallback: Wenn keine Statusvariable konfiguriert ist, verwende img_wm_an als Standard
+            $result['statusBildauswahl'] = 'wm_an';
         }
 
         // Lade die konfigurierte Variablenliste
