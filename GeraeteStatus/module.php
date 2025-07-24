@@ -12,7 +12,7 @@ class UniversalDeviceTile extends IPSModule
     
     public function Create()
     {
-        // Nie diese Zeile löschen!
+        // Nie diese Zeile löschen! 
         parent::Create();
 
         // Alter Gerätestatus (immer oben angezeigt)
