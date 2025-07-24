@@ -1060,12 +1060,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         }
         
         
-        // Prüfe zuerst die direkte Mapping-Tabelle
-        if (isset($directMappings[$iconName])) {
-            $mappedName = $directMappings[$iconName];
-            $this->DebugLog('Found in direct mapping table: ' . $iconName . ' → ' . $mappedName);
-            return $mappedName;
-        }
+        // Direkte Mapping-Tabelle übersprungen (nicht definiert)
         
         // Entferne fa-Präfix falls vorhanden, um den Basis-Namen zu erhalten
         $baseName = $iconName;
@@ -1074,16 +1069,6 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
             $baseName = substr($iconName, 3);
             $hadFaPrefix = true;
             $this->DebugLog('Removed fa- prefix from icon: ' . $iconName . ' → ' . $baseName);
-        }
-        
-        // Prüfe direkte Mapping-Tabelle mit dem Basis-Namen
-        if (isset($directMappings[$baseName])) {
-            $mappedName = $directMappings[$baseName];
-            if ($hadFaPrefix && strpos($mappedName, 'fa-') !== 0) {
-                $mappedName = 'fa-' . $mappedName;
-            }
-            $this->DebugLog('Found basename in direct mapping table: ' . $baseName . ' → ' . $mappedName);
-            return $mappedName;
         }
         
         // Versuche den Basis-Namen in der JSON-Mapping-Tabelle zu finden
