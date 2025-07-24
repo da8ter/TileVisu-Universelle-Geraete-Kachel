@@ -309,6 +309,17 @@ class UniversalDeviceTile extends IPSModule
                         $statusColor = $assoziation['StatusColor'] ?? -1;
                         $updateData['statusColor'] = isset($assoziation['StatusColor']) ? '#' . sprintf('%06X', $assoziation['StatusColor']) : '#000000';
                         $updateData['isStatusColorTransparent'] = isset($assoziation['StatusColor']) && ($assoziation['StatusColor'] == -1 || $assoziation['StatusColor'] == 16777215);
+                        
+                        // Prüfe Progressbar Active Flag
+                        $progressbarActive = $assoziation['ProgressbarActive'] ?? true;
+                        $updateData['progressbarActive'] = $progressbarActive;
+                        
+                        // Wenn Progressbar inaktiv ist, setze alle Progress-Werte auf 0
+                        if (!$progressbarActive) {
+                            $updateData['progressbarDisabled'] = true;
+                            $this->SendDebug('MessageSink', 'Progressbar disabled for association: ' . $assoziation['AssoziationName'], 0);
+                        }
+                        
                         break;
                     }
                 }
@@ -608,6 +619,22 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                     // Extrahiere Min/Max-Werte aus Variablenprofil für Progress-Balken
                     $progressMinMax = $this->GetProgressMinMax($variable['Variable']);
                     
+                    // Ermittle Progressbar Active Status basierend auf ProfilAssoziazionen
+                    $progressbarActive = true; // Standard: aktiv
+                    $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+                    if (is_array($profilAssoziationen)) {
+                        $statusId = $this->ReadPropertyInteger('Status');
+                        if ($statusId > 0 && IPS_VariableExists($statusId)) {
+                            $currentStatusValue = GetValue($statusId);
+                            foreach ($profilAssoziationen as $assoziation) {
+                                if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentStatusValue) {
+                                    $progressbarActive = $assoziation['ProgressbarActive'] ?? true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
                     $variableData = [
                         'id' => $variable['Variable'],
                         'label' => $label,
@@ -631,7 +658,8 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         'progressMax' => $progressMinMax['max'],
                         'formattedValue' => GetValueFormatted($variable['Variable']),
                         'rawValue' => GetValue($variable['Variable']),
-                        'icon' => $icon
+                        'icon' => $icon,
+                        'progressbarActive' => $progressbarActive // Progressbar Active Status
                     ];
                     
                     // Zweite Variable für Progress-Bars hinzufügen

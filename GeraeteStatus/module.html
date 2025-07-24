@@ -1082,24 +1082,44 @@
                 // Wert je nach Darstellungstyp hinzufügen
                 if (variable.displayType === 'progress') {
                     // Fortschrittsbalken - nutze zentrale Konfiguration
-                    // Berechne Prozentsatz basierend auf Min/Max-Werten
-                    const rawValue = parseFloat(variable.rawValue) || 0;
-                    const minValue = parseFloat(variable.progressMin) || 0;
-                    const maxValue = parseFloat(variable.progressMax) || 100;
+                    // Prüfe Progressbar Active Status - wenn inaktiv, überschreibe mit 0-Werten
+                    let rawValue, progressValue, displayValue;
                     
-                    // Stelle sicher, dass maxValue > minValue
-                    const range = maxValue - minValue;
-                    let progressValue = 0;
-                    
-                    if (range > 0) {
-                        progressValue = Math.max(0, Math.min(100, ((rawValue - minValue) / range) * 100));
+                    if (variable.progressbarActive === false) {
+                        // Progressbar inaktiv - zeige 0-Werte und verhindere Updates
+                        rawValue = 0;
+                        progressValue = 0;
+                        
+                        // Extrahiere Suffix aus ursprünglichem formatiertem Wert
+                        const originalFormatted = variable.formattedValue || '';
+                        const suffixMatch = originalFormatted.match(/[^0-9.,\-\s]+/);
+                        const suffix = suffixMatch ? suffixMatch[0] : '';
+                        
+                        displayValue = '0 ' + suffix;
+                        debugLog('Progress bar disabled for variable ' + variable.id + ' - showing zero values with suffix: "' + suffix + '"');
+                    } else {
+                        // Progressbar aktiv - normale Berechnung
+                        rawValue = parseFloat(variable.rawValue) || 0;
+                        const minValue = parseFloat(variable.progressMin) || 0;
+                        const maxValue = parseFloat(variable.progressMax) || 100;
+                        
+                        // Stelle sicher, dass maxValue > minValue
+                        const range = maxValue - minValue;
+                        progressValue = 0;
+                        
+                        if (range > 0) {
+                            progressValue = Math.max(0, Math.min(100, ((rawValue - minValue) / range) * 100));
+                        }
+                        displayValue = variable.formattedValue;
                     }
+                    
+                    // Berechne Prozentsatz basierend auf Min/Max-Werten
+                    const progressPercent = progressValue.toFixed(1) + '%';
                     
                     debugLog('Progress bar calculation for variable', variable.id + ':', {
                         rawValue: rawValue,
-                        minValue: minValue,
-                        maxValue: maxValue,
-                        progressPercent: progressValue.toFixed(1) + '%'
+                        progressPercent: progressPercent,
+                        progressbarActive: variable.progressbarActive
                     });
                     
                     // Progress-Bar Inhalt basierend auf Konfiguration
@@ -1122,12 +1142,12 @@
                     }
                     
                     if (variable.showValue) {
-                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${displayValue}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
                     if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${displayValue}</span>`);
                     }
                     
                     const progressText = progressTextParts.join('');
@@ -1152,7 +1172,17 @@
                         
                         // Wert für zweite Variable
                         if (variable.secondVariable.showValue) {
-                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                            let secondVariableDisplayValue;
+                            if (variable.progressbarActive === false) {
+                                // Extrahiere Suffix aus zweiter Variable
+                                const secondOriginalFormatted = variable.secondVariable.formattedValue || '';
+                                const secondSuffixMatch = secondOriginalFormatted.match(/[^0-9.,\-\s]+/);
+                                const secondSuffix = secondSuffixMatch ? secondSuffixMatch[0] : '';
+                                secondVariableDisplayValue = '0 ' + secondSuffix;
+                            } else {
+                                secondVariableDisplayValue = variable.secondVariable.formattedValue;
+                            }
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${secondVariableDisplayValue}</span>`);
                         }
                         
                         // Falls nichts konfiguriert ist, zeige Wert als Fallback

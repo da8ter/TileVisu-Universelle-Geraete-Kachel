@@ -220,6 +220,16 @@
               "edit": {
                 "type": "SelectColor"
               }
+            },
+            {
+              "caption": "Progressbar active",
+              "name": "ProgressbarActive",
+              "width": "120px",
+              "save": true,
+              "add": true,
+              "edit": {
+                "type": "CheckBox"
+              }
             }
           ]
         }
