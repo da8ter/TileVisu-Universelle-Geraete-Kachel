@@ -889,18 +889,30 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
     }
 
     private function GetIcon($id) {
-        $variable = IPS_GetVariable($id);
-        $Value = GetValue($id);
-        $icon = "";
-        
-        // Debug-Ausgabe für Variable
-        $this->DebugLog('GetIcon called for Variable ID: ' . $id . ' (Name: ' . IPS_GetObject($id)['ObjectName'] . '), Value: ' . $Value, 'GetIcon');
-        $this->DebugLog('Starting icon search for Variable ID: ' . $id . ' (Name: ' . IPS_GetObject($id)['ObjectName'] . '), Value: ' . $Value, 'GetIcon');
-        
-        // Vollständige Variable und Objekt Info
-        $this->DebugLog('COMPLETE VARIABLE INFO: ' . json_encode($variable, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), 'GetIcon');
-        $obj = IPS_GetObject($id);
-        $this->DebugLog('COMPLETE OBJECT INFO: ' . json_encode($obj, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), 'GetIcon');
+        try {
+            $this->DebugLog('GetIcon called for Variable ID: ' . $id, 'GetIcon');
+            
+            $variable = IPS_GetVariable($id);
+            $this->DebugLog('GetIcon: Got variable data for ID: ' . $id, 'GetIcon');
+            
+            $Value = GetValue($id);
+            $this->DebugLog('GetIcon: Got value for ID: ' . $id . ', Value: ' . $Value, 'GetIcon');
+            
+            $icon = "";
+            
+            // Debug-Ausgabe für Variable
+            $objName = IPS_GetObject($id)['ObjectName'];
+            $this->DebugLog('GetIcon called for Variable ID: ' . $id . ' (Name: ' . $objName . '), Value: ' . $Value, 'GetIcon');
+            $this->DebugLog('Starting icon search for Variable ID: ' . $id . ' (Name: ' . $objName . '), Value: ' . $Value, 'GetIcon');
+            
+            // Vollständige Variable und Objekt Info
+            $this->DebugLog('COMPLETE VARIABLE INFO: ' . json_encode($variable, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), 'GetIcon');
+            $obj = IPS_GetObject($id);
+            $this->DebugLog('COMPLETE OBJECT INFO: ' . json_encode($obj, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), 'GetIcon');
+        } catch (Exception $e) {
+            $this->DebugLog('ERROR in GetIcon for Variable ID ' . $id . ': ' . $e->getMessage(), 'GetIcon');
+            return 'Transparent'; // Fallback bei Fehler
+        }
         
         // Prüfe VariableCustomPresentation für Icon
         if ($icon == "" && !empty($variable['VariableCustomPresentation'])) {
