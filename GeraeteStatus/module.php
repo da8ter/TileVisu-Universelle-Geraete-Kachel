@@ -615,8 +615,11 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         // Sammle Informationen für jede konfigurierte Variable (Array-Reihenfolge durch changeOrder)
         if (is_array($variablesList)) {
             $variables = [];
+            $this->DebugLog('DEBUG VARIABLES LIST: Processing ' . count($variablesList) . ' variables from configuration');
             foreach ($variablesList as $index => $variable) {
+                $this->DebugLog('DEBUG VARIABLE CHECK: Index ' . $index . ', Variable ID: ' . ($variable['Variable'] ?? 'NONE') . ', Group: ' . ($variable['Group'] ?? 'NONE'));
                 if (isset($variable['Variable']) && $variable['Variable'] > 0 && IPS_VariableExists($variable['Variable'])) {
+                    $this->DebugLog('DEBUG VARIABLE PROCESSING: Variable ID ' . $variable['Variable'] . ' passed validation and will be processed');
                     $this->SendDebug('GetFullUpdateMessage', 'Processing variable ID: ' . $variable['Variable'], 0);
                     // Verwende Variablennamen als Fallback wenn kein Label gesetzt ist
                     $label = $variable['Label'] ?? '';
