@@ -638,9 +638,10 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         $this->DebugLog('DEBUG: After label assignment for Variable ID: ' . $variable['Variable'] . ', Label: ' . $label);
                     }
                     
-                    $this->DebugLog('DEBUG: About to call GetIcon for Variable ID: ' . $variable['Variable']);
+                    $this->DebugLog('DEBUG: About to call GetIcon for Variable ID: ' . $variable['Variable'] . ', Index: ' . $index);
+                    $this->DebugLog('DEBUG: About to call GetIcon for Variable ID: ' . $variable['Variable'] . ', Index: ' . $index);
                     $icon = $this->GetIcon($variable['Variable']);
-                    $this->DebugLog('DEBUG: GetIcon returned for Variable ID: ' . $variable['Variable'] . ', Icon: "' . $icon . '"');
+                    $this->DebugLog('DEBUG: GetIcon returned for Variable ID: ' . $variable['Variable'] . ', Index: ' . $index . ', Icon: "' . $icon . '"');
                     $variableInfo = IPS_GetVariable($variable['Variable']);
                     
                     // Extrahiere Button-Farben aus Profil/Darstellung für Bool-Variablen
@@ -1087,7 +1088,8 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
      */
     private function MapIconToFontAwesome($iconName) {
     // Vorverarbeitung: Whitespace entfernen und Normalisieren
-    $iconName = trim($iconName);
+    // Entferne führende/trailing Whitespaces inkl. Unicode-Leerzeichen (NBSP, NNBSP, etc.)
+    $iconName = preg_replace('/^[\p{Z}\s\x{00A0}]+|[\p{Z}\s\x{00A0}]+$/u', '', $iconName);
     // Manche Profile liefern bereits eine FontAwesome-Klasse wie "fa-bolt" – das belassen wir
     // Debug speziell für Electricity Icon
     if (strpos($iconName, 'Electricity') !== false) {
