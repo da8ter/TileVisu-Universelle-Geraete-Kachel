@@ -628,7 +628,9 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         $label = $variableObject['ObjectName'];
                     }
                     
+                    $this->DebugLog('DEBUG: About to call GetIcon for Variable ID: ' . $variable['Variable']);
                     $icon = $this->GetIcon($variable['Variable']);
+                    $this->DebugLog('DEBUG: GetIcon returned for Variable ID: ' . $variable['Variable'] . ', Icon: "' . $icon . '"');
                     $variableInfo = IPS_GetVariable($variable['Variable']);
                     
                     // Extrahiere Button-Farben aus Profil/Darstellung für Bool-Variablen
