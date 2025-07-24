@@ -617,6 +617,15 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
             $variables = [];
             $this->DebugLog('DEBUG VARIABLES LIST: Processing ' . count($variablesList) . ' variables from configuration');
             foreach ($variablesList as $index => $variable) {
+                $varId = $variable['Variable'] ?? 'NONE';
+                $varType = 'UNKNOWN';
+                if (isset($variable['Variable']) && IPS_VariableExists($variable['Variable'])) {
+                    $varInfo = IPS_GetVariable($variable['Variable']);
+                    $varType = $varInfo['VariableType'];
+                }
+                $typeString = ($varType === 3) ? 'TEXT' : $varType;
+                $this->DebugLog('DEBUG FOREACH: Index ' . $index . ', Variable ID: ' . $varId . ', Type: ' . $typeString);
+
                 $this->DebugLog('DEBUG VARIABLE CHECK: Index ' . $index . ', Variable ID: ' . ($variable['Variable'] ?? 'NONE') . ', Group: ' . ($variable['Group'] ?? 'NONE'));
                 if (isset($variable['Variable']) && $variable['Variable'] > 0 && IPS_VariableExists($variable['Variable'])) {
                     $this->DebugLog('DEBUG VARIABLE PROCESSING: Variable ID ' . $variable['Variable'] . ' passed validation and will be processed');
