@@ -1140,7 +1140,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                     return $value;
                 }
             }
-            }
+            
         } else {
             $this->DebugLog('Icon mapping table is NULL, trying to load it now');
             $this->LoadIconMapping();
