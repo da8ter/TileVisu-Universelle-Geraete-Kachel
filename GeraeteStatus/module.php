@@ -12,7 +12,7 @@ class UniversalDeviceTile extends IPSModule
     
     public function Create()
     {
-        // Nie diese Zeile löschen! 
+        // Nie diese Zeile löschen!
         parent::Create();
 
         // Alter Gerätestatus (immer oben angezeigt)
@@ -1083,6 +1083,13 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
      * @return string Der gemappte FontAwesome-Name oder der Original-Name falls kein Mapping gefunden
      */
     private function MapIconToFontAwesome($iconName) {
+    // Vorverarbeitung: Whitespace entfernen und Normalisieren
+    $iconName = trim($iconName);
+    // Manche Profile liefern bereits eine FontAwesome-Klasse wie "fa-bolt" – das belassen wir
+    // Debug speziell für Electricity Icon
+    if (strpos($iconName, 'Electricity') !== false) {
+        $this->DebugLog('ELECTRICITY DEBUG: Normalized iconName = "' . $iconName . '"');
+    }
         // Debug speziell für Electricity Icon
         if (strpos($iconName, 'Electricity') !== false) {
             $this->DebugLog('ELECTRICITY DEBUG: Input iconName = "' . $iconName . '"');
@@ -1124,6 +1131,15 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                 }
                 
                 return $mappedName;
+            }
+            // Case-insensitive Fallback: Vergleiche alle Keys in Kleinbuchstaben
+            $lowerKey = strtolower($baseName);
+            foreach ($this->iconMapping as $key => $value) {
+                if (strtolower($key) === $lowerKey) {
+                    $this->DebugLog('Case-insensitive mapping hit: ' . $key . ' → ' . $value);
+                    return $value;
+                }
+            }
             }
         } else {
             $this->DebugLog('Icon mapping table is NULL, trying to load it now');
