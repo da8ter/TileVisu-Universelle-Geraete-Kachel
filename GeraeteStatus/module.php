@@ -722,7 +722,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         $variableData['timeInSeconds'] = $hours * 3600 + $minutes * 60 + $seconds;
                     }
                     
-                    $this->SendDebug('GetFullUpdateMessage', 'Variable data: ' . json_encode($variableData), 0);
+                    $this->SendDebug('GetFullUpdateMessage', 'Variable data: ' . json_encode($variableData), $index);
                     $variables[] = $variableData;
                 }
             }
