@@ -1116,14 +1116,13 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
             $this->DebugLog('Removed fa- prefix from icon: ' . $iconName . ' → ' . $baseName);
         }
         
+        // Stelle sicher, dass das Icon Mapping immer geladen ist
+        if ($this->iconMapping === null || empty($this->iconMapping)) {
+            $this->LoadIconMapping();
+        }
+        
         // Versuche den Basis-Namen in der JSON-Mapping-Tabelle zu finden
-        if ($this->iconMapping !== null) {
-            // Stellen sicher, dass die Mapping-Tabelle neu geladen wird, falls sie leer ist
-            if (empty($this->iconMapping)) {
-                $this->LoadIconMapping();
-                $this->DebugLog('Reloaded icon mapping table');
-            }
-            
+        if ($this->iconMapping !== null && is_array($this->iconMapping) && !empty($this->iconMapping)) {
             if (isset($this->iconMapping[$baseName])) {
                 $mappedName = $this->iconMapping[$baseName];
                 $this->DebugLog('Mapped icon from JSON: ' . $baseName . ' → ' . $mappedName);
@@ -1135,16 +1134,16 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                 }
                 
                 return $mappedName;
-            }
-            // Case-insensitive Fallback: Vergleiche alle Keys in Kleinbuchstaben
-            $lowerKey = strtolower($baseName);
-            foreach ($this->iconMapping as $key => $value) {
-                if (strtolower($key) === $lowerKey) {
-                    $this->DebugLog('Case-insensitive mapping hit: ' . $key . ' → ' . $value);
-                    return $value;
+            } else {
+                // Case-insensitive Fallback: Vergleiche alle Keys in Kleinbuchstaben
+                $lowerKey = strtolower($baseName);
+                foreach ($this->iconMapping as $key => $value) {
+                    if (strtolower($key) === $lowerKey) {
+                        $this->DebugLog('Case-insensitive mapping hit: ' . $key . ' → ' . $value);
+                        return $value;
+                    }
                 }
             }
-            
         } else {
             $this->DebugLog('Icon mapping table is NULL, trying to load it now');
             $this->LoadIconMapping();
