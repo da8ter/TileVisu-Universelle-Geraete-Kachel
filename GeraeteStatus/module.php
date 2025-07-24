@@ -626,6 +626,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                     if (empty($label)) {
                         $variableObject = IPS_GetObject($variable['Variable']);
                         $label = $variableObject['ObjectName'];
+                        $this->DebugLog('DEBUG: After label assignment for Variable ID: ' . $variable['Variable'] . ', Label: ' . $label);
                     }
                     
                     $this->DebugLog('DEBUG: About to call GetIcon for Variable ID: ' . $variable['Variable']);
