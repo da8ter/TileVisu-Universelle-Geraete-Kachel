@@ -1054,6 +1054,11 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
      * @return string Der gemappte FontAwesome-Name oder der Original-Name falls kein Mapping gefunden
      */
     private function MapIconToFontAwesome($iconName) {
+        // Debug speziell für Electricity Icon
+        if (strpos($iconName, 'Electricity') !== false) {
+            $this->DebugLog('ELECTRICITY DEBUG: Input iconName = "' . $iconName . '"');
+        }
+        
         // Wenn kein Icon oder "Transparent", leeren String zurückgeben
         if (empty($iconName) || $iconName === 'Transparent') {
             return '';
