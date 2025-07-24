@@ -991,7 +991,9 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
 
 
         // Icon-Mapping zu FontAwesome durchführen
+        $this->DebugLog('BEFORE MapIconToFontAwesome - Variable ID: ' . $id . ', Icon: "' . $icon . '"');
         $mappedIcon = $this->MapIconToFontAwesome($icon);
+        $this->DebugLog('AFTER MapIconToFontAwesome - Variable ID: ' . $id . ', Mapped Icon: "' . $mappedIcon . '"');
         
         // Debug-Ausgabe
         $this->DebugLog('GetIcon RESULT - Variable ID: ' . $id . ', Original Icon: "' . $icon . '", Mapped Icon: "' . $mappedIcon . '"');
