@@ -68,16 +68,20 @@
               "caption": "Image selection",
               "options": [
                 {
-                  "caption": "Washing machine",
+                  "caption": "Clothes dryer",
                   "value": 0
                 },
                 {
-                  "caption": "Clothes dryer",
+                  "caption": "Washing machine",
                   "value": 1
                 },
                 {
                   "caption": "Custom images",
                   "value": 2
+                },
+                {
+                  "caption": "kein Bild",
+                  "value": 3
                 }
               ]
             },
@@ -631,59 +635,73 @@
               "visible": true
             },
             {
-              "caption": "Group (All elements in a group are displayed in a single row. Only for button and text display.)",
-              "name": "Group",
-              "type": "Select",
-              "width": "100%",  
-              "options": [
+              "type": "RowLayout",
+              "items": [
                 {
-                  "caption": "keine Gruppe",
-                  "value": "keine Gruppe"
+                  "caption": "Group (All elements in a group are displayed in a single row. Only for button and text display.)",
+                  "name": "Group",
+                  "type": "Select",
+                  "width": "600px",
+                  "options": [
+                    {
+                      "caption": "keine Gruppe",
+                      "value": "keine Gruppe"
+                    },
+                    {
+                      "caption": "Gruppe 1",
+                      "value": "Gruppe 1"
+                    },
+                    {
+                      "caption": "Gruppe 2",
+                      "value": "Gruppe 2"
+                    },
+                    {
+                      "caption": "Gruppe 3",
+                      "value": "Gruppe 3"
+                    },
+                    {
+                      "caption": "Gruppe 4",
+                      "value": "Gruppe 4"
+                    },
+                    {
+                      "caption": "Gruppe 5",
+                      "value": "Gruppe 5"
+                    },
+                    {
+                      "caption": "Gruppe 6",
+                      "value": "Gruppe 6"
+                    },
+                    {
+                      "caption": "Gruppe 7",
+                      "value": "Gruppe 7"
+                    },
+                    {
+                      "caption": "Gruppe 8",
+                      "value": "Gruppe 8"
+                    },
+                    {
+                      "caption": "Gruppe 9",
+                      "value": "Gruppe 9"
+                    },
+                    {
+                      "caption": "Gruppe 10",
+                      "value": "Gruppe 10"
+                    }
+                  ],
+                  "save": true,
+                  "add": "keine Gruppe",
+                  "visible": true
                 },
                 {
-                  "caption": "Gruppe 1",
-                  "value": "Gruppe 1"
-                },
-                {
-                  "caption": "Gruppe 2",
-                  "value": "Gruppe 2"
-                },
-                {
-                  "caption": "Gruppe 3",
-                  "value": "Gruppe 3"
-                },
-                {
-                  "caption": "Gruppe 4",
-                  "value": "Gruppe 4"
-                },
-                {
-                  "caption": "Gruppe 5",
-                  "value": "Gruppe 5"
-                },
-                {
-                  "caption": "Gruppe 6",
-                  "value": "Gruppe 6"
-                },
-                {
-                  "caption": "Gruppe 7",
-                  "value": "Gruppe 7"
-                },
-                {
-                  "caption": "Gruppe 8",
-                  "value": "Gruppe 8"
-                },
-                {
-                  "caption": "Gruppe 9",
-                  "value": "Gruppe 9"
-                },
-                {
-                  "caption": "Gruppe 10",
-                  "value": "Gruppe 10"
+                  "caption": "Show Group Name",
+                  "name": "ShowGroupName",
+                  "type": "CheckBox",
+                  "width": "200px",
+                  "save": true,
+                  "add": false,
+                  "visible": true
                 }
-              ],
-              "save": true,
-              "add": "keine Gruppe",
-              "visible": true
+              ]
             },
             {
               "type": "RowLayout",
@@ -837,6 +855,33 @@
       "minimum": 0,
       "maximum": 50,
       "suffix": "px"
+    },
+    {
+      "type": "ExpansionPanel",
+      "caption": "Group Names",
+      "items": [
+        {
+          "type": "List",
+          "name": "GroupNamesList",
+          "caption": "Group Names Configuration",
+          "columns": [
+            {
+              "name": "Group",
+              "caption": "Group",
+              "width": "100px"
+            },
+            {
+              "name": "GroupName",
+              "caption": "Group Name",
+              "width": "auto",
+              "edit": {
+                "type": "ValidationTextBox"
+              }
+            }
+          ],
+          "rowCount": 10
+        }
+      ]
     },
     {
       "type": "Label",

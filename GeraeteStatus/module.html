@@ -336,6 +336,34 @@
             return variable.textColor;
         }
 
+        // Hilfsfunktion zur Bildanzeige-Steuerung basierend auf Bildauswahl und Bildbreite
+        function updateImageVisibility() {
+            const div1 = document.getElementById('div1');
+            const div2 = document.getElementById('div2');
+            const mainContainer = document.querySelector('.main_container');
+            const bildauswahl = window.currentBildauswahl;
+            const bildbreite = window.currentBildbreite;
+            
+            debugLog('updateImageVisibility called with:', { bildauswahl, bildbreite });
+            
+            // Verstecke Bild wenn "kein Bild" (Wert 3) ausgewählt ist oder Bildbreite 0 ist
+            if (bildauswahl === 3 || bildbreite === 0) {
+                // Komplett verstecken und Layout auf Vollbreite umstellen
+                div1.style.display = 'none';
+                div2.style.padding = '0px 5px 5px 5px'; // Gleichmäßiges Padding
+                div2.style.width = '100%';
+                div2.style.borderLeft = 'none'; // Entferne linken Border falls vorhanden
+                debugLog('Image completely hidden, content full width: bildauswahl=' + bildauswahl + ', bildbreite=' + bildbreite);
+            } else {
+                // Normales zwei-Spalten Layout wiederherstellen
+                div1.style.display = 'block';
+                div1.className = 'div1';
+                div2.style.padding = '0px 5px 5px 2.5%'; // Standard-Padding wiederherstellen
+                div2.style.width = '100%'; // div2 bleibt flexibel
+                debugLog('Image shown, two-column layout: bildauswahl=' + bildauswahl + ', bildbreite=' + bildbreite);
+            }
+        }
+
         function updateProgressBarStyles(config) {
             debugLog('Updating progress bar styles with config:', config);
             const root = document.documentElement;
@@ -399,7 +427,21 @@
                         renderStatus(decodedData);
                         break;
                     case 'variables':
-                        renderVariables(value);
+                        // Speichere Variables-Daten für spätere Verwendung
+                        window.lastVariablesData = value;
+                        
+                        // Rendere nur wenn groupNames bereits verfügbar sind, oder wenn keine Gruppen verwendet werden
+                        const hasGroupedVariables = value && value.some(v => v.group && v.group !== 'keine Gruppe' && v.showGroupName);
+                        
+                        if (!hasGroupedVariables || window.groupNames) {
+                            // Keine Gruppen mit showGroupName ODER groupNames sind verfügbar
+                            renderVariables(value);
+                            debugLog('Variables rendered immediately. hasGroupedVariables: ' + hasGroupedVariables + ', groupNames available: ' + !!window.groupNames);
+                        } else {
+                            // Warte auf groupNames - wird später von groupNames case gerendert
+                            debugLog('Variables rendering delayed - waiting for groupNames');
+                        }
+                        
                         break;
                     case 'progressbarconfig':
                         updateProgressBarStyles(value);
@@ -408,16 +450,33 @@
                             renderVariables(window.lastVariablesData);
                         }
                         break;
+                    case 'assets':
+                        // Aktualisiere Assets (Bilder) sofort
+                        if (typeof value === 'object') {
+                            window.assets = window.assets || {};
+                            Object.assign(window.assets, value);
+                            debugLog('Assets updated:', Object.keys(value));
+                        }
+                        break;
+                    case 'groupnames':
+                        // Speichere Gruppennamen für Frontend-Verwendung
+                        window.groupNames = value;
+                        debugLog('Group names updated: ' + JSON.stringify(value));
+                        // Re-render variables wenn bereits geladen, damit neue Gruppennamen angezeigt werden
+                        if (window.lastVariablesData) {
+                            renderVariables(window.lastVariablesData);
+                        }
+                        break;
+                    case 'bildauswahl':
+                        // Speichere Bildauswahl für spätere Verwendung
+                        window.currentBildauswahl = value;
+                        updateImageVisibility();
+                        break;
                     case 'bildbreite':
                         root.style.setProperty('--bildbreite', value + '%');
-                        const div1 = document.getElementById('div1');
-                        const div2 = document.getElementById('div2');
-                        if (value !== 0) {
-                            div1.className = 'div1';
-                        } else {
-                            div1.className = 'hidden';
-                            div2.style.padding = '0px 5px 5px 0px';
-                        }
+                        // Speichere Bildbreite für spätere Verwendung
+                        window.currentBildbreite = value;
+                        updateImageVisibility();
                         break;
                     case 'bildtransparenz':
                         root.style.setProperty('--bildtransparenz', value);
@@ -839,6 +898,55 @@
             
             debugLog('renderVariables called with:', variables);
             
+            // PHASE 1: Berechne maximale Gruppenname-Breite für Alignment
+            let maxGroupNameWidth = 0;
+            if (window.groupNames) {
+                const tempDiv = document.createElement('div');
+                tempDiv.style.position = 'absolute';
+                tempDiv.style.visibility = 'hidden';
+                tempDiv.style.whiteSpace = 'nowrap';
+                tempDiv.style.fontWeight = 'bold';
+                document.body.appendChild(tempDiv);
+                
+                // Gruppiere Variablen und finde alle sichtbaren Gruppennamen
+                const groupedVariables = variables.reduce((acc, variable) => {
+                    if (variable.group && variable.group !== 'keine Gruppe') {
+                        if (!acc[variable.group]) acc[variable.group] = [];
+                        acc[variable.group].push(variable);
+                    }
+                    return acc;
+                }, {});
+                
+                // Berechne Breite für jeden sichtbaren Gruppennamen
+                Object.keys(groupedVariables).forEach(groupKey => {
+                    const groupVariables = groupedVariables[groupKey];
+                    const shouldShowGroupName = groupVariables.some(v => v.showGroupName === true);
+                    
+                    if (shouldShowGroupName) {
+                        // Bestimme Anzeigenamen
+                        let displayGroupName = groupKey;
+                        const groupMatch = groupKey.match(/Gruppe (\d+)/);
+                        if (groupMatch && window.groupNames) {
+                            const groupNumber = parseInt(groupMatch[1]);
+                            displayGroupName = window.groupNames[groupNumber] || groupKey;
+                        }
+                        
+                        // Verwende die gleiche Schriftgröße wie die erste Variable
+                        const firstVariableFontSize = groupVariables[0]?.fontSize || 14;
+                        tempDiv.style.fontSize = firstVariableFontSize + 'px';
+                        tempDiv.textContent = displayGroupName + ':';
+                        
+                        const width = tempDiv.offsetWidth;
+                        maxGroupNameWidth = Math.max(maxGroupNameWidth, width);
+                        
+                        debugLog('Group name "' + displayGroupName + '" width: ' + width + 'px');
+                    }
+                });
+                
+                document.body.removeChild(tempDiv);
+                debugLog('Maximum group name width for alignment: ' + maxGroupNameWidth + 'px');
+            }
+            
             // Track welche Gruppen bereits gerendert wurden
             const renderedGroups = new Set();
             let content = '';
@@ -871,9 +979,57 @@
                         const groupHasBorderLine = groupVariables.some(v => v.showBorderLine && v.displayType === 'text');
                         const groupCssClasses = groupHasBorderLine ? 'variable-group with-border-line' : 'variable-group';
                         
+                        // Prüfe ob eine Variable in der Gruppe ShowGroupName aktiviert hat
+                        const shouldShowGroupName = groupVariables.some(v => v.showGroupName === true);
+                        
+                        // Debug: Zeige showGroupName Status für alle Variablen in der Gruppe
+                        debugLog('Group "' + variable.group + '" showGroupName status:');
+                        groupVariables.forEach(v => {
+                            debugLog('  Variable ' + v.id + ': showGroupName = ' + v.showGroupName);
+                        });
+                        debugLog('shouldShowGroupName result: ' + shouldShowGroupName);
+                        debugLog('window.groupNames available: ' + (window.groupNames ? 'yes' : 'no'));
+                        if (window.groupNames) {
+                            debugLog('Available group names:', window.groupNames);
+                        }
+                        
+                        // Bestimme den Gruppennamen basierend auf der Gruppenbezeichnung
+                        let displayGroupName = variable.group;
+                        if (shouldShowGroupName && window.groupNames) {
+                            // Extrahiere Gruppennummer aus "Gruppe X" Format
+                            const groupMatch = variable.group.match(/Gruppe (\d+)/);
+                            if (groupMatch) {
+                                const groupNumber = parseInt(groupMatch[1]);
+                                displayGroupName = window.groupNames[groupNumber] || variable.group;
+                                debugLog('Group match found: Gruppe ' + groupNumber + ' -> "' + displayGroupName + '"');
+                            } else {
+                                debugLog('No group number found in: "' + variable.group + '"');
+                            }
+                        }
+                        
                         content += `
-                            <div class="${groupCssClasses}" style="margin-bottom: var(--element-spacing, 8px); margin-top: var(--element-spacing, 8px);">
-                                <div class="variable-group-items" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+                            <div class="${groupCssClasses}" style="margin-bottom: var(--element-spacing, 8px); margin-top: var(--element-spacing, 8px); display: flex; align-items: flex-start; gap: 16px;">
+                        `;
+                        
+                        // Füge Gruppennamen links hinzu wenn gewünscht
+                        if (shouldShowGroupName) {
+                            // Verwende die gleiche Schriftgröße wie die erste Variable der Gruppe
+                            const firstVariableFontSize = groupVariables[0]?.fontSize || 14;
+                            
+                            // Verwende feste Breite für einheitliches Alignment aller Gruppen
+                            const groupNameWidth = maxGroupNameWidth > 0 ? maxGroupNameWidth + 'px' : 'auto';
+                            
+                            content += `
+                                <div class="group-name-label" style="font-weight: bold; color: var(--content-color); font-size: ${firstVariableFontSize}px; white-space: nowrap; align-self: center; margin-right: 8px; width: ${groupNameWidth}; display: inline-block; text-align: left;">
+                                    ${displayGroupName}:
+                                </div>
+                            `;
+                            
+                            debugLog('Group name "' + displayGroupName + '" using font size: ' + firstVariableFontSize + 'px, aligned width: ' + groupNameWidth);
+                        }
+                        
+                        content += `
+                                <div class="variable-group-items" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; flex: 1;">
                         `;
                         
                         groupVariables.forEach(groupVar => {

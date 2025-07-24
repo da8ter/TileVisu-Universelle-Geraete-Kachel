@@ -48,6 +48,21 @@ class UniversalDeviceTile extends IPSModule
         
         // Debug-Steuerung
         $this->RegisterPropertyBoolean('DebugEnabled', false);
+        
+        // Benutzerdefinierte Gruppennamen (Groups 1-10)
+        $defaultGroupNames = json_encode([
+            ['Group' => 1, 'GroupName' => 'Group 1'],
+            ['Group' => 2, 'GroupName' => 'Group 2'],
+            ['Group' => 3, 'GroupName' => 'Group 3'],
+            ['Group' => 4, 'GroupName' => 'Group 4'],
+            ['Group' => 5, 'GroupName' => 'Group 5'],
+            ['Group' => 6, 'GroupName' => 'Group 6'],
+            ['Group' => 7, 'GroupName' => 'Group 7'],
+            ['Group' => 8, 'GroupName' => 'Group 8'],
+            ['Group' => 9, 'GroupName' => 'Group 9'],
+            ['Group' => 10, 'GroupName' => 'Group 10']
+        ]);
+        $this->RegisterPropertyString('GroupNamesList', $defaultGroupNames);
 
         // Visualisierungstyp auf 1 setzen, da wir HTML anbieten möchten
         $this->SetVisualizationType(1);
@@ -143,7 +158,124 @@ class UniversalDeviceTile extends IPSModule
         }
 
         // Schicke eine komplette Update-Nachricht an die Darstellung, da sich ja Parameter geändert haben können
-        $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
+        $fullUpdateMessageJson = $this->GetFullUpdateMessage(); // Gibt bereits JSON-String zurück
+        $fullUpdateMessage = json_decode($fullUpdateMessageJson, true); // In Array umwandeln
+        
+        // Füge Asset-Update hinzu wenn sich Bildauswahl geändert hat
+        $bildauswahl = $this->ReadPropertyInteger('Bildauswahl');
+        $assets = $this->GenerateAssets($bildauswahl);
+        if (!empty($assets)) {
+            $fullUpdateMessage['assets'] = $assets;
+        }
+        
+        $this->UpdateVisualizationValue(json_encode($fullUpdateMessage));
+    }
+
+    /**
+     * Gibt den benutzerdefinierten Gruppennamen für eine Gruppennummer zurück
+     * @param int $groupNumber Die Gruppennummer (1-10)
+     * @return string Der benutzerdefinierte Gruppenname oder Fallback
+     */
+    public function GetGroupName($groupNumber)
+    {
+        $groupNamesList = json_decode($this->ReadPropertyString('GroupNamesList'), true);
+        
+        if (is_array($groupNamesList)) {
+            foreach ($groupNamesList as $group) {
+                if (isset($group['Group']) && $group['Group'] == $groupNumber) {
+                    return $group['GroupName'] ?? "Group $groupNumber";
+                }
+            }
+        }
+        
+        // Fallback falls keine Konfiguration gefunden wurde
+        return "Group $groupNumber";
+    }
+    
+    /**
+     * Gibt alle Gruppennamen als Array zurück für Frontend-Verwendung
+     * @return array Assoziatives Array mit Gruppennummer als Key und Name als Value
+     */
+    public function GetAllGroupNames()
+    {
+        $groupNamesList = json_decode($this->ReadPropertyString('GroupNamesList'), true);
+        $result = [];
+        
+        if (is_array($groupNamesList)) {
+            foreach ($groupNamesList as $group) {
+                if (isset($group['Group']) && isset($group['GroupName'])) {
+                    $result[$group['Group']] = $group['GroupName'];
+                }
+            }
+        }
+        
+        // Stelle sicher, dass alle Gruppen 1-10 existieren
+        for ($i = 1; $i <= 10; $i++) {
+            if (!isset($result[$i])) {
+                $result[$i] = "Group $i";
+            }
+        }
+        
+        return $result;
+    }
+
+    // Hilfsmethode zur Asset-Generierung basierend auf Bildauswahl
+    private function GenerateAssets($bildauswahl) {
+        $assets = [];
+        
+        if($bildauswahl == 0) {
+            // Waschmaschine - Option 0 soll Waschmaschinen-Bilder zeigen
+            $assets['img_wm_aus'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp'));
+            $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp'));
+        }
+        elseif($bildauswahl == 1) {
+            // Trockner - Option 1 soll Trockner-Bilder zeigen
+            $assets['img_wm_aus'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_aus.webp'));
+            $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_an.webp'));
+        }
+        elseif($bildauswahl == 2) {
+            // Custom Images
+            $imageID_Bild_An = $this->ReadPropertyInteger('Bild_An');
+            if (IPS_MediaExists($imageID_Bild_An)) {
+                $image = IPS_GetMedia($imageID_Bild_An);
+                if ($image['MediaType'] === MEDIATYPE_IMAGE) {
+                    $imageFile = explode('.', $image['MediaFile']);
+                    $imageContent = $this->GetImageDataUri(end($imageFile));
+                    if ($imageContent) {
+                        $assets['img_wm_an'] = $imageContent . IPS_GetMediaContent($imageID_Bild_An);
+                    }
+                }
+            }
+            
+            $imageID_Bild_Aus = $this->ReadPropertyInteger('Bild_Aus');
+            if (IPS_MediaExists($imageID_Bild_Aus)) {
+                $image = IPS_GetMedia($imageID_Bild_Aus);
+                if ($image['MediaType'] === MEDIATYPE_IMAGE) {
+                    $imageFile = explode('.', $image['MediaFile']);
+                    $imageContent = $this->GetImageDataUri(end($imageFile));
+                    if ($imageContent) {
+                        $assets['img_wm_aus'] = $imageContent . IPS_GetMediaContent($imageID_Bild_Aus);
+                    }
+                }
+            }
+        }
+        // Bei bildauswahl == 3 ("kein Bild") werden keine Assets benötigt
+        
+        return $assets;
+    }
+    
+    // Hilfsmethode für Data URI basierend auf Dateierweiterung
+    private function GetImageDataUri($extension) {
+        switch (strtolower($extension)) {
+            case 'bmp': return 'data:image/bmp;base64,';
+            case 'jpg':
+            case 'jpeg': return 'data:image/jpeg;base64,';
+            case 'gif': return 'data:image/gif;base64,';
+            case 'png': return 'data:image/png;base64,';
+            case 'ico': return 'data:image/x-icon;base64,';
+            case 'webp': return 'data:image/webp;base64,';
+            default: return null;
+        }
     }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
@@ -482,6 +614,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         'displayType' => $variable['DisplayType'] ?? 'text',
                         'variableType' => $variableInfo['VariableType'], // Für Button-Validierung
                         'group' => $variable['Group'] ?? 'keine Gruppe', // Group-Information für Frontend-Gruppierung
+                        'showGroupName' => $variable['ShowGroupName'] ?? false, // Show Group Name Flag für Frontend
                         'showIcon' => ($variable['ShowIcon'] ?? true) && !empty($icon) && $icon !== 'Transparent',
                         'showLabel' => $variable['ShowLabel'] ?? true,
                         'showValue' => $variable['ShowValue'] ?? true,
@@ -550,6 +683,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         ];
         
         // Bild-Konfiguration
+        $result['bildauswahl'] = $this->ReadPropertyInteger('Bildauswahl');
         $result['BildBreite'] = $this->ReadPropertyFloat('BildBreite');
         $result['bildtransparenz'] = $this->ReadPropertyFloat('Bildtransparenz');
         $result['kachelhintergrundfarbe'] = '#' . sprintf('%06X', $this->ReadPropertyInteger('Kachelhintergrundfarbe'));
@@ -614,6 +748,9 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         
         // Füge Instance-ID für RequestAction-Aufrufe hinzu
         $result['instanceid'] = $this->InstanceID;
+        
+        // Füge Gruppennamen hinzu für Frontend-Verwendung
+        $result['groupNames'] = $this->GetAllGroupNames();
         
         return json_encode($result);
     }
