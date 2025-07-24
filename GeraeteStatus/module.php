@@ -729,7 +729,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
             
             $result['variables'] = $variables;
         // Debug: Log the first variable object to verify icon mapping
-        $this->SendDebug('GetFullUpdateMessage', 'FIRST VAR AFTER MAPPING: ' . (isset($variables[0]) ? json_encode($variables[0]) : 'NONE'), 0);
+        $this->SendDebug('FirstVarAfterMapping', (isset($variables[0]) ? json_encode($variables[0]) : 'NONE'), 0);
         }
         
         // Zentrale Fortschrittsbalken-Konfiguration
