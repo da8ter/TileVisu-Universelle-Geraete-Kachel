@@ -199,12 +199,17 @@ class UniversalDeviceTile extends IPSModule
     public function GetAllGroupNames()
     {
         $groupNamesList = json_decode($this->ReadPropertyString('GroupNamesList'), true);
+        $this->DebugLog('GetAllGroupNames - Raw GroupNamesList property: ' . $this->ReadPropertyString('GroupNamesList'));
+        $this->DebugLog('GetAllGroupNames - Decoded GroupNamesList: ' . print_r($groupNamesList, true));
+        
         $result = [];
         
         if (is_array($groupNamesList)) {
-            foreach ($groupNamesList as $group) {
-                if (isset($group['Group']) && isset($group['GroupName'])) {
-                    $result[$group['Group']] = $group['GroupName'];
+            foreach ($groupNamesList as $index => $group) {
+                if (isset($group['GroupName'])) {
+                    $groupNumber = $index + 1; // Array-Index 0 = Gruppe 1
+                    $this->DebugLog('GetAllGroupNames - Adding group: ' . $groupNumber . ' => ' . $group['GroupName']);
+                    $result[$groupNumber] = $group['GroupName'];
                 }
             }
         }
@@ -809,10 +814,21 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         
         // Füge Instance-ID für RequestAction-Aufrufe hinzu
         $result['instanceid'] = $this->InstanceID;
+        $this->DebugLog('DEBUG: About to add groupNames to result');
         
         // Füge Gruppennamen hinzu für Frontend-Verwendung
-        $result['groupNames'] = $this->GetAllGroupNames();
+        try {
+            $this->DebugLog('DEBUG: Calling GetAllGroupNames()');
+            $groupNames = $this->GetAllGroupNames();
+            $this->DebugLog('DEBUG: GetAllGroupNames() returned: ' . print_r($groupNames, true));
+            $this->DebugLog('GetFullUpdateMessage - Sending groupNames: ' . print_r($groupNames, true));
+            $result['groupNames'] = $groupNames;
+            $this->DebugLog('DEBUG: Added groupNames to result successfully');
+        } catch (Exception $e) {
+            $this->DebugLog('ERROR: Exception in groupNames processing: ' . $e->getMessage());
+        }
         
+        $this->DebugLog('DEBUG: About to return JSON with keys: ' . implode(', ', array_keys($result)));
         return json_encode($result);
     }
 
