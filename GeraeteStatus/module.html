@@ -883,8 +883,8 @@
         }
 
         function renderVariables(variables) {
-            if (!variables || !Array.isArray(variables)) return;
-            
+            debugLog('renderVariables called with ' + (variables ? variables.length : 0) + ' variables');
+            console.log('DIRECT DEBUG: renderVariables called with variables:', variables);
             const container = document.getElementById('variables-container');
             if (!container) return;
             
@@ -924,10 +924,21 @@
                     if (shouldShowGroupName) {
                         // Bestimme Anzeigenamen
                         let displayGroupName = groupKey;
+                        debugLog('Group name mapping - groupKey: "' + groupKey + '"');
+                        debugLog('Group name mapping - window.groupNames available: ' + !!window.groupNames);
+                        if (window.groupNames) {
+                            debugLog('Group name mapping - available groupNames:', window.groupNames);
+                        }
                         const groupMatch = groupKey.match(/Gruppe (\d+)/);
+                        debugLog('Group name mapping - groupMatch result:', groupMatch);
                         if (groupMatch && window.groupNames) {
                             const groupNumber = parseInt(groupMatch[1]);
+                            debugLog('Group name mapping - groupNumber: ' + groupNumber);
+                            debugLog('Group name mapping - looking up: window.groupNames[' + groupNumber + ']');
                             displayGroupName = window.groupNames[groupNumber] || groupKey;
+                            debugLog('Group name mapping - final displayGroupName: "' + displayGroupName + '"');
+                        } else {
+                            debugLog('Group name mapping - no match or no groupNames, using original: "' + displayGroupName + '"');
                         }
                         
                         // Verwende die gleiche Schriftgröße wie die erste Variable
@@ -993,17 +1004,21 @@
                         }
                         
                         // Bestimme den Gruppennamen basierend auf der Gruppenbezeichnung
+                        // WICHTIG: Mapping erfolgt immer wenn window.groupNames verfügbar ist,
+                        // shouldShowGroupName kontrolliert nur die Anzeige!
                         let displayGroupName = variable.group;
-                        if (shouldShowGroupName && window.groupNames) {
+                        if (window.groupNames) {
                             // Extrahiere Gruppennummer aus "Gruppe X" Format
                             const groupMatch = variable.group.match(/Gruppe (\d+)/);
                             if (groupMatch) {
                                 const groupNumber = parseInt(groupMatch[1]);
                                 displayGroupName = window.groupNames[groupNumber] || variable.group;
-                                debugLog('Group match found: Gruppe ' + groupNumber + ' -> "' + displayGroupName + '"');
+                                debugLog('Group mapping: Gruppe ' + groupNumber + ' -> "' + displayGroupName + '" (showGroupName: ' + shouldShowGroupName + ')');
                             } else {
                                 debugLog('No group number found in: "' + variable.group + '"');
                             }
+                        } else {
+                            debugLog('window.groupNames not available, using default: "' + displayGroupName + '"');
                         }
                         
                         content += `
