@@ -394,7 +394,7 @@
                     "value": "progress"
                   },
                   {
-                    "caption": "Button (Bool + Integer)",
+                    "caption": "Button",
                     "value": "button"
                   }
                 ]
