@@ -325,17 +325,6 @@ class UniversalDeviceTile extends IPSModule
                         $statusColor = $assoziation['StatusColor'] ?? -1;
                         $updateData['statusColor'] = isset($assoziation['StatusColor']) ? '#' . sprintf('%06X', $assoziation['StatusColor']) : '#000000';
                         $updateData['isStatusColorTransparent'] = isset($assoziation['StatusColor']) && ($assoziation['StatusColor'] == -1 || $assoziation['StatusColor'] == 16777215);
-                        
-                        // Prüfe Progressbar Active Flag
-                        $progressbarActive = $assoziation['ProgressbarActive'] ?? true;
-                        $updateData['progressbarActive'] = $progressbarActive;
-                        
-                        // Wenn Progressbar inaktiv ist, setze alle Progress-Werte auf 0
-                        if (!$progressbarActive) {
-                            $updateData['progressbarDisabled'] = true;
-                            $this->DebugLog('MessageSink: Progressbar disabled for association: ' . $assoziation['AssoziationName']);
-                        }
-                        
                         break;
                     }
                 }
@@ -346,8 +335,8 @@ class UniversalDeviceTile extends IPSModule
             }
         }
 
-    // Dynamische Verarbeitung der konfigurierten Variablen
-$variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
+        // Dynamische Verarbeitung der konfigurierten Variablen
+        $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
     
     if (is_array($variablesList)) {
         foreach ($variablesList as $index => $variable) {
@@ -412,6 +401,12 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         $newValue = intval($value);
         $currentValue = GetValue($variableID);
         $this->DebugLog('RequestAction: Integer variable ' . $variableID . ' set from ' . $currentValue . ' to ' . $newValue);
+        RequestAction($variableID, $newValue);
+    } else if ($variableType === VARIABLETYPE_STRING) {
+        // String-Variable: Verwende den übergebenen String-Wert direkt (für Multi-Button-Interface)
+        $newValue = strval($value);
+        $currentValue = GetValue($variableID);
+        $this->DebugLog('RequestAction: String variable ' . $variableID . ' set from "' . $currentValue . '" to "' . $newValue . '"');
         RequestAction($variableID, $newValue);
     } else {
         // Andere Variablentypen: Fallback auf Toggle-Verhalten
@@ -769,9 +764,9 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                     // Extrahiere Button-Farben aus Profil/Darstellung für Bool-Variablen
                     $buttonColors = $this->GetButtonColors($variable['Variable']);
                     
-                    // Extrahiere Integer-Associations für Button-Erstellung
-                    $integerAssociations = null;
-                    $this->DebugLog('Integer Association Check for Variable ID: ' . $variable['Variable'] . ' - VariableType: ' . $variableInfo['VariableType'] . ' (INTEGER=' . VARIABLETYPE_INTEGER . '), DisplayType: "' . ($variable['DisplayType'] ?? 'text') . '"');
+                    // Extrahiere Variable-Associations für Button-Erstellung (Integer + String)
+                    $variableAssociations = null;
+                    $this->DebugLog('Variable Association Check for Variable ID: ' . $variable['Variable'] . ' - VariableType: ' . $variableInfo['VariableType'] . ' (INTEGER=' . VARIABLETYPE_INTEGER . ', STRING=' . VARIABLETYPE_STRING . '), DisplayType: "' . ($variable['DisplayType'] ?? 'text') . '"');
                     
                     // Spezielle Debug-Ausgabe für Variable 11998
                     if ($variable['Variable'] == 11998) {
@@ -779,12 +774,20 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         $this->DebugLog('SPECIAL DEBUG Variable 11998: Type comparison: ' . ($variableInfo['VariableType'] === VARIABLETYPE_INTEGER ? 'TRUE' : 'FALSE') . ', DisplayType comparison: ' . (($variable['DisplayType'] ?? 'text') === 'button' ? 'TRUE' : 'FALSE'));
                     }
                     
-                    if ($variableInfo['VariableType'] === VARIABLETYPE_INTEGER && ($variable['DisplayType'] ?? 'text') === 'button') {
-                        $this->DebugLog('Calling GetIntegerAssociations for Variable ID: ' . $variable['Variable']);
-                        $integerAssociations = $this->GetIntegerAssociations($variable['Variable']);
-                        $this->DebugLog('GetIntegerAssociations returned: ' . ($integerAssociations ? json_encode($integerAssociations) : 'null'));
+                    if (($variable['DisplayType'] ?? 'text') === 'button') {
+                        if ($variableInfo['VariableType'] === VARIABLETYPE_INTEGER) {
+                            $this->DebugLog('Calling GetIntegerAssociations for Variable ID: ' . $variable['Variable']);
+                            $variableAssociations = $this->GetIntegerAssociations($variable['Variable']);
+                            $this->DebugLog('GetIntegerAssociations returned: ' . ($variableAssociations ? json_encode($variableAssociations) : 'null'));
+                        } elseif ($variableInfo['VariableType'] === VARIABLETYPE_STRING) {
+                            $this->DebugLog('Calling GetStringAssociations for Variable ID: ' . $variable['Variable']);
+                            $variableAssociations = $this->GetStringAssociations($variable['Variable']);
+                            $this->DebugLog('GetStringAssociations returned: ' . ($variableAssociations ? json_encode($variableAssociations) : 'null'));
+                        } else {
+                            $this->DebugLog('Skipping Variable Associations for Variable ID: ' . $variable['Variable'] . ' - unsupported variable type: ' . $variableInfo['VariableType']);
+                        }
                     } else {
-                        $this->DebugLog('Skipping GetIntegerAssociations for Variable ID: ' . $variable['Variable'] . ' - conditions not met');
+                        $this->DebugLog('Skipping Variable Associations for Variable ID: ' . $variable['Variable'] . ' - DisplayType is not "button"');
                     }
                     
                     // Extrahiere Min/Max-Werte aus Variablenprofil für Progress-Balken
@@ -831,7 +834,8 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         'rawValue' => GetValue($variable['Variable']),
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
-                        'integerAssociations' => $integerAssociations // Integer-Associations für Button-Erstellung
+                        'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
+                        'integerAssociations' => $variableAssociations // Backward compatibility
                     ];
                     
                     // Zweite Variable für Progress-Bars hinzufügen
@@ -1341,265 +1345,6 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
     }
     
     /**
-     * Extrahiert Associations einer Integer-Variable für Button-Erstellung
-     * Unterstützt sowohl klassische Variablenprofile als auch neue Symcon-Darstellungen
-     * @param int $variableId Die Variable-ID
-     * @return array|null Array mit Associations oder null wenn keine vorhanden
-     */
-    private function GetIntegerAssociations($variableId) {
-        $this->DebugLog('GetIntegerAssociations START for variable: ' . $variableId);
-        
-        if (!IPS_VariableExists($variableId)) {
-            $this->DebugLog('GetIntegerAssociations: Variable ' . $variableId . ' does not exist');
-            return null;
-        }
-        
-        $variable = IPS_GetVariable($variableId);
-        $this->DebugLog('GetIntegerAssociations: Variable data: ' . json_encode($variable));
-        
-        // Nur für Integer-Variablen
-        if ($variable['VariableType'] !== VARIABLETYPE_INTEGER) {
-            $this->DebugLog('GetIntegerAssociations: Variable ' . $variableId . ' is not INTEGER type (type: ' . $variable['VariableType'] . ')');
-            return null;
-        }
-        
-        $associations = [];
-        
-        // 1. Prüfe klassische Variablenprofile
-        $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-        $this->DebugLog('GetIntegerAssociations: Profile check - CustomProfile: "' . ($variable['VariableCustomProfile'] ?? 'null') . '", Profile: "' . ($variable['VariableProfile'] ?? 'null') . '", Using: "' . $profile . '"');
-        
-        if (!empty($profile) && IPS_VariableProfileExists($profile)) {
-            $this->DebugLog('GetIntegerAssociations: Profile "' . $profile . '" exists, checking associations');
-            $profileData = IPS_GetVariableProfile($profile);
-            $this->DebugLog('GetIntegerAssociations: Profile data: ' . json_encode($profileData));
-            
-            if (isset($profileData['Associations']) && is_array($profileData['Associations'])) {
-                $this->DebugLog('GetIntegerAssociations: Found ' . count($profileData['Associations']) . ' profile associations');
-                foreach ($profileData['Associations'] as $index => $association) {
-                    $this->DebugLog('GetIntegerAssociations: Profile association [' . $index . ']: ' . json_encode($association));
-                    if (isset($association['Value']) && isset($association['Name'])) {
-                        $associations[] = [
-                            'value' => $association['Value'],
-                            'name' => $association['Name'],
-                            'color' => isset($association['Color']) && $association['Color'] !== -1 ? '#' . sprintf('%06X', $association['Color']) : null,
-                            'icon' => isset($association['Icon']) ? $association['Icon'] : null
-                        ];
-                        $this->DebugLog('GetIntegerAssociations: Added profile association: Value=' . $association['Value'] . ', Name=' . $association['Name']);
-                    } else {
-                        $this->DebugLog('GetIntegerAssociations: Skipped profile association [' . $index . '] - missing Value or Name');
-                    }
-                }
-            } else {
-                $this->DebugLog('GetIntegerAssociations: Profile has no associations or associations is not array');
-            }
-        } else {
-            $this->DebugLog('GetIntegerAssociations: No valid profile found or profile does not exist');
-        }
-        
-        // 2. Prüfe neue Symcon-Darstellungen/Visualisierung (ObjectVisualization)
-        $objectId = $variableId;
-        $this->DebugLog('GetIntegerAssociations: Checking ObjectVisualization for object: ' . $objectId);
-        if (IPS_ObjectExists($objectId)) {
-            $object = IPS_GetObject($objectId);
-            $this->DebugLog('GetIntegerAssociations: Object data: ' . json_encode($object));
-            if (isset($object['ObjectVisualization']) && !empty($object['ObjectVisualization'])) {
-                $this->DebugLog('GetIntegerAssociations: ObjectVisualization found, raw data: ' . $object['ObjectVisualization']);
-                $visualization = json_decode($object['ObjectVisualization'], true);
-                $this->DebugLog('GetIntegerAssociations: Parsed visualization: ' . json_encode($visualization));
-                if (is_array($visualization) && isset($visualization['ValueMappings'])) {
-                    $this->DebugLog('GetIntegerAssociations: Found ' . count($visualization['ValueMappings']) . ' value mappings');
-                    foreach ($visualization['ValueMappings'] as $index => $mapping) {
-                        $this->DebugLog('GetIntegerAssociations: Value mapping [' . $index . ']: ' . json_encode($mapping));
-                        if (isset($mapping['Value']) && isset($mapping['Text'])) {
-                            $color = null;
-                            if (isset($mapping['Color']) && !empty($mapping['Color']) && $mapping['Color'] !== 'transparent') {
-                                // Konvertiere Farbe falls nötig
-                                if (is_numeric($mapping['Color'])) {
-                                    $color = '#' . sprintf('%06X', $mapping['Color']);
-                                } else {
-                                    $color = $mapping['Color'];
-                                }
-                            }
-                            
-                            $associations[] = [
-                                'value' => $mapping['Value'],
-                                'name' => $mapping['Text'],
-                                'color' => $color,
-                                'icon' => isset($mapping['Icon']) ? $mapping['Icon'] : null
-                            ];
-                            $this->DebugLog('GetIntegerAssociations: Added visualization mapping: Value=' . $mapping['Value'] . ', Text=' . $mapping['Text']);
-                        } else {
-                            $this->DebugLog('GetIntegerAssociations: Skipped value mapping [' . $index . '] - missing Value or Text');
-                        }
-                    }
-                } else {
-                    $this->DebugLog('GetIntegerAssociations: Visualization has no ValueMappings or is not array');
-                }
-            } else {
-                $this->DebugLog('GetIntegerAssociations: No ObjectVisualization found or empty');
-            }
-        } else {
-            $this->DebugLog('GetIntegerAssociations: Object ' . $objectId . ' does not exist');
-        }
-        
-        // 3. Prüfe VariableCustomPresentation (direkt aus Variable-Array - wie in GetProgressMinMax)
-        $this->DebugLog('GetIntegerAssociations: Checking VariableCustomPresentation for variable: ' . $variableId);
-        
-        // TRY-CATCH PROTECTION: Prevent hanging like with GetIcon()
-        try {
-            if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
-            $customPresentation = $variable['VariableCustomPresentation'];
-            $this->DebugLog('GetIntegerAssociations: VariableCustomPresentation found, size: ' . strlen(json_encode($customPresentation)));
-            
-            // GRANULAR DEBUG: Sichere Verarbeitung der VariableCustomPresentation
-            try {
-                $this->DebugLog('GetIntegerAssociations: About to process VariableCustomPresentation JSON');
-                $jsonString = json_encode($customPresentation, JSON_UNESCAPED_UNICODE);
-                $this->DebugLog('GetIntegerAssociations: JSON encoding successful, length: ' . strlen($jsonString));
-                
-                // Logging in kleinen Teilen um Speicher-/Performance-Probleme zu vermeiden
-                if (strlen($jsonString) > 1000) {
-                    $this->DebugLog('GetIntegerAssociations: Large VariableCustomPresentation detected, showing truncated version');
-                    $this->DebugLog('GetIntegerAssociations: First 500 chars: ' . substr($jsonString, 0, 500));
-                } else {
-                    $this->DebugLog('GetIntegerAssociations: VariableCustomPresentation: ' . $jsonString);
-                }
-                
-            } catch (Exception $e) {
-                $this->DebugLog('GetIntegerAssociations: ERROR processing VariableCustomPresentation JSON: ' . $e->getMessage());
-                // Continue mit nächstem Abschnitt
-            }
-            
-            // Prüfe auf verschiedene mögliche Strukturen für Associations
-            $foundAssociations = false;
-            
-            // Möglichkeit 1: Direkte Associations im Custom Presentation
-            if (isset($customPresentation['Associations']) && is_array($customPresentation['Associations'])) {
-                $this->DebugLog('GetIntegerAssociations: Found Associations in VariableCustomPresentation');
-                foreach ($customPresentation['Associations'] as $index => $assoc) {
-                    $this->DebugLog('GetIntegerAssociations: Association [' . $index . ']: ' . json_encode($assoc));
-                    if (isset($assoc['Value']) && isset($assoc['Name'])) {
-                        $color = null;
-                        if (isset($assoc['Color']) && $assoc['Color'] !== -1) {
-                            $color = '#' . sprintf('%06X', $assoc['Color']);
-                        }
-                        
-                        $associations[] = [
-                            'value' => $assoc['Value'],
-                            'name' => $assoc['Name'],
-                            'color' => $color,
-                            'icon' => isset($assoc['Icon']) ? $assoc['Icon'] : null
-                        ];
-                        $foundAssociations = true;
-                        $this->DebugLog('GetIntegerAssociations: Added VariableCustomPresentation association: Value=' . $assoc['Value'] . ', Name=' . $assoc['Name']);
-                    }
-                }
-            }
-            
-            // Möglichkeit 2: ValueList Struktur
-            if (!$foundAssociations && isset($customPresentation['ValueList']) && is_array($customPresentation['ValueList'])) {
-                $this->DebugLog('GetIntegerAssociations: Found ValueList in VariableCustomPresentation');
-                foreach ($customPresentation['ValueList'] as $index => $valueEntry) {
-                    $this->DebugLog('GetIntegerAssociations: ValueList entry [' . $index . ']: ' . json_encode($valueEntry));
-                    if (isset($valueEntry['Value']) && isset($valueEntry['Caption'])) {
-                        $color = null;
-                        if (isset($valueEntry['Color']) && $valueEntry['Color'] !== -1) {
-                            $color = '#' . sprintf('%06X', $valueEntry['Color']);
-                        }
-                        
-                        $associations[] = [
-                            'value' => $valueEntry['Value'],
-                            'name' => $valueEntry['Caption'],
-                            'color' => $color,
-                            'icon' => isset($valueEntry['Icon']) ? $valueEntry['Icon'] : null
-                        ];
-                        $foundAssociations = true;
-                        $this->DebugLog('GetIntegerAssociations: Added VariableCustomPresentation ValueList: Value=' . $valueEntry['Value'] . ', Caption=' . $valueEntry['Caption']);
-                    }
-                }
-            }
-            
-            // Möglichkeit 3: Direkte Value/Name Paare in der Root
-            if (!$foundAssociations) {
-                $this->DebugLog('GetIntegerAssociations: Searching for direct value mappings in VariableCustomPresentation root');
-                // Hier können weitere Strukturen geprüft werden, je nach dem was Variable 11998 enthält
-                foreach ($customPresentation as $key => $value) {
-                    $this->DebugLog('GetIntegerAssociations: VariableCustomPresentation key "' . $key . '": ' . (is_array($value) ? 'ARRAY(' . count($value) . ')' : json_encode($value)));
-                }
-            }
-            
-            // Möglichkeit 4: OPTIONS-Format (Variable 11998 Format) - JSON String
-            if (!$foundAssociations && isset($customPresentation['OPTIONS'])) {
-                $this->DebugLog('GetIntegerAssociations: Found OPTIONS in VariableCustomPresentation, trying to parse');
-                $optionsData = $customPresentation['OPTIONS'];
-                
-                // OPTIONS ist ein JSON-String, nicht ein Array!
-                if (is_string($optionsData)) {
-                    $this->DebugLog('GetIntegerAssociations: OPTIONS is JSON string, decoding...');
-                    
-                    try {
-                        $optionsArray = json_decode($optionsData, true);
-                        $this->DebugLog('GetIntegerAssociations: JSON decode successful, found ' . (is_array($optionsArray) ? count($optionsArray) : 0) . ' items');
-                        
-                        if (is_array($optionsArray)) {
-                            foreach ($optionsArray as $index => $option) {
-                                if (isset($option['Value']) && isset($option['Caption'])) {
-                                    $color = null;
-                                    if (isset($option['Color']) && is_numeric($option['Color'])) {
-                                        $color = '#' . sprintf('%06X', $option['Color']);
-                                    }
-                                    
-                                    $associations[] = [
-                                        'value' => intval($option['Value']),
-                                        'name' => $option['Caption'],
-                                        'color' => $color,
-                                        'icon' => isset($option['IconValue']) && !empty($option['IconValue']) ? $option['IconValue'] : null
-                                    ];
-                                    
-                                    $this->DebugLog('GetIntegerAssociations: Added OPTIONS JSON association: Value=' . $option['Value'] . ', Caption=' . $option['Caption'] . ', Color=' . ($color ?? 'none'));
-                                    $foundAssociations = true;
-                                }
-                            }
-                        }
-                    } catch (Exception $e) {
-                        $this->DebugLog('GetIntegerAssociations: Failed to decode OPTIONS JSON: ' . $e->getMessage());
-                    }
-                }
-            }
-            
-            // Keine Associations in direkter Struktur gefunden - prüfe auf andere Formate
-            if (!$foundAssociations) {
-                $this->DebugLog('GetIntegerAssociations: No associations found in VariableCustomPresentation structure');
-            }
-            
-        } else {
-            $this->DebugLog('GetIntegerAssociations: No VariableCustomPresentation found');
-        }
-        
-        } catch (Exception $e) {
-            $this->DebugLog('GetIntegerAssociations: ERROR processing VariableCustomPresentation for variable ' . $variableId . ' - ' . $e->getMessage());
-            $this->DebugLog('GetIntegerAssociations: Using fallback associations (empty)');
-        } catch (Error $e) {
-            $this->DebugLog('GetIntegerAssociations: FATAL ERROR processing VariableCustomPresentation for variable ' . $variableId . ' - ' . $e->getMessage());
-            $this->DebugLog('GetIntegerAssociations: Using fallback associations (empty)');
-        }
-        
-        $this->DebugLog('GetIntegerAssociations: Reached end of function for variable ' . $variableId);
-        $this->DebugLog('GetIntegerAssociations: Final associations count: ' . count($associations));
-        
-        if (count($associations) > 0) {
-            $this->DebugLog('GetIntegerAssociations RESULT for variable ' . $variableId . ': SUCCESS with ' . count($associations) . ' associations');
-            $this->DebugLog('GetIntegerAssociations RESULT: ' . json_encode($associations));
-        } else {
-            $this->DebugLog('GetIntegerAssociations RESULT for variable ' . $variableId . ': NO ASSOCIATIONS FOUND');
-        }
-        
-        $this->DebugLog('GetIntegerAssociations: COMPLETED for variable ' . $variableId);
-        return empty($associations) ? null : $associations;
-    }
-
-    /**
      * Extrahiert Button-Farben aus Variablen-Profil oder Darstellung
      * @param int $variableId Die Variable-ID
      * @return array Array mit 'active' und 'inactive' Farben
@@ -1867,6 +1612,175 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         return $defaultMinMax;
     }
     
+    /**
+     * Extrahiert Associations einer Integer-Variable für Button-Erstellung
+     * Unterstützt 4 Fälle: Alte Variablenprofile, CustomPresentation mit OPTIONS/TEMPLATE/PRESENTATION GUID
+     */
+    private function GetIntegerAssociations($variableId) {
+        return $this->GetVariableAssociations($variableId, VARIABLETYPE_INTEGER);
+    }
+    
+    /**
+     * Extrahiert Associations einer String-Variable für Button-Erstellung
+     * Unterstützt 4 Fälle: Alte Variablenprofile, CustomPresentation mit OPTIONS/TEMPLATE/PRESENTATION GUID
+     */
+    private function GetStringAssociations($variableId) {
+        return $this->GetVariableAssociations($variableId, VARIABLETYPE_STRING);
+    }
+    
+    /**
+     * Generische Funktion zum Extrahieren von Associations für Integer- und String-Variablen
+     * Unterstützt 4 Fälle: Alte Variablenprofile, CustomPresentation mit OPTIONS/TEMPLATE/PRESENTATION GUID
+     */
+    private function GetVariableAssociations($variableId, $expectedVariableType) {
+        if (!IPS_VariableExists($variableId)) {
+            return null;
+        }
+        
+        $variable = IPS_GetVariable($variableId);
+        
+        // Nur für den erwarteten Variablentyp
+        if ($variable['VariableType'] !== $expectedVariableType) {
+            return null;
+        }
+        
+        // Bestimme den Gruppennamen für FALL 4 basierend auf Variablentyp
+        $groupName = ($expectedVariableType === VARIABLETYPE_INTEGER) ? 'Numeric' : 'String';
+        
+        // **FALL 1: Alte Variablenprofile**
+        $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+        if (!empty($profile) && IPS_VariableProfileExists($profile)) {
+            $profileData = IPS_GetVariableProfile($profile);
+            
+            if (isset($profileData['Associations']) && is_array($profileData['Associations'])) {
+                $associations = [];
+                foreach ($profileData['Associations'] as $association) {
+                    if (isset($association['Value']) && isset($association['Name'])) {
+                        $associations[] = [
+                            'value' => $association['Value'], // Kann Integer oder String sein
+                            'name' => $association['Name'],
+                            'color' => isset($association['Color']) && $association['Color'] !== -1 ? '#' . sprintf('%06X', $association['Color']) : null,
+                            'icon' => isset($association['Icon']) ? $association['Icon'] : null
+                        ];
+                    }
+                }
+                return $associations;
+            }
+        }
+        
+        // Prüfe VariableCustomPresentation für Fälle 2-4
+        if (!isset($variable['VariableCustomPresentation']) || empty($variable['VariableCustomPresentation'])) {
+            return null;
+        }
+        
+        $customPresentation = $variable['VariableCustomPresentation'];
+        // **FALL 2: CustomPresentation mit direkten OPTIONS**
+        if (isset($customPresentation['OPTIONS'])) {
+            $options = is_string($customPresentation['OPTIONS']) ? json_decode($customPresentation['OPTIONS'], true) : $customPresentation['OPTIONS'];
+            if (is_array($options)) {
+                $associations = [];
+                foreach ($options as $option) {
+                    if (isset($option['Value']) && isset($option['Caption'])) {
+                        $associations[] = [
+                            'value' => $option['Value'], // Kann Integer oder String sein
+                            'name' => $option['Caption'],
+                            'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
+                            'icon' => isset($option['IconValue']) && !empty($option['IconValue']) ? $option['IconValue'] : null
+                        ];
+                    }
+                }
+                return $associations;
+            }
+        }
+        
+        // **FALL 3: CustomPresentation mit TEMPLATE**
+        if (isset($customPresentation['TEMPLATE'])) {
+            try {
+                if (function_exists('IPS_GetTemplate')) {
+                    $templateData = IPS_GetTemplate($customPresentation['TEMPLATE']);
+                    
+                    if (isset($templateData['Values']['OPTIONS'])) {
+                        $options = is_string($templateData['Values']['OPTIONS']) ? json_decode($templateData['Values']['OPTIONS'], true) : $templateData['Values']['OPTIONS'];
+                        if (is_array($options)) {
+                            $associations = [];
+                            foreach ($options as $option) {
+                                if (isset($option['Value']) && isset($option['Caption'])) {
+                                    $associations[] = [
+                                        'value' => $option['Value'], // Kann Integer oder String sein
+                                        'name' => $option['Caption'],
+                                        'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
+                                        'icon' => isset($option['IconValue']) && !empty($option['IconValue']) ? $option['IconValue'] : null
+                                    ];
+                                }
+                            }
+                            return $associations;
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // Template-Fehler ignorieren und mit nächstem Fall fortfahren
+            }
+        }
+        
+        // **FALL 4: CustomPresentation mit PRESENTATION GUID (Fallback)**
+        if (isset($customPresentation['PRESENTATION'])) {
+            try {
+                if (function_exists('IPS_GetPresentation')) {
+                    $presentationData = IPS_GetPresentation($customPresentation['PRESENTATION']);
+                    
+                    // Falls es ein JSON-String ist, dekodieren
+                    if (is_string($presentationData)) {
+                        $presentationData = json_decode($presentationData, true);
+                        if (json_last_error() !== JSON_ERROR_NONE) {
+                            return null;
+                        }
+                    }
+                    
+                    // Suche nach der entsprechenden Gruppe ("Numeric" für Integer, "String" für String)
+                    if (isset($presentationData['groups']) && is_array($presentationData['groups'])) {
+                        foreach ($presentationData['groups'] as $group) {
+                            if (isset($group['name']) && $group['name'] === $groupName) {
+                                if (isset($group['presentationParameters']['OPTIONS'])) {
+                                    $options = is_string($group['presentationParameters']['OPTIONS']) ? json_decode($group['presentationParameters']['OPTIONS'], true) : $group['presentationParameters']['OPTIONS'];
+                                    if (is_array($options)) {
+                                        // Prüfe auf deutsche Übersetzungen in locale.de
+                                        if (isset($presentationData['locale']['de'])) {
+                                            $originalOptionsString = $group['presentationParameters']['OPTIONS'];
+                                            if (isset($presentationData['locale']['de'][$originalOptionsString])) {
+                                                $germanOptionsString = $presentationData['locale']['de'][$originalOptionsString];
+                                                $germanOptions = json_decode($germanOptionsString, true);
+                                                if (is_array($germanOptions)) {
+                                                    $options = $germanOptions; // Verwende deutsche Übersetzungen
+                                                }
+                                            }
+                                        }
+                                        
+                                        $associations = [];
+                                        foreach ($options as $option) {
+                                            if (isset($option['Value']) && isset($option['Caption'])) {
+                                                $associations[] = [
+                                                    'value' => $option['Value'], // Kann Integer oder String sein
+                                                    'name' => $option['Caption'],
+                                                    'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
+                                                    'icon' => isset($option['IconValue']) && !empty($option['IconValue']) ? $option['IconValue'] : null
+                                                ];
+                                            }
+                                        }
+                                        return $associations;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // Presentation-Fehler ignorieren und fortfahren
+            }
+        }
+        
+        return null;
+    }
     
 }
 ?>

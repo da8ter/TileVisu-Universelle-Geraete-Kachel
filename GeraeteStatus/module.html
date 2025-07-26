@@ -642,21 +642,27 @@
         function updateButtonDisplay(buttonElement, variable) {
             debugLog('Updating button display for variable:', variable.id);
             
-            // Check if this is a multi-button container (Integer variable)
+            // Check if this is a multi-button container (Integer or String variable)
             const multiButtonContainer = buttonElement.querySelector('.variable-multi-button-container');
             
-            if (multiButtonContainer && variable.variableType === 1 && variable.integerAssociations) {
-                // Integer variable: Update multi-buttons
-                const currentValue = parseInt(variable.rawValue);
+            // Support both Integer (variableType 1) and String (variableType 3) variables
+            const associations = variable.variableAssociations || variable.integerAssociations;
+            const isButtonVariable = (variable.variableType === 1 || variable.variableType === 3) && associations;
+            
+            if (multiButtonContainer && isButtonVariable) {
+                // Integer/String variable: Update multi-buttons
+                const currentValue = variable.variableType === 1 ? parseInt(variable.rawValue) : variable.rawValue;
                 const buttons = multiButtonContainer.querySelectorAll('.variable-multi-button');
                 
                 buttons.forEach(button => {
-                    const associationValue = parseInt(button.getAttribute('data-association-value'));
+                    const associationValue = variable.variableType === 1 ? 
+                        parseInt(button.getAttribute('data-association-value')) : 
+                        button.getAttribute('data-association-value');
                     const isActive = currentValue === associationValue;
                     
                     // Find the corresponding association for color
-                    const association = variable.integerAssociations.find(assoc => assoc.value === associationValue);
-                    const buttonColor = association?.color || (isActive ? '#28a745' : '#6c757d');
+                    const association = associations.find(assoc => assoc.value === associationValue);
+                    const buttonColor = association?.color || (isActive ? '#00CDAA' : '#007562');
                     const opacity = isActive ? '1' : '0.7';
                     
                     // Update button state
@@ -1320,8 +1326,8 @@
                         const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
                         
                         // Verwende Progress-Farben für Button-Status (Progress Color 1 für true, Progress Color 2 für false)
-                        const activeColor = variable.progressColor1 || '#28a745';
-                        const inactiveColor = variable.progressColor2 || '#dc3545';
+                        const activeColor = variable.progressColor1 || '#00CDAA';
+                        const inactiveColor = variable.progressColor2 || '#007562';
                         const currentColor = isActive ? activeColor : inactiveColor;
                         
                         // Button-Inhalt basierend auf allgemeiner Konfiguration
@@ -1395,25 +1401,27 @@
                         `;
                         
                         debugLog('  - FINAL: Button rendered with color:', currentColor, 'width:', buttonWidth + 'px');
-                    } else if (variable.variableType === 1 && variable.integerAssociations && variable.integerAssociations.length > 0) {
-                        // Integer-Variable: Multi-Button für jede Association
-                        debugLog('Rendering multi-buttons for Integer variable:', variable.id, 'with', variable.integerAssociations.length, 'associations');
+                    } else if ((variable.variableType === 1 || variable.variableType === 3) && (variable.variableAssociations || variable.integerAssociations)) {
+                        // Integer/String-Variable: Multi-Button für jede Association
+                        const associations = variable.variableAssociations || variable.integerAssociations;
+                        const variableTypeLabel = variable.variableType === 1 ? 'Integer' : 'String';
+                        debugLog('Rendering multi-buttons for', variableTypeLabel, 'variable:', variable.id, 'with', associations.length, 'associations');
                         
                         // ButtonWidth aus Variablenkonfiguration verwenden (wie bei Boolean-Buttons)
                         const buttonWidth = variable.buttonWidth || 80; // Etwas schmaler für Multi-Buttons
                         debugLog('Multi-button width for variable:', variable.id, '→', buttonWidth + 'px');
                         
                         let buttonsHtml = '';
-                        const currentValue = parseInt(variable.rawValue);
+                        const currentValue = variable.variableType === 1 ? parseInt(variable.rawValue) : variable.rawValue;
                         
-                        variable.integerAssociations.forEach((association, index) => {
+                        associations.forEach((association, index) => {
                             const isActive = currentValue === association.value;
-                            const buttonColor = association.color || (isActive ? '#28a745' : '#6c757d');
+                            const buttonColor = association.color || (isActive ? '#00CDAA' : '#007562');
                             const opacity = isActive ? '1' : '0.7';
                             
                             // Button-Gruppierung: Bestimme CSS-Klasse basierend auf Position
                             let positionClass = '';
-                            const totalButtons = variable.integerAssociations.length;
+                            const totalButtons = associations.length;
                             
                             if (totalButtons === 1) {
                                 positionClass = 'single-button'; // Nur ein Button: alle Ecken rund
@@ -1438,7 +1446,7 @@
                             
                             buttonsHtml += `
                                 <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
-                                        onclick="requestAction('${variable.id}', ${association.value}); debugLog('Multi-button clicked for variable: ${variable.id}, value: ${association.value}');" 
+                                        onclick="requestAction('${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"}); debugLog('Multi-button clicked for variable: ${variable.id}, value: ${association.value}');" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
                                         style="background-color: ${buttonColor} !important; border-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
@@ -1455,12 +1463,74 @@
                         `;
                         
                         debugLog('Multi-buttons rendered for variable:', variable.id, 'current value:', currentValue);
+                    } else if (variable.variableType === 3 && variable.stringAssociations && variable.stringAssociations.length > 0) {
+                        // String-Variable: Multi-Button für jede Association
+                        debugLog('Rendering multi-buttons for String variable:', variable.id, 'with', variable.stringAssociations.length, 'associations');
+                        
+                        // ButtonWidth aus Variablenkonfiguration verwenden (wie bei Boolean-Buttons)
+                        const buttonWidth = variable.buttonWidth || 80; // Etwas schmaler für Multi-Buttons
+                        debugLog('Multi-button width for string variable:', variable.id, '→', buttonWidth + 'px');
+                        
+                        let buttonsHtml = '';
+                        const currentValue = String(variable.rawValue); // String-Wert als String behandeln
+                        
+                        variable.stringAssociations.forEach((association, index) => {
+                            const isActive = currentValue === String(association.value);
+                            const buttonColor = association.color || (isActive ? '#00CDAA' : '#007562');
+                            const opacity = isActive ? '1' : '0.7';
+                            
+                            // Button-Gruppierung: Bestimme CSS-Klasse basierend auf Position
+                            let positionClass = '';
+                            const totalButtons = variable.stringAssociations.length;
+                            
+                            if (totalButtons === 1) {
+                                positionClass = 'single-button'; // Nur ein Button: alle Ecken rund
+                            } else if (index === 0) {
+                                positionClass = 'first-button'; // Erster Button: nur links rund
+                            } else if (index === totalButtons - 1) {
+                                positionClass = 'last-button'; // Letzter Button: nur rechts rund
+                            } else {
+                                positionClass = 'middle-button'; // Mittlere Buttons: keine runden Ecken
+                            }
+                            
+                            // Button-Text basierend auf Association-Name
+                            let buttonText = association.name || String(association.value);
+                            
+                            // Icon hinzufügen falls vorhanden
+                            if (association.icon && association.icon !== 'Transparent') {
+                                const iconClass = prepareIconForDisplay(association.icon);
+                                if (iconClass) {
+                                    buttonText = `<i class="${iconClass}" style="margin-right: 4px;"></i>${buttonText}`;
+                                }
+                            }
+                            
+                            buttonsHtml += `
+                                <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
+                                        onclick="requestAction('${variable.id}', '${association.value}'); debugLog('String multi-button clicked for variable: ${variable.id}, value: ${association.value}');" 
+                                        data-variable-id="${variable.id}"
+                                        data-association-value="${association.value}"
+                                        style="background-color: ${buttonColor} !important; border-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                    ${buttonText}
+                                </button>`;
+                        });
+                        
+                        content += `
+                            <div class="variable-button-container">
+                                <div class="variable-multi-button-container">
+                                    ${buttonsHtml}
+                                </div>
+                            </div>
+                        `;
+                        
+                        debugLog('String multi-buttons rendered for variable:', variable.id, 'current value:', currentValue);
                     } else {
-                        // Fallback für Nicht-Bool/Integer-Variablen oder Integer ohne Associations: Zeige als Text
+                        // Fallback für Nicht-Bool/Integer/String-Variablen oder Variablen ohne Associations: Zeige als Text
                         if (variable.variableType === 1) {
                             console.warn('Integer variable', variable.id, 'has no associations for button display. Showing as text.');
+                        } else if (variable.variableType === 3) {
+                            console.warn('String variable', variable.id, 'has no associations for button display. Showing as text.');
                         } else {
-                            console.warn('Button display type only supported for boolean and integer variables. Variable', variable.id, 'is type', variable.variableType);
+                            console.warn('Button display type only supported for boolean, integer, and string variables. Variable', variable.id, 'is type', variable.variableType);
                         }
                         
                         let textParts = [];
@@ -1490,7 +1560,7 @@
                     if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
                         const iconClass = prepareIconForDisplay(variable.icon);
                         if (iconClass) {
-                            textParts.push(`<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
+                            textParts.push(`<i class="${iconClass} variable-icon" style="color: var(--accent-color);"></i>`);
                             debugLog(`Text variable icon rendered: ${variable.label}: ${variable.icon} → ${iconClass}`);
                         }
                     }
