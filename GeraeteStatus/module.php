@@ -73,13 +73,13 @@ class UniversalDeviceTile extends IPSModule
     
     /**
      * Zentrale Debug-Funktion - alle Debug-Ausgaben laufen über diese Funktion
+     * Sendet NUR ins Meldungsfenster, nicht ins Debug-Protokoll
      * @param string $message Debug-Nachricht
      * @param string $category Optional: Kategorie für bessere Übersicht (default: 'TileVisu DEBUG')
      */
     private function DebugLog($message, $category = 'TileVisu DEBUG') {
         if ($this->ReadPropertyBoolean('DebugEnabled')) {
             IPS_LogMessage($category, $message);
-            $this->SendDebug($category, $message, 0);
         }
     }
 
@@ -298,7 +298,6 @@ class UniversalDeviceTile extends IPSModule
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
         $this->DebugLog('DEBUG TEST: MessageSink called! SenderID: ' . $SenderID . ', Message: ' . $Message, 'MessageSink');
-        $this->SendDebug('MessageSink', 'DEBUG TEST: MessageSink called! SenderID: ' . $SenderID . ', Message: ' . $Message, 0);
         
         // Verarbeitung der Status-Variable
         $statusId = $this->ReadPropertyInteger('Status');
@@ -334,7 +333,7 @@ class UniversalDeviceTile extends IPSModule
                         // Wenn Progressbar inaktiv ist, setze alle Progress-Werte auf 0
                         if (!$progressbarActive) {
                             $updateData['progressbarDisabled'] = true;
-                            $this->SendDebug('MessageSink', 'Progressbar disabled for association: ' . $assoziation['AssoziationName'], 0);
+                            $this->DebugLog('MessageSink: Progressbar disabled for association: ' . $assoziation['AssoziationName']);
                         }
                         
                         break;
@@ -356,7 +355,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
             if (isset($variable['Variable']) && $SenderID === $variable['Variable']) {
                 switch ($Message) {
                     case VM_UPDATE:
-                        $this->SendDebug('MessageSink', 'Main variable update detected for index: ' . $index . ', variable ID: ' . $variable['Variable'], 0);
+                        $this->DebugLog('MessageSink: Main variable update detected for index: ' . $index . ', variable ID: ' . $variable['Variable']);
                         
                         // Sende vollständige Update-Nachricht für diese Variable
                         $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
@@ -367,7 +366,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
             elseif (isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable']) {
                 switch ($Message) {
                     case VM_UPDATE:
-                        $this->SendDebug('MessageSink', 'SecondVariable update detected for index: ' . $index . ', SecondVariable ID: ' . $variable['SecondVariable'], 0);
+                        $this->DebugLog('MessageSink: SecondVariable update detected for index: ' . $index . ', SecondVariable ID: ' . $variable['SecondVariable']);
                         
                         // Sende vollständige Update-Nachricht für diese Variable (enthält auch SecondVariable-Daten)
                         $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
@@ -392,15 +391,35 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         }
         
         // Nachrichten von der HTML-Darstellung schicken immer den Ident passend zur Eigenschaft und im Wert die Differenz, welche auf die Variable gerechnet werden soll
-        $variableID = $Ident;
-        if (!IPS_VariableExists($variableID)) {
-            $this->SendDebug('Error in RequestAction', 'Variable to be updated does not exist', 0);
-            return;
-        }
-            // Umschalten des Werts der Variable
+    $variableID = $Ident;
+    if (!IPS_VariableExists($variableID)) {
+        $this->DebugLog('Error in RequestAction: Variable to be updated does not exist');
+        return;
+    }
+    
+    // Ermittle Variablentyp für unterschiedliche Behandlung
+    $variable = IPS_GetVariable($variableID);
+    $variableType = $variable['VariableType'];
+    
+    if ($variableType === VARIABLETYPE_BOOLEAN) {
+        // Boolean-Variable: Toggle-Verhalten (wie bisher)
         $currentValue = GetValue($variableID);
-        //SetValue($variableID, !$currentValue);
-        RequestAction($variableID, !$currentValue);
+        $newValue = !$currentValue;
+        $this->DebugLog('RequestAction: Boolean variable ' . $variableID . ' toggle from ' . ($currentValue ? 'true' : 'false') . ' to ' . ($newValue ? 'true' : 'false'));
+        RequestAction($variableID, $newValue);
+    } else if ($variableType === VARIABLETYPE_INTEGER) {
+        // Integer-Variable: Verwende den übergebenen Wert direkt (für Multi-Button-Interface)
+        $newValue = intval($value);
+        $currentValue = GetValue($variableID);
+        $this->DebugLog('RequestAction: Integer variable ' . $variableID . ' set from ' . $currentValue . ' to ' . $newValue);
+        RequestAction($variableID, $newValue);
+    } else {
+        // Andere Variablentypen: Fallback auf Toggle-Verhalten
+        $currentValue = GetValue($variableID);
+        $newValue = !$currentValue;
+        $this->DebugLog('RequestAction: Unknown variable type ' . $variableType . ' for variable ' . $variableID . ', using toggle behavior');
+        RequestAction($variableID, $newValue);
+    }
     }
 
 
@@ -576,6 +595,51 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         $result = [];
         $this->DebugLog('DEBUG TEST: GetFullUpdateMessage called!', 'GetFullUpdateMessage');
         $this->DebugLog('Starting update message generation', 'GetFullUpdateMessage');
+        
+        // DIREKTER TEST: Ist Variable 11998 konfiguriert?
+        $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
+        $found11998 = false;
+        if (is_array($variablesList)) {
+            foreach ($variablesList as $index => $variable) {
+                if (isset($variable['Variable']) && $variable['Variable'] == 11998) {
+                    $found11998 = true;
+                    $this->DebugLog('DIRECT TEST: Variable 11998 FOUND at index ' . $index . ' with config: ' . json_encode($variable));
+                    break;
+                }
+            }
+        }
+        if (!$found11998) {
+            $this->DebugLog('DIRECT TEST: Variable 11998 NOT FOUND in VariablesList! Total variables: ' . (is_array($variablesList) ? count($variablesList) : 'NULL'));
+        }
+        
+        // ARRAY ANALYSIS: Prüfe Array-Struktur
+        if (is_array($variablesList)) {
+            $this->DebugLog('ARRAY ANALYSIS: Total count = ' . count($variablesList));
+            $this->DebugLog('ARRAY ANALYSIS: Max index = ' . (count($variablesList) - 1));
+            $this->DebugLog('ARRAY ANALYSIS: Index 11 exists? ' . (isset($variablesList[11]) ? 'YES' : 'NO'));
+            if (isset($variablesList[11])) {
+                $this->DebugLog('ARRAY ANALYSIS: Index 11 content: ' . json_encode($variablesList[11]));
+            }
+            
+            // ARRAY REINDEX: Reindiziere Array um Lücken zu schließen
+            $this->DebugLog('ARRAY REINDEX: Original keys: ' . implode(',', array_keys($variablesList)));
+            $variablesList = array_values($variablesList); // Reindiziert von 0 bis count-1
+            $this->DebugLog('ARRAY REINDEX: New total count after reindexing = ' . count($variablesList));
+            $this->DebugLog('ARRAY REINDEX: New keys: ' . implode(',', array_keys($variablesList)));
+            
+            // ARRAY REINDEX: Finde Variable 11998 im reindiziertem Array
+            $found11998AfterReindex = false;
+            foreach ($variablesList as $newIndex => $variable) {
+                if (isset($variable['Variable']) && $variable['Variable'] == 11998) {
+                    $found11998AfterReindex = true;
+                    $this->DebugLog('ARRAY REINDEX: Variable 11998 now at index ' . $newIndex . ' (was at index 11)');
+                    break;
+                }
+            }
+            if (!$found11998AfterReindex) {
+                $this->DebugLog('ARRAY REINDEX: ERROR - Variable 11998 lost during reindexing!');
+            }
+        }
 
         // Status-Daten (werden immer oben angezeigt)
         $statusId = $this->ReadPropertyInteger('Status');
@@ -615,13 +679,18 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
 
         // Lade die konfigurierte Variablenliste
         $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
-        $this->SendDebug('GetFullUpdateMessage', 'Variables list: ' . json_encode($variablesList), 0);
+        $this->DebugLog('GetFullUpdateMessage: Variables list: ' . json_encode($variablesList));
         
         // Sammle Informationen für jede konfigurierte Variable (Array-Reihenfolge durch changeOrder)
         if (is_array($variablesList)) {
             $variables = [];
             $this->DebugLog('DEBUG VARIABLES LIST: Processing ' . count($variablesList) . ' variables from configuration');
             foreach ($variablesList as $index => $variable) {
+                $this->DebugLog('FOREACH START: Processing index ' . $index . ' (Target: find index 11 with Variable 11998)');
+                
+                // CLEANUP: Removed temporary bypass - GetIcon() now has proper error handling
+                
+                try {
                 $varId = $variable['Variable'] ?? 'NONE';
                 $varType = 'UNKNOWN';
                 if (isset($variable['Variable']) && IPS_VariableExists($variable['Variable'])) {
@@ -634,7 +703,12 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                 $this->DebugLog('DEBUG VARIABLE CHECK: Index ' . $index . ', Variable ID: ' . ($variable['Variable'] ?? 'NONE') . ', Group: ' . ($variable['Group'] ?? 'NONE'));
                 if (isset($variable['Variable']) && $variable['Variable'] > 0 && IPS_VariableExists($variable['Variable'])) {
                     $this->DebugLog('DEBUG VARIABLE PROCESSING: Variable ID ' . $variable['Variable'] . ' passed validation and will be processed');
-                    $this->SendDebug('GetFullUpdateMessage', 'Processing variable ID: ' . $variable['Variable'], 0);
+                    $this->DebugLog('GetFullUpdateMessage: Processing variable ID: ' . $variable['Variable']);
+                    
+                    // GRANULARE DIAGNOSE für Index 6
+                    if ($index == 6) {
+                        $this->DebugLog('INDEX 6 STEP 1: Starting detailed processing of Variable 37555');
+                    }
                     // Verwende Variablennamen als Fallback wenn kein Label gesetzt ist
                     $label = $variable['Label'] ?? '';
                     if (empty($label)) {
@@ -643,13 +717,75 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         $this->DebugLog('DEBUG: After label assignment for Variable ID: ' . $variable['Variable'] . ', Label: ' . $label);
                     }
                     
-                    $this->SendDebug('GetFullUpdateMessage', 'About to call GetIcon for Variable ID: ' . $variable['Variable'] . ', Index: ' . $index, $index);
-                    $icon = $this->GetIcon($variable['Variable']);
-                    $this->SendDebug('GetFullUpdateMessage', 'GetIcon returned for Variable ID: ' . $variable['Variable'] . ', Index: ' . $index . ', Icon: "' . $icon . '"', $index);
+                    // GRANULARE DIAGNOSE für Index 6 - GetIcon
+                    if ($index == 6) {
+                        $this->DebugLog('INDEX 6 STEP 2: About to call GetIcon for Variable 37555');
+                    }
+                    
+                    $this->DebugLog('GetFullUpdateMessage: About to call GetIcon for Variable ID: ' . $variable['Variable'] . ', Index: ' . $index);
+                    
+                    // PROTECTION: Try-Catch um GetIcon call, um Abstürze zu verhindern
+                    try {
+                        $icon = $this->GetIcon($variable['Variable']);
+                        
+                        // GRANULARE DIAGNOSE für Index 6 - GetIcon completed
+                        if ($index == 6) {
+                            $this->DebugLog('INDEX 6 STEP 3: GetIcon completed for Variable 37555, result: "' . $icon . '"');
+                        }
+                        
+                    } catch (Exception $e) {
+                        $icon = '';
+                        $this->DebugLog('GETICON ERROR: GetIcon failed for Variable ' . $variable['Variable'] . ' - ' . $e->getMessage());
+                        $this->DebugLog('GETICON ERROR: Using empty icon as fallback');
+                        
+                        if ($index == 6) {
+                            $this->DebugLog('INDEX 6 STEP 3: GetIcon FAILED for Variable 37555, using empty icon fallback');
+                        }
+                        
+                    } catch (Error $e) {
+                        $icon = '';
+                        $this->DebugLog('GETICON FATAL ERROR: GetIcon fatal error for Variable ' . $variable['Variable'] . ' - ' . $e->getMessage());
+                        $this->DebugLog('GETICON FATAL ERROR: Using empty icon as fallback');
+                        
+                        if ($index == 6) {
+                            $this->DebugLog('INDEX 6 STEP 3: GetIcon FATAL ERROR for Variable 37555, using empty icon fallback');
+                        }
+                    }
+                    
+                    $this->DebugLog('GetFullUpdateMessage: GetIcon returned for Variable ID: ' . $variable['Variable'] . ', Index: ' . $index . ', Icon: "' . $icon . '"');
+                    
+                    // GRANULARE DIAGNOSE für Index 6 - IPS_GetVariable
+                    if ($index == 6) {
+                        $this->DebugLog('INDEX 6 STEP 4: About to call IPS_GetVariable for Variable 37555');
+                    }
+                    
                     $variableInfo = IPS_GetVariable($variable['Variable']);
+                    
+                    // GRANULARE DIAGNOSE für Index 6 - IPS_GetVariable completed
+                    if ($index == 6) {
+                        $this->DebugLog('INDEX 6 STEP 5: IPS_GetVariable completed for Variable 37555');
+                    }
                     
                     // Extrahiere Button-Farben aus Profil/Darstellung für Bool-Variablen
                     $buttonColors = $this->GetButtonColors($variable['Variable']);
+                    
+                    // Extrahiere Integer-Associations für Button-Erstellung
+                    $integerAssociations = null;
+                    $this->DebugLog('Integer Association Check for Variable ID: ' . $variable['Variable'] . ' - VariableType: ' . $variableInfo['VariableType'] . ' (INTEGER=' . VARIABLETYPE_INTEGER . '), DisplayType: "' . ($variable['DisplayType'] ?? 'text') . '"');
+                    
+                    // Spezielle Debug-Ausgabe für Variable 11998
+                    if ($variable['Variable'] == 11998) {
+                        $this->DebugLog('SPECIAL DEBUG Variable 11998: VariableType=' . $variableInfo['VariableType'] . ', VARIABLETYPE_INTEGER=' . VARIABLETYPE_INTEGER . ', DisplayType="' . ($variable['DisplayType'] ?? 'text') . '"');
+                        $this->DebugLog('SPECIAL DEBUG Variable 11998: Type comparison: ' . ($variableInfo['VariableType'] === VARIABLETYPE_INTEGER ? 'TRUE' : 'FALSE') . ', DisplayType comparison: ' . (($variable['DisplayType'] ?? 'text') === 'button' ? 'TRUE' : 'FALSE'));
+                    }
+                    
+                    if ($variableInfo['VariableType'] === VARIABLETYPE_INTEGER && ($variable['DisplayType'] ?? 'text') === 'button') {
+                        $this->DebugLog('Calling GetIntegerAssociations for Variable ID: ' . $variable['Variable']);
+                        $integerAssociations = $this->GetIntegerAssociations($variable['Variable']);
+                        $this->DebugLog('GetIntegerAssociations returned: ' . ($integerAssociations ? json_encode($integerAssociations) : 'null'));
+                    } else {
+                        $this->DebugLog('Skipping GetIntegerAssociations for Variable ID: ' . $variable['Variable'] . ' - conditions not met');
+                    }
                     
                     // Extrahiere Min/Max-Werte aus Variablenprofil für Progress-Balken
                     $progressMinMax = $this->GetProgressMinMax($variable['Variable']);
@@ -694,14 +830,15 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         'formattedValue' => GetValueFormatted($variable['Variable']),
                         'rawValue' => GetValue($variable['Variable']),
                         'icon' => $icon,
-                        'progressbarActive' => $progressbarActive // Progressbar Active Status
+                        'progressbarActive' => $progressbarActive, // Progressbar Active Status
+                        'integerAssociations' => $integerAssociations // Integer-Associations für Button-Erstellung
                     ];
                     
                     // Zweite Variable für Progress-Bars hinzufügen
                     if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0 && IPS_VariableExists($variable['SecondVariable'])) {
                         // Icon für zweite Variable ermitteln (vollständige Icon-Suche wie bei Hauptvariablen)
                         $secondIcon = $this->GetIcon($variable['SecondVariable']);
-                        $this->SendDebug('GetFullUpdateMessage', 'Second variable icon search result: ' . $secondIcon . ' for variable ID: ' . $variable['SecondVariable'], 0);
+                        $this->DebugLog('GetFullUpdateMessage: Second variable icon search result: ' . $secondIcon . ' for variable ID: ' . $variable['SecondVariable']);
                         
                         // Label für zweite Variable ermitteln
                         $secondLabel = !empty($variable['SecondVariableLabel']) ? $variable['SecondVariableLabel'] : IPS_GetName($variable['SecondVariable']);
@@ -716,7 +853,7 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                             'showLabel' => $variable['SecondVariableShowLabel'] ?? true,
                             'showValue' => $variable['SecondVariableShowValue'] ?? true
                         ];
-                        $this->SendDebug('GetFullUpdateMessage', 'Second variable added: ' . $variable['SecondVariable'] . ' with config: ' . json_encode($variableData['secondVariable']), 0);
+                        $this->DebugLog('GetFullUpdateMessage: Second variable added: ' . $variable['SecondVariable'] . ' with config: ' . json_encode($variableData['secondVariable']));
                     }
                     
                     // Spezielle Behandlung für Zeitwerte
@@ -727,14 +864,37 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
                         $variableData['timeInSeconds'] = $hours * 3600 + $minutes * 60 + $seconds;
                     }
                     
-                    $this->SendDebug('GetFullUpdateMessage', 'Variable data: ' . json_encode($variableData), $index);
+                    $this->DebugLog('GetFullUpdateMessage: Variable data: ' . json_encode($variableData));
                     $variables[] = $variableData;
+                }
+                
+                $this->DebugLog('FOREACH END: Successfully completed index ' . $index);
+                
+                // SPEZIELLE UNTERSUCHUNG: Was passiert nach Index 6?
+                if ($index == 6) {
+                    $this->DebugLog('POST-INDEX-6: Successfully completed index 6 - now checking if index 7 will be reached');
+                    $this->DebugLog('POST-INDEX-6: Memory usage: ' . memory_get_usage() . ' bytes');
+                    $this->DebugLog('POST-INDEX-6: Next iteration should process index 7...');
+                }
+                
+                } catch (Exception $e) {
+                    $this->DebugLog('FOREACH ERROR: Exception at index ' . $index . ' - ' . $e->getMessage());
+                    $this->DebugLog('FOREACH ERROR: This prevented reaching Variable 11998 at index 11!');
+                    $this->DebugLog('FOREACH ERROR: Exception details: ' . $e->getFile() . ':' . $e->getLine());
+                    // Continue mit nächster Variable statt abzubrechen
+                    continue;
+                } catch (Error $e) {
+                    $this->DebugLog('FOREACH FATAL ERROR: Fatal error at index ' . $index . ' - ' . $e->getMessage());
+                    $this->DebugLog('FOREACH FATAL ERROR: This is likely what stops the loop before reaching Variable 11998!');
+                    $this->DebugLog('FOREACH FATAL ERROR: Error details: ' . $e->getFile() . ':' . $e->getLine());
+                    // Continue mit nächster Variable statt abzubrechen
+                    continue;
                 }
             }
             
             $result['variables'] = $variables;
         // Debug: Log the first variable object to verify icon mapping
-        $this->SendDebug('FirstVarAfterMapping', (isset($variables[0]) ? json_encode($variables[0]) : 'NONE'), 0);
+        $this->DebugLog('FirstVarAfterMapping: ' . (isset($variables[0]) ? json_encode($variables[0]) : 'NONE'));
         IPS_LogMessage('FirstVarAfterMapping', isset($variables[0]) ? json_encode($variables[0]) : 'NONE');
         }
         
@@ -1180,6 +1340,265 @@ $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         return $iconName;
     }
     
+    /**
+     * Extrahiert Associations einer Integer-Variable für Button-Erstellung
+     * Unterstützt sowohl klassische Variablenprofile als auch neue Symcon-Darstellungen
+     * @param int $variableId Die Variable-ID
+     * @return array|null Array mit Associations oder null wenn keine vorhanden
+     */
+    private function GetIntegerAssociations($variableId) {
+        $this->DebugLog('GetIntegerAssociations START for variable: ' . $variableId);
+        
+        if (!IPS_VariableExists($variableId)) {
+            $this->DebugLog('GetIntegerAssociations: Variable ' . $variableId . ' does not exist');
+            return null;
+        }
+        
+        $variable = IPS_GetVariable($variableId);
+        $this->DebugLog('GetIntegerAssociations: Variable data: ' . json_encode($variable));
+        
+        // Nur für Integer-Variablen
+        if ($variable['VariableType'] !== VARIABLETYPE_INTEGER) {
+            $this->DebugLog('GetIntegerAssociations: Variable ' . $variableId . ' is not INTEGER type (type: ' . $variable['VariableType'] . ')');
+            return null;
+        }
+        
+        $associations = [];
+        
+        // 1. Prüfe klassische Variablenprofile
+        $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+        $this->DebugLog('GetIntegerAssociations: Profile check - CustomProfile: "' . ($variable['VariableCustomProfile'] ?? 'null') . '", Profile: "' . ($variable['VariableProfile'] ?? 'null') . '", Using: "' . $profile . '"');
+        
+        if (!empty($profile) && IPS_VariableProfileExists($profile)) {
+            $this->DebugLog('GetIntegerAssociations: Profile "' . $profile . '" exists, checking associations');
+            $profileData = IPS_GetVariableProfile($profile);
+            $this->DebugLog('GetIntegerAssociations: Profile data: ' . json_encode($profileData));
+            
+            if (isset($profileData['Associations']) && is_array($profileData['Associations'])) {
+                $this->DebugLog('GetIntegerAssociations: Found ' . count($profileData['Associations']) . ' profile associations');
+                foreach ($profileData['Associations'] as $index => $association) {
+                    $this->DebugLog('GetIntegerAssociations: Profile association [' . $index . ']: ' . json_encode($association));
+                    if (isset($association['Value']) && isset($association['Name'])) {
+                        $associations[] = [
+                            'value' => $association['Value'],
+                            'name' => $association['Name'],
+                            'color' => isset($association['Color']) && $association['Color'] !== -1 ? '#' . sprintf('%06X', $association['Color']) : null,
+                            'icon' => isset($association['Icon']) ? $association['Icon'] : null
+                        ];
+                        $this->DebugLog('GetIntegerAssociations: Added profile association: Value=' . $association['Value'] . ', Name=' . $association['Name']);
+                    } else {
+                        $this->DebugLog('GetIntegerAssociations: Skipped profile association [' . $index . '] - missing Value or Name');
+                    }
+                }
+            } else {
+                $this->DebugLog('GetIntegerAssociations: Profile has no associations or associations is not array');
+            }
+        } else {
+            $this->DebugLog('GetIntegerAssociations: No valid profile found or profile does not exist');
+        }
+        
+        // 2. Prüfe neue Symcon-Darstellungen/Visualisierung (ObjectVisualization)
+        $objectId = $variableId;
+        $this->DebugLog('GetIntegerAssociations: Checking ObjectVisualization for object: ' . $objectId);
+        if (IPS_ObjectExists($objectId)) {
+            $object = IPS_GetObject($objectId);
+            $this->DebugLog('GetIntegerAssociations: Object data: ' . json_encode($object));
+            if (isset($object['ObjectVisualization']) && !empty($object['ObjectVisualization'])) {
+                $this->DebugLog('GetIntegerAssociations: ObjectVisualization found, raw data: ' . $object['ObjectVisualization']);
+                $visualization = json_decode($object['ObjectVisualization'], true);
+                $this->DebugLog('GetIntegerAssociations: Parsed visualization: ' . json_encode($visualization));
+                if (is_array($visualization) && isset($visualization['ValueMappings'])) {
+                    $this->DebugLog('GetIntegerAssociations: Found ' . count($visualization['ValueMappings']) . ' value mappings');
+                    foreach ($visualization['ValueMappings'] as $index => $mapping) {
+                        $this->DebugLog('GetIntegerAssociations: Value mapping [' . $index . ']: ' . json_encode($mapping));
+                        if (isset($mapping['Value']) && isset($mapping['Text'])) {
+                            $color = null;
+                            if (isset($mapping['Color']) && !empty($mapping['Color']) && $mapping['Color'] !== 'transparent') {
+                                // Konvertiere Farbe falls nötig
+                                if (is_numeric($mapping['Color'])) {
+                                    $color = '#' . sprintf('%06X', $mapping['Color']);
+                                } else {
+                                    $color = $mapping['Color'];
+                                }
+                            }
+                            
+                            $associations[] = [
+                                'value' => $mapping['Value'],
+                                'name' => $mapping['Text'],
+                                'color' => $color,
+                                'icon' => isset($mapping['Icon']) ? $mapping['Icon'] : null
+                            ];
+                            $this->DebugLog('GetIntegerAssociations: Added visualization mapping: Value=' . $mapping['Value'] . ', Text=' . $mapping['Text']);
+                        } else {
+                            $this->DebugLog('GetIntegerAssociations: Skipped value mapping [' . $index . '] - missing Value or Text');
+                        }
+                    }
+                } else {
+                    $this->DebugLog('GetIntegerAssociations: Visualization has no ValueMappings or is not array');
+                }
+            } else {
+                $this->DebugLog('GetIntegerAssociations: No ObjectVisualization found or empty');
+            }
+        } else {
+            $this->DebugLog('GetIntegerAssociations: Object ' . $objectId . ' does not exist');
+        }
+        
+        // 3. Prüfe VariableCustomPresentation (direkt aus Variable-Array - wie in GetProgressMinMax)
+        $this->DebugLog('GetIntegerAssociations: Checking VariableCustomPresentation for variable: ' . $variableId);
+        
+        // TRY-CATCH PROTECTION: Prevent hanging like with GetIcon()
+        try {
+            if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
+            $customPresentation = $variable['VariableCustomPresentation'];
+            $this->DebugLog('GetIntegerAssociations: VariableCustomPresentation found, size: ' . strlen(json_encode($customPresentation)));
+            
+            // GRANULAR DEBUG: Sichere Verarbeitung der VariableCustomPresentation
+            try {
+                $this->DebugLog('GetIntegerAssociations: About to process VariableCustomPresentation JSON');
+                $jsonString = json_encode($customPresentation, JSON_UNESCAPED_UNICODE);
+                $this->DebugLog('GetIntegerAssociations: JSON encoding successful, length: ' . strlen($jsonString));
+                
+                // Logging in kleinen Teilen um Speicher-/Performance-Probleme zu vermeiden
+                if (strlen($jsonString) > 1000) {
+                    $this->DebugLog('GetIntegerAssociations: Large VariableCustomPresentation detected, showing truncated version');
+                    $this->DebugLog('GetIntegerAssociations: First 500 chars: ' . substr($jsonString, 0, 500));
+                } else {
+                    $this->DebugLog('GetIntegerAssociations: VariableCustomPresentation: ' . $jsonString);
+                }
+                
+            } catch (Exception $e) {
+                $this->DebugLog('GetIntegerAssociations: ERROR processing VariableCustomPresentation JSON: ' . $e->getMessage());
+                // Continue mit nächstem Abschnitt
+            }
+            
+            // Prüfe auf verschiedene mögliche Strukturen für Associations
+            $foundAssociations = false;
+            
+            // Möglichkeit 1: Direkte Associations im Custom Presentation
+            if (isset($customPresentation['Associations']) && is_array($customPresentation['Associations'])) {
+                $this->DebugLog('GetIntegerAssociations: Found Associations in VariableCustomPresentation');
+                foreach ($customPresentation['Associations'] as $index => $assoc) {
+                    $this->DebugLog('GetIntegerAssociations: Association [' . $index . ']: ' . json_encode($assoc));
+                    if (isset($assoc['Value']) && isset($assoc['Name'])) {
+                        $color = null;
+                        if (isset($assoc['Color']) && $assoc['Color'] !== -1) {
+                            $color = '#' . sprintf('%06X', $assoc['Color']);
+                        }
+                        
+                        $associations[] = [
+                            'value' => $assoc['Value'],
+                            'name' => $assoc['Name'],
+                            'color' => $color,
+                            'icon' => isset($assoc['Icon']) ? $assoc['Icon'] : null
+                        ];
+                        $foundAssociations = true;
+                        $this->DebugLog('GetIntegerAssociations: Added VariableCustomPresentation association: Value=' . $assoc['Value'] . ', Name=' . $assoc['Name']);
+                    }
+                }
+            }
+            
+            // Möglichkeit 2: ValueList Struktur
+            if (!$foundAssociations && isset($customPresentation['ValueList']) && is_array($customPresentation['ValueList'])) {
+                $this->DebugLog('GetIntegerAssociations: Found ValueList in VariableCustomPresentation');
+                foreach ($customPresentation['ValueList'] as $index => $valueEntry) {
+                    $this->DebugLog('GetIntegerAssociations: ValueList entry [' . $index . ']: ' . json_encode($valueEntry));
+                    if (isset($valueEntry['Value']) && isset($valueEntry['Caption'])) {
+                        $color = null;
+                        if (isset($valueEntry['Color']) && $valueEntry['Color'] !== -1) {
+                            $color = '#' . sprintf('%06X', $valueEntry['Color']);
+                        }
+                        
+                        $associations[] = [
+                            'value' => $valueEntry['Value'],
+                            'name' => $valueEntry['Caption'],
+                            'color' => $color,
+                            'icon' => isset($valueEntry['Icon']) ? $valueEntry['Icon'] : null
+                        ];
+                        $foundAssociations = true;
+                        $this->DebugLog('GetIntegerAssociations: Added VariableCustomPresentation ValueList: Value=' . $valueEntry['Value'] . ', Caption=' . $valueEntry['Caption']);
+                    }
+                }
+            }
+            
+            // Möglichkeit 3: Direkte Value/Name Paare in der Root
+            if (!$foundAssociations) {
+                $this->DebugLog('GetIntegerAssociations: Searching for direct value mappings in VariableCustomPresentation root');
+                // Hier können weitere Strukturen geprüft werden, je nach dem was Variable 11998 enthält
+                foreach ($customPresentation as $key => $value) {
+                    $this->DebugLog('GetIntegerAssociations: VariableCustomPresentation key "' . $key . '": ' . (is_array($value) ? 'ARRAY(' . count($value) . ')' : json_encode($value)));
+                }
+            }
+            
+            // Möglichkeit 4: OPTIONS-Format (Variable 11998 Format) - JSON String
+            if (!$foundAssociations && isset($customPresentation['OPTIONS'])) {
+                $this->DebugLog('GetIntegerAssociations: Found OPTIONS in VariableCustomPresentation, trying to parse');
+                $optionsData = $customPresentation['OPTIONS'];
+                
+                // OPTIONS ist ein JSON-String, nicht ein Array!
+                if (is_string($optionsData)) {
+                    $this->DebugLog('GetIntegerAssociations: OPTIONS is JSON string, decoding...');
+                    
+                    try {
+                        $optionsArray = json_decode($optionsData, true);
+                        $this->DebugLog('GetIntegerAssociations: JSON decode successful, found ' . (is_array($optionsArray) ? count($optionsArray) : 0) . ' items');
+                        
+                        if (is_array($optionsArray)) {
+                            foreach ($optionsArray as $index => $option) {
+                                if (isset($option['Value']) && isset($option['Caption'])) {
+                                    $color = null;
+                                    if (isset($option['Color']) && is_numeric($option['Color'])) {
+                                        $color = '#' . sprintf('%06X', $option['Color']);
+                                    }
+                                    
+                                    $associations[] = [
+                                        'value' => intval($option['Value']),
+                                        'name' => $option['Caption'],
+                                        'color' => $color,
+                                        'icon' => isset($option['IconValue']) && !empty($option['IconValue']) ? $option['IconValue'] : null
+                                    ];
+                                    
+                                    $this->DebugLog('GetIntegerAssociations: Added OPTIONS JSON association: Value=' . $option['Value'] . ', Caption=' . $option['Caption'] . ', Color=' . ($color ?? 'none'));
+                                    $foundAssociations = true;
+                                }
+                            }
+                        }
+                    } catch (Exception $e) {
+                        $this->DebugLog('GetIntegerAssociations: Failed to decode OPTIONS JSON: ' . $e->getMessage());
+                    }
+                }
+            }
+            
+            // Keine Associations in direkter Struktur gefunden - prüfe auf andere Formate
+            if (!$foundAssociations) {
+                $this->DebugLog('GetIntegerAssociations: No associations found in VariableCustomPresentation structure');
+            }
+            
+        } else {
+            $this->DebugLog('GetIntegerAssociations: No VariableCustomPresentation found');
+        }
+        
+        } catch (Exception $e) {
+            $this->DebugLog('GetIntegerAssociations: ERROR processing VariableCustomPresentation for variable ' . $variableId . ' - ' . $e->getMessage());
+            $this->DebugLog('GetIntegerAssociations: Using fallback associations (empty)');
+        } catch (Error $e) {
+            $this->DebugLog('GetIntegerAssociations: FATAL ERROR processing VariableCustomPresentation for variable ' . $variableId . ' - ' . $e->getMessage());
+            $this->DebugLog('GetIntegerAssociations: Using fallback associations (empty)');
+        }
+        
+        $this->DebugLog('GetIntegerAssociations: Reached end of function for variable ' . $variableId);
+        $this->DebugLog('GetIntegerAssociations: Final associations count: ' . count($associations));
+        
+        if (count($associations) > 0) {
+            $this->DebugLog('GetIntegerAssociations RESULT for variable ' . $variableId . ': SUCCESS with ' . count($associations) . ' associations');
+            $this->DebugLog('GetIntegerAssociations RESULT: ' . json_encode($associations));
+        } else {
+            $this->DebugLog('GetIntegerAssociations RESULT for variable ' . $variableId . ': NO ASSOCIATIONS FOUND');
+        }
+        
+        $this->DebugLog('GetIntegerAssociations: COMPLETED for variable ' . $variableId);
+        return empty($associations) ? null : $associations;
+    }
+
     /**
      * Extrahiert Button-Farben aus Variablen-Profil oder Darstellung
      * @param int $variableId Die Variable-ID

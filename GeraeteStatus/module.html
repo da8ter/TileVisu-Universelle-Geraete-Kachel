@@ -265,6 +265,61 @@
             box-sizing: border-box;
         }
 
+        /* Multi-Button-Container für Integer-Variablen */
+        .variable-multi-button-container {
+            display: flex;
+            gap: 1px; /* Reduzierter Abstand für Button-Gruppierung */
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Einzelne Buttons in Multi-Button-Container */
+        .variable-multi-button {
+            display: inline-flex;
+            align-items: center;
+            height: var(--progress-bar-height, 20px);
+            padding: 0 8px;
+            border: 2px solid #ccc;
+            border-radius: var(--progress-bar-border-radius, 10px);
+            background-color: #f8f9fa;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: inherit;
+            font-weight: 500;
+            user-select: none;
+            min-width: 60px;
+            justify-content: center;
+            box-sizing: border-box;
+            flex: 0 0 auto; /* Verhindere automatisches Stretching, respektiere explizite Breite */
+        }
+
+        .variable-multi-button:hover {
+            opacity: 0.8;
+        }
+
+        .variable-multi-button.active {
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Button-Gruppierung: Spezielle Border-Radius für zusammenhängende Button-Gruppe */
+        .variable-multi-button.first-button {
+            border-radius: var(--progress-bar-border-radius, 10px) 0 0 var(--progress-bar-border-radius, 10px); /* Nur links rund */
+        }
+
+        .variable-multi-button.middle-button {
+            border-radius: 0; /* Keine runden Ecken */
+        }
+
+        .variable-multi-button.last-button {
+            border-radius: 0 var(--progress-bar-border-radius, 10px) var(--progress-bar-border-radius, 10px) 0; /* Nur rechts rund */
+        }
+
+        .variable-multi-button.single-button {
+            border-radius: var(--progress-bar-border-radius, 10px); /* Alle Ecken rund wenn nur ein Button */
+        }
+
         
         /* Status-Bereich Styles */
         .status-container {
@@ -587,52 +642,84 @@
         function updateButtonDisplay(buttonElement, variable) {
             debugLog('Updating button display for variable:', variable.id);
             
-            // Aktualisiere Bool-Wert-Erkennung
-            const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
-            debugLog('Button color update - isActive:', isActive, 'for value:', variable.rawValue);
+            // Check if this is a multi-button container (Integer variable)
+            const multiButtonContainer = buttonElement.querySelector('.variable-multi-button-container');
             
-            // Verwende Progress-Farben für Button-Status (Progress Color 1 für true, Progress Color 2 für false)
-            const activeColor = variable.progressColor1 || 'var(--accent-color)';
-            const inactiveColor = variable.progressColor2 || '#dc3545';
-            const currentColor = isActive ? activeColor : inactiveColor;
-            
-            // Aktualisiere Button-Style
-            buttonElement.style.backgroundColor = currentColor;
-            buttonElement.style.borderColor = currentColor;
-            
-            // Button-Inhalt zusammenstellen
-            let buttonText = '';
-            let iconHtml = '';
-            
-            // Icon-Verarbeitung für Button-Update
-            if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
-                const iconClass = prepareIconForDisplay(variable.icon);
-                if (iconClass) {
-                    iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+            if (multiButtonContainer && variable.variableType === 1 && variable.integerAssociations) {
+                // Integer variable: Update multi-buttons
+                const currentValue = parseInt(variable.rawValue);
+                const buttons = multiButtonContainer.querySelectorAll('.variable-multi-button');
+                
+                buttons.forEach(button => {
+                    const associationValue = parseInt(button.getAttribute('data-association-value'));
+                    const isActive = currentValue === associationValue;
+                    
+                    // Find the corresponding association for color
+                    const association = variable.integerAssociations.find(assoc => assoc.value === associationValue);
+                    const buttonColor = association?.color || (isActive ? '#28a745' : '#6c757d');
+                    const opacity = isActive ? '1' : '0.7';
+                    
+                    // Update button state
+                    button.style.backgroundColor = buttonColor;
+                    button.style.borderColor = buttonColor;
+                    button.style.opacity = opacity;
+                    
+                    if (isActive) {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                });
+                
+                debugLog('Multi-buttons updated for variable:', variable.id, 'current value:', currentValue);
+            } else {
+                // Boolean variable: Single button update
+                const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+                debugLog('Button color update - isActive:', isActive, 'for value:', variable.rawValue);
+                
+                // Verwende Progress-Farben für Button-Status (Progress Color 1 für true, Progress Color 2 für false)
+                const activeColor = variable.progressColor1 || 'var(--accent-color)';
+                const inactiveColor = variable.progressColor2 || '#dc3545';
+                const currentColor = isActive ? activeColor : inactiveColor;
+                
+                // Aktualisiere Button-Style
+                buttonElement.style.backgroundColor = currentColor;
+                buttonElement.style.borderColor = currentColor;
+                
+                // Button-Inhalt zusammenstellen
+                let buttonText = '';
+                let iconHtml = '';
+                
+                // Icon-Verarbeitung für Button-Update
+                if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                    const iconClass = prepareIconForDisplay(variable.icon);
+                    if (iconClass) {
+                        iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                    }
                 }
+                
+                let textParts = [];
+                if (variable.showIcon && iconHtml) {
+                    textParts.push(iconHtml);
+                }
+                if (variable.showLabel) {
+                    textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
+                }
+                if (variable.showValue) {
+                    textParts.push(variable.formattedValue);
+                }
+                if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                    textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
+                }
+                
+                buttonText = textParts.join(' ');
+                if (variable.showIcon && !variable.showLabel && !variable.showValue && iconHtml) {
+                    buttonText = iconHtml.replace('margin-right: 6px;', '');
+                }
+                
+                buttonElement.innerHTML = buttonText;
+                debugLog('Single button updated successfully for variable:', variable.id);
             }
-            
-            let textParts = [];
-            if (variable.showIcon && iconHtml) {
-                textParts.push(iconHtml);
-            }
-            if (variable.showLabel) {
-                textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
-            }
-            if (variable.showValue) {
-                textParts.push(variable.formattedValue);
-            }
-            if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
-            }
-            
-            buttonText = textParts.join(' ');
-            if (variable.showIcon && !variable.showLabel && !variable.showValue && iconHtml) {
-                buttonText = iconHtml.replace('margin-right: 6px;', '');
-            }
-            
-            buttonElement.innerHTML = buttonText;
-            debugLog('Button updated successfully for variable:', variable.id);
         }
         
         // Hilfsfunktion für Text- und Progress-Display-Update
@@ -1226,8 +1313,9 @@
                         </div>
                     `;
                 } else if (variable.displayType === 'button') {
-                    // Button nur für Bool-Variablen (VARIABLETYPE_BOOLEAN = 0)
+                    // Button für Bool-Variablen (VARIABLETYPE_BOOLEAN = 0) und Integer-Variablen (VARIABLETYPE_INTEGER = 1)
                     if (variable.variableType === 0) {
+                        // Boolean-Variable: Einzelner Button
                         // Erweiterte Bool-Wert-Erkennung
                         const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
                         
@@ -1307,9 +1395,73 @@
                         `;
                         
                         debugLog('  - FINAL: Button rendered with color:', currentColor, 'width:', buttonWidth + 'px');
+                    } else if (variable.variableType === 1 && variable.integerAssociations && variable.integerAssociations.length > 0) {
+                        // Integer-Variable: Multi-Button für jede Association
+                        debugLog('Rendering multi-buttons for Integer variable:', variable.id, 'with', variable.integerAssociations.length, 'associations');
+                        
+                        // ButtonWidth aus Variablenkonfiguration verwenden (wie bei Boolean-Buttons)
+                        const buttonWidth = variable.buttonWidth || 80; // Etwas schmaler für Multi-Buttons
+                        debugLog('Multi-button width for variable:', variable.id, '→', buttonWidth + 'px');
+                        
+                        let buttonsHtml = '';
+                        const currentValue = parseInt(variable.rawValue);
+                        
+                        variable.integerAssociations.forEach((association, index) => {
+                            const isActive = currentValue === association.value;
+                            const buttonColor = association.color || (isActive ? '#28a745' : '#6c757d');
+                            const opacity = isActive ? '1' : '0.7';
+                            
+                            // Button-Gruppierung: Bestimme CSS-Klasse basierend auf Position
+                            let positionClass = '';
+                            const totalButtons = variable.integerAssociations.length;
+                            
+                            if (totalButtons === 1) {
+                                positionClass = 'single-button'; // Nur ein Button: alle Ecken rund
+                            } else if (index === 0) {
+                                positionClass = 'first-button'; // Erster Button: nur links rund
+                            } else if (index === totalButtons - 1) {
+                                positionClass = 'last-button'; // Letzter Button: nur rechts rund
+                            } else {
+                                positionClass = 'middle-button'; // Mittlere Buttons: keine runden Ecken
+                            }
+                            
+                            // Button-Text basierend auf Association-Name
+                            let buttonText = association.name || `Wert ${association.value}`;
+                            
+                            // Icon hinzufügen falls vorhanden
+                            if (association.icon && association.icon !== 'Transparent') {
+                                const iconClass = prepareIconForDisplay(association.icon);
+                                if (iconClass) {
+                                    buttonText = `<i class="${iconClass}" style="margin-right: 4px;"></i>${buttonText}`;
+                                }
+                            }
+                            
+                            buttonsHtml += `
+                                <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
+                                        onclick="requestAction('${variable.id}', ${association.value}); debugLog('Multi-button clicked for variable: ${variable.id}, value: ${association.value}');" 
+                                        data-variable-id="${variable.id}"
+                                        data-association-value="${association.value}"
+                                        style="background-color: ${buttonColor} !important; border-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                    ${buttonText}
+                                </button>`;
+                        });
+                        
+                        content += `
+                            <div class="variable-button-container">
+                                <div class="variable-multi-button-container">
+                                    ${buttonsHtml}
+                                </div>
+                            </div>
+                        `;
+                        
+                        debugLog('Multi-buttons rendered for variable:', variable.id, 'current value:', currentValue);
                     } else {
-                        // Fallback für Nicht-Bool-Variablen: Zeige als Text mit Konfiguration
-                        console.warn('Button display type only supported for boolean variables. Variable', variable.id, 'is type', variable.variableType);
+                        // Fallback für Nicht-Bool/Integer-Variablen oder Integer ohne Associations: Zeige als Text
+                        if (variable.variableType === 1) {
+                            console.warn('Integer variable', variable.id, 'has no associations for button display. Showing as text.');
+                        } else {
+                            console.warn('Button display type only supported for boolean and integer variables. Variable', variable.id, 'is type', variable.variableType);
+                        }
                         
                         let textParts = [];
                         

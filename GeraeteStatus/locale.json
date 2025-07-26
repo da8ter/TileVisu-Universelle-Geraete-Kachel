@@ -42,7 +42,7 @@
         "Consumption today:": "Verbrauch Heute:",
         "Costs today:": "Kosten Heute:",
         "Program:": "Programm:",
-        "Button Width (only for buttons)": "Button-Breite (nur für Buttons)",
+        "Button Width": "Button-Breite",
         "Label (Overrides the variable name)": "Beschriftung (Überschreibt den Variablenname)",
         "Element spacing (vertical distance between items)": "Elementabstand (vertikaler Abstand zwischen Elementen)",
         "Bild": "Bild",
