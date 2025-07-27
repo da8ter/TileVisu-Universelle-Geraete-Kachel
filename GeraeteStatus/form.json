@@ -788,7 +788,7 @@
                 {
                   "type": "Label",
                   "caption": "Additional information in the progress bar",
-                  "underline": true,
+                  "underline": false,
                   "width": "100%"
                 },
                 {

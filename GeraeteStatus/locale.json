@@ -108,7 +108,8 @@
         "Washing Machine - On": "Waschmaschine - An",
         "Dryer - Off": "Trockner - Aus",
         "Dryer - On": "Trockner - An",
-        "Custom Image": "Benutzerdefiniertes Bild"
+        "Custom Image": "Benutzerdefiniertes Bild",
+        "Bool Button Color": "Schalter Farbe"
         }
     }
   }
