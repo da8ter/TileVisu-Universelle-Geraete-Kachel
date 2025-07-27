@@ -251,7 +251,7 @@
             align-items: center;
             height: var(--progress-bar-height, 20px);
             padding: 0 12px;
-            border: 2px solid #ccc;
+            border: none;
             border-radius: var(--progress-bar-border-radius, 10px);
             background-color: #f8f9fa;
             color: #333;
@@ -279,7 +279,7 @@
             align-items: center;
             height: var(--progress-bar-height, 20px);
             padding: 0 8px;
-            border: 2px solid #ccc;
+            border: none;
             border-radius: var(--progress-bar-border-radius, 10px);
             background-color: #f8f9fa;
             color: #333;
@@ -393,29 +393,127 @@
 
         // Hilfsfunktion zur Bildanzeige-Steuerung basierend auf Bildauswahl und Bildbreite
         function updateImageVisibility() {
+            debugLog('=== updateImageVisibility START ===', 'updateImageVisibility');
             const div1 = document.getElementById('div1');
             const div2 = document.getElementById('div2');
             const mainContainer = document.querySelector('.main_container');
             const bildauswahl = window.currentBildauswahl;
             const bildbreite = window.currentBildbreite;
+            debugLog('Current values - bildauswahl: ' + bildauswahl + ' (type: ' + typeof bildauswahl + '), bildbreite: ' + bildbreite + ' (type: ' + typeof bildbreite + ')', 'updateImageVisibility');
             
-            debugLog('updateImageVisibility called with:', { bildauswahl, bildbreite });
+            // DEBUG: DOM-Elemente prüfen
+            debugLog('DOM elements - div1: ' + (div1 ? 'found' : 'NOT FOUND'), 'updateImageVisibility');
+            debugLog('DOM elements - div2: ' + (div2 ? 'found' : 'NOT FOUND'), 'updateImageVisibility');
             
-            // Verstecke Bild wenn "kein Bild" (Wert 3) ausgewählt ist oder Bildbreite 0 ist
-            if (bildauswahl === 3 || bildbreite === 0) {
-                // Komplett verstecken und Layout auf Vollbreite umstellen
-                div1.style.display = 'none';
-                div2.style.padding = '0px 5px 5px 5px'; // Gleichmäßiges Padding
-                div2.style.width = '100%';
-                div2.style.borderLeft = 'none'; // Entferne linken Border falls vorhanden
-                debugLog('Image completely hidden, content full width: bildauswahl=' + bildauswahl + ', bildbreite=' + bildbreite);
+            // HINWEIS: bildauswahl === undefined ist normal im neuen per-Assoziation-System
+            
+            // EXPLICIT NONE CHECK FOR DEBUGGING
+            debugLog('updateImageVisibility: Checking if bildauswahl is NONE. Current value: ' + bildauswahl + ' (type: ' + typeof bildauswahl + ')', 'updateImageVisibility');
+            if (bildauswahl === 'none') {
+                debugLog('*** NONE DETECTED *** bildauswahl is exactly "none" - HIDING IMAGE!', 'updateImageVisibility');
+            }
+            
+            // SEPARATED LOGIC: Column hiding vs Image hiding
+            const hideImageColumn = window.hideImageColumn || false;
+            const currentImageIsNone = (bildauswahl === 'none');
+            
+            // Hide ENTIRE COLUMN only when: ALL associations "none" OR bildbreite = 0
+            const shouldHideColumn = (
+                hideImageColumn ||           // All associations are "none"
+                bildbreite === 0 || bildbreite === '0'  // Image width is 0
+            );
+            
+            // Hide just IMAGE (keep column) when: current status is "none"
+            const shouldHideImageOnly = currentImageIsNone && !shouldHideColumn;
+            
+            // DEBUG: Detaillierte Bedingungsprüfung
+            debugLog('Condition checks:', 'updateImageVisibility');
+            debugLog('  hideImageColumn (all associations none): ' + hideImageColumn, 'updateImageVisibility');
+            debugLog('  currentImageIsNone (current status none): ' + currentImageIsNone, 'updateImageVisibility');
+            debugLog('  bildauswahl value: ' + bildauswahl, 'updateImageVisibility');
+            debugLog('  bildbreite === 0: ' + (bildbreite === 0), 'updateImageVisibility');
+            debugLog('  bildbreite === "0": ' + (bildbreite === '0'), 'updateImageVisibility');
+            debugLog('  shouldHideColumn (entire column): ' + shouldHideColumn, 'updateImageVisibility');
+            debugLog('  shouldHideImageOnly (image only, keep column): ' + shouldHideImageOnly, 'updateImageVisibility');
+            
+            if (shouldHideColumn) {
+                debugLog('*** EXECUTING COLUMN HIDE (entire column) ***', 'updateImageVisibility');
+                if (div1) {
+                    debugLog('Setting div1.style.display = "none"', 'updateImageVisibility');
+                    div1.style.display = 'none';
+                    debugLog('Setting div1.className = "hidden"', 'updateImageVisibility');
+                    div1.className = 'hidden';
+                    debugLog('Current div1.style.display after change: ' + div1.style.display, 'updateImageVisibility');
+                } else {
+                    debugLog('ERROR: div1 not found, cannot hide column!', 'updateImageVisibility');
+                }
+                if (div2) {
+                    debugLog('Setting div2 single-column layout', 'updateImageVisibility');
+                    div2.style.padding = '10px';
+                    div2.style.width = '100%'; // div2 nimmt gesamte Breite ein
+                } else {
+                    debugLog('ERROR: div2 not found, cannot adjust layout!', 'updateImageVisibility');
+                }
+                debugLog('Column hidden, single-column layout: hideImageColumn=' + hideImageColumn + ', bildbreite=' + bildbreite, 'updateImageVisibility');
+            } else if (shouldHideImageOnly) {
+                debugLog('*** EXECUTING IMAGE HIDE ONLY (keep column) ***', 'updateImageVisibility');
+                if (div1) {
+                    debugLog('Keeping div1 visible but hiding image content', 'updateImageVisibility');
+                    div1.style.display = 'block';  // Keep column visible
+                    div1.className = 'div1';        // Keep normal column class
+                    // Hide the actual image element inside div1
+                    const imageElement = div1.querySelector('#image');
+                    if (imageElement) {
+                        imageElement.style.display = 'none';
+                        debugLog('Hidden image element inside div1', 'updateImageVisibility');
+                    }
+                } else {
+                    debugLog('ERROR: div1 not found, cannot hide image content!', 'updateImageVisibility');
+                }
+                if (div2) {
+                    debugLog('Keeping div2 two-column layout', 'updateImageVisibility');
+                    div2.style.padding = '0px 5px 5px 2.5%'; // Standard two-column padding
+                    div2.style.width = '100%';
+                } else {
+                    debugLog('ERROR: div2 not found, cannot maintain layout!', 'updateImageVisibility');
+                }
+                debugLog('Image content hidden, two-column layout maintained: bildauswahl=' + bildauswahl, 'updateImageVisibility');
             } else {
-                // Normales zwei-Spalten Layout wiederherstellen
-                div1.style.display = 'block';
-                div1.className = 'div1';
-                div2.style.padding = '0px 5px 5px 2.5%'; // Standard-Padding wiederherstellen
-                div2.style.width = '100%'; // div2 bleibt flexibel
-                debugLog('Image shown, two-column layout: bildauswahl=' + bildauswahl + ', bildbreite=' + bildbreite);
+                debugLog('*** EXECUTING IMAGE SHOW ***', 'updateImageVisibility');
+                if (div1) {
+                    debugLog('Setting div1.style.display = "block"', 'updateImageVisibility');
+                    div1.style.display = 'block';
+                    debugLog('Setting div1.className = "div1"', 'updateImageVisibility');
+                    div1.className = 'div1';
+                    // Show the image element inside div1
+                    const imageElement = div1.querySelector('#image');
+                    if (imageElement) {
+                        imageElement.style.display = 'block';
+                        debugLog('Shown image element inside div1', 'updateImageVisibility');
+                    }
+                    debugLog('Current div1.style.display after change: ' + div1.style.display, 'updateImageVisibility');
+                } else {
+                    debugLog('ERROR: div1 not found, cannot show image!', 'updateImageVisibility');
+                }
+                if (div2) {
+                    debugLog('Setting div2 two-column layout', 'updateImageVisibility');
+                    div2.style.padding = '0px 5px 5px 2.5%'; // Standard-Padding wiederherstellen
+                    div2.style.width = '100%'; // div2 bleibt flexibel
+                } else {
+                    debugLog('ERROR: div2 not found, cannot adjust layout!', 'updateImageVisibility');
+                }
+                debugLog('Image shown, two-column layout: bildauswahl=' + bildauswahl + ', bildbreite=' + bildbreite, 'updateImageVisibility');
+            }
+            debugLog('=== updateImageVisibility END ===', 'updateImageVisibility');
+            
+            // DEBUG: Final DOM state check
+            if (div1) {
+                debugLog('FINAL STATE - div1.style.display: ' + div1.style.display, 'updateImageVisibility');
+                debugLog('FINAL STATE - div1.className: ' + div1.className, 'updateImageVisibility');
+            }
+            if (div2) {
+                debugLog('FINAL STATE - div2.style.padding: ' + div2.style.padding, 'updateImageVisibility');
+                debugLog('FINAL STATE - div2.style.width: ' + div2.style.width, 'updateImageVisibility');
             }
         }
 
@@ -447,6 +545,20 @@
         }
 
         function handleMessage(data) {
+            // --- DEBUG: Log all contents of handleMessage input ---
+            try {
+                debugLog('handleMessage: FULL INPUT (JSON): ' + JSON.stringify(data, null, 2), 'handleMessage');
+                if (data && typeof data === 'object') {
+                    Object.keys(data).forEach(function(key) {
+                        debugLog('handleMessage: Property: ' + key + ' | Value: ' + JSON.stringify(data[key]) + ' | Type: ' + typeof data[key], 'handleMessage');
+                    });
+                } else {
+                    debugLog('handleMessage: data is not an object! Type: ' + typeof data, 'handleMessage');
+                }
+            } catch (e) {
+                debugLog('handleMessage: ERROR while logging input: ' + e, 'handleMessage');
+            }
+            // --- END DEBUG ---
             debugLog('handleMessage called with raw data: ' + data, 'handleMessage');
             const decodedData = JSON.parse(data);
             debugLog('Decoded data: ' + JSON.stringify(decodedData), 'handleMessage');
@@ -477,7 +589,23 @@
                     case 'status':
                     case 'statusvalue':
                     case 'statuscolor':
-                    case 'statusbildauswahl':
+                    case 'statusBildauswahl':  
+                        // Set global currentBildauswahl for updateImageVisibility
+                        if (decodedData.hasOwnProperty('statusBildauswahl')) {
+                            window.currentBildauswahl = decodedData.statusBildauswahl;
+                            debugLog('Global currentBildauswahl now set to: ' + window.currentBildauswahl, 'handleMessage');
+                        }
+                        renderStatus(decodedData);
+                        updateImageVisibility();
+                        break;
+                    case 'hideimagecolumn':
+                        // NEW: Handle hideImageColumn flag for complete image column visibility
+                        if (decodedData.hasOwnProperty('hideImageColumn')) {
+                            window.hideImageColumn = decodedData.hideImageColumn;
+                            debugLog('Global hideImageColumn set to: ' + window.hideImageColumn, 'handleMessage');
+                            updateImageVisibility();
+                        }
+                        break;
                     case 'statusschriftgroesse':
                         renderStatus(decodedData);
                         break;
@@ -522,15 +650,11 @@
                             renderVariables(window.lastVariablesData);
                         }
                         break;
-                    case 'bildauswahl':
-                        // Speichere Bildauswahl für spätere Verwendung
-                        window.currentBildauswahl = value;
-                        updateImageVisibility();
-                        break;
                     case 'bildbreite':
                         root.style.setProperty('--bildbreite', value + '%');
-                        // Speichere Bildbreite für spätere Verwendung
+                        debugLog('Setting bildbreite to: ' + value + ' (type: ' + typeof value + ')', 'handleMessage');
                         window.currentBildbreite = value;
+                        debugLog('Global bildbreite is now: ' + window.currentBildbreite, 'handleMessage');
                         updateImageVisibility();
                         break;
                     case 'bildtransparenz':
@@ -662,12 +786,11 @@
                     
                     // Find the corresponding association for color
                     const association = associations.find(assoc => assoc.value === associationValue);
-                    const buttonColor = association?.color || (isActive ? '#00CDAA' : '#007562');
+                    const buttonColor = association?.color || 'var(--accent-color)';
                     const opacity = isActive ? '1' : '0.7';
                     
                     // Update button state
                     button.style.backgroundColor = buttonColor;
-                    button.style.borderColor = buttonColor;
                     button.style.opacity = opacity;
                     
                     if (isActive) {
@@ -681,24 +804,55 @@
             } else {
                 // Boolean variable: Single button update
                 const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
-                debugLog('Button color update - isActive:', isActive, 'for value:', variable.rawValue);
+                const currentBoolValue = isActive; // Use actual boolean value for Association-Matching
+                debugLog('Button color update - isActive:', isActive, 'for value:', variable.rawValue, 'currentBoolValue:', currentBoolValue);
                 
-                // Verwende Progress-Farben für Button-Status (Progress Color 1 für true, Progress Color 2 für false)
-                const activeColor = variable.progressColor1 || 'var(--accent-color)';
-                const inactiveColor = variable.progressColor2 || '#dc3545';
-                const currentColor = isActive ? activeColor : inactiveColor;
+                // Bool Buttons verwenden ausschließlich boolButtonColor
+                let buttonColor = 'var(--accent-color)';
+                let associationIcon = null;
+                let associationName = null;
+                
+                // Verwende ausschließlich boolButtonColor für Bool Buttons
+                if (variable.isBoolButtonColorTransparent) {
+                    buttonColor = 'var(--accent-color)';
+                } else {
+                    buttonColor = variable.boolButtonColor || 'var(--accent-color)';
+                }
+                
+                debugLog('Bool Button using exclusive boolButtonColor:', {
+                    boolButtonColor: variable.boolButtonColor,
+                    isTransparent: variable.isBoolButtonColorTransparent,
+                    finalColor: buttonColor
+                });
+                
+                // Association-Icon und Name für Bool Buttons (nur für Icon/Name, nicht für Farbe)
+                const associations = variable.variableAssociations;
+                if (associations && Array.isArray(associations)) {
+                    const currentAssociation = associations.find(assoc => assoc.value === currentBoolValue);
+                    if (currentAssociation) {
+                        associationIcon = currentAssociation.icon;
+                        associationName = currentAssociation.name;
+                        debugLog('Boolean button using association icon/name only:', {
+                            icon: associationIcon,
+                            name: associationName
+                        });
+                    }
+                }                
+                const opacity = isActive ? '1' : '0.7';
                 
                 // Aktualisiere Button-Style
-                buttonElement.style.backgroundColor = currentColor;
-                buttonElement.style.borderColor = currentColor;
+                buttonElement.style.backgroundColor = buttonColor;
+                // buttonElement.style.borderColor = buttonColor; // Border entfernt
+                buttonElement.style.opacity = opacity;
                 
                 // Button-Inhalt zusammenstellen
                 let buttonText = '';
                 let iconHtml = '';
                 
-                // Icon-Verarbeitung für Button-Update
-                if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
-                    const iconClass = prepareIconForDisplay(variable.icon);
+                // Icon-Verarbeitung für Button-Update - Verwende Association-Icon falls vorhanden
+                let finalIcon = associationIcon || variable.icon; // Association-Icon hat Priorität
+                if (variable.showIcon && finalIcon && finalIcon !== 'Transparent') {
+                    const iconClass = prepareIconForDisplay(finalIcon);
                     if (iconClass) {
                         iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
                     }
@@ -709,7 +863,9 @@
                     textParts.push(iconHtml);
                 }
                 if (variable.showLabel) {
-                    textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
+                    // Verwende Variablenname als Priorität, Association-Name als Fallback
+                    const displayLabel = variable.label || associationName || (isActive ? 'ON' : 'OFF');
+                    textParts.push(displayLabel);
                 }
                 if (variable.showValue) {
                     textParts.push(variable.formattedValue);
@@ -955,10 +1111,33 @@
             
             // Gerätebild wird separat im div1 Container angezeigt - IMMER prüfen, auch ohne Status
             if (data.statusBildauswahl) {
-                const imageUrl = window.assets[`img_${data.statusBildauswahl}`];
-                debugLog('Looking for image:', data.statusBildauswahl, 'Found URL:', imageUrl);
+                let imageUrl = null;
+                
+                // FRONTEND DEBUG: Zeige empfangene Daten und verfügbare Assets
+                debugLog('FRONTEND DEBUG: statusBildauswahl received:', data.statusBildauswahl);
+                debugLog('FRONTEND DEBUG: Available window.assets:', Object.keys(window.assets || {}));
+                
+                // DOM-Elemente ZUERST definieren, bevor sie verwendet werden
                 const deviceImgContainer = document.getElementById('div1');
                 const deviceImg = document.getElementById('image');
+                
+                if (data.statusBildauswahl === 'none') {
+                    // Kein Bild anzeigen
+                    debugLog('No image selected (none option)');
+                    if (deviceImgContainer) {
+                        deviceImgContainer.classList.add('hidden');
+                        deviceImgContainer.classList.remove('div1');
+                    }
+                    // Früh return, da kein Bild gesetzt werden soll
+                    return;
+                } else if (data.statusBildauswahl.startsWith('img_custom_')) {
+                    // Custom Image über Asset-System verwenden
+                    imageUrl = window.assets[data.statusBildauswahl];
+                    debugLog('Using custom image asset:', data.statusBildauswahl);
+                } else {
+                    // Vorkonfigurierte Bilder verwenden (wm_an, wm_aus, dryer_on, dryer_off, etc.)
+                    imageUrl = window.assets[`img_${data.statusBildauswahl}`];
+                }
                 
                 if (imageUrl && deviceImg && deviceImgContainer) {
                     deviceImg.src = imageUrl;
@@ -1157,7 +1336,12 @@
                 }
             });
             
-            debugLog('Rendered groups:', Array.from(renderedGroups));
+            debugLog('Rendered groups: ' + Array.from(renderedGroups).join(','));
+            
+            // Rufe updateImageVisibility() nach dem initialen Rendering auf
+            // um sicherzustellen, dass die Bildanzeige korrekt gesetzt wird
+            updateImageVisibility();
+            
             container.innerHTML = content;
         }
         
@@ -1322,23 +1506,59 @@
                     // Button für Bool-Variablen (VARIABLETYPE_BOOLEAN = 0) und Integer-Variablen (VARIABLETYPE_INTEGER = 1)
                     if (variable.variableType === 0) {
                         // Boolean-Variable: Einzelner Button
+                        console.log('=== BOOLEAN BUTTON DEBUG START ===');
+                        console.log('Variable ID:', variable.id, 'Variable Type:', variable.variableType);
+                        console.log('Raw Value:', variable.rawValue, 'Type:', typeof variable.rawValue);
+                        
                         // Erweiterte Bool-Wert-Erkennung
                         const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+                        // Verwende den tatsächlichen Boolean-Wert für Association-Matching (nicht Integer-Konvertierung!)
+                        const currentBoolValue = variable.rawValue; // Direkt verwenden, da Associations auch Boolean-Werte haben
                         
-                        // Verwende Progress-Farben für Button-Status (Progress Color 1 für true, Progress Color 2 für false)
-                        const activeColor = variable.progressColor1 || '#00CDAA';
-                        const inactiveColor = variable.progressColor2 || '#007562';
-                        const currentColor = isActive ? activeColor : inactiveColor;
+                        console.log('isActive:', isActive, 'currentBoolValue for matching:', currentBoolValue, 'type:', typeof currentBoolValue);
                         
-                        // Button-Inhalt basierend auf allgemeiner Konfiguration
+                        // Bool Buttons verwenden ausschließlich boolButtonColor (initial rendering)
+                        let buttonColor = 'var(--accent-color)';
+                        let associationIcon = null;
+                        let associationName = null;
+                        
+                        // Verwende ausschließlich boolButtonColor für Bool Buttons (initial rendering)
+                        if (variable.isBoolButtonColorTransparent) {
+                            buttonColor = 'var(--accent-color)';
+                        } else {
+                            buttonColor = variable.boolButtonColor || 'var(--accent-color)';
+                        }
+                        
+                        debugLog('Bool Button initial rendering using exclusive boolButtonColor:', {
+                            boolButtonColor: variable.boolButtonColor,
+                            isTransparent: variable.isBoolButtonColorTransparent,
+                            finalColor: buttonColor
+                        });
+                        
+                        // Association-Icon und Name für Bool Buttons (nur für Icon/Name, nicht für Farbe)
+                        const associations = variable.variableAssociations;
+                        if (associations && Array.isArray(associations)) {
+                            const currentAssociation = associations.find(assoc => assoc.value === currentBoolValue);
+                            if (currentAssociation) {
+                                associationIcon = currentAssociation.icon;
+                                associationName = currentAssociation.name;
+                                debugLog('Boolean button initial rendering using association icon/name only:', {
+                                    icon: associationIcon,
+                                    name: associationName
+                                });
+                            }
+                        }
+                        
+                        const opacity = isActive ? '1' : '0.7';
                         const buttonWidth = variable.buttonWidth || 120;
                         
                         let buttonText = '';
                         let iconHtml = '';
                         
-                        // Icon-Verarbeitung für Button
-                        if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
-                            const iconClass = prepareIconForDisplay(variable.icon);
+                        // Icon-Verarbeitung für Button - Verwende Association-Icon falls vorhanden
+                        let finalIcon = associationIcon || variable.icon; // Association-Icon hat Priorität
+                        if (variable.showIcon && finalIcon && finalIcon !== 'Transparent') {
+                            const iconClass = prepareIconForDisplay(finalIcon);
                             if (iconClass) {
                                 iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
                             }
@@ -1352,12 +1572,14 @@
                         }
                         
                         if (variable.showLabel) {
+                            // Verwende Variablenname als Label (höchste Priorität), dann Association-Name als Fallback
+                            const displayLabel = variable.label || associationName || (isActive ? 'ON' : 'OFF');
                             if (variable.showValue) {
                                 // Doppelpunkt nur wenn auch Value angezeigt wird - Label fett
-                                textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}:&nbsp;</span>`);
+                                textParts.push(`<span style="font-weight: 700;">${displayLabel}:&nbsp;</span>`);
                             } else {
                                 // Kein Doppelpunkt wenn nur Label - Label fett
-                                textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}</span>`);
+                                textParts.push(`<span style="font-weight: 700;">${displayLabel}</span>`);
                             }
                         }
                         
@@ -1384,9 +1606,8 @@
                         debugLog('  - showValue: ' + variable.showValue, 'renderSingleVariable');
                         debugLog('  - buttonWidth: ' + buttonWidth, 'renderSingleVariable');
                         debugLog('  - isActive: ' + isActive, 'renderSingleVariable');
-                        debugLog('  - activeColor: ' + activeColor, 'renderSingleVariable');
-                        debugLog('  - inactiveColor: ' + inactiveColor, 'renderSingleVariable');
-                        debugLog('  - currentColor: ' + currentColor, 'renderSingleVariable');
+                        debugLog('  - buttonColor: ' + buttonColor, 'renderSingleVariable');
+                        debugLog('  - opacity: ' + opacity, 'renderSingleVariable');
                         debugLog('  - buttonText: ' + buttonText, 'renderSingleVariable');
                         
                         content += `
@@ -1394,13 +1615,13 @@
                                 <button class="variable-button" 
                                         onclick="requestAction('${variable.id}', 1); debugLog('Button clicked for variable: ${variable.id}');" 
                                         data-variable-id="${variable.id}"
-                                        style="background-color: ${currentColor} !important; border-color: ${currentColor} !important; color: ${getTextColor(variable)} !important; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                        style="background-color: ${buttonColor} !important; opacity: ${opacity} !important; color: ${getTextColor(variable)} !important; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
                                     ${buttonText}
                                 </button>
                             </div>
                         `;
                         
-                        debugLog('  - FINAL: Button rendered with color:', currentColor, 'width:', buttonWidth + 'px');
+                        debugLog('  - FINAL: Button rendered with color:', buttonColor, 'opacity:', opacity, 'width:', buttonWidth + 'px');
                     } else if ((variable.variableType === 1 || variable.variableType === 3) && (variable.variableAssociations || variable.integerAssociations)) {
                         // Integer/String-Variable: Multi-Button für jede Association
                         const associations = variable.variableAssociations || variable.integerAssociations;
@@ -1416,7 +1637,7 @@
                         
                         associations.forEach((association, index) => {
                             const isActive = currentValue === association.value;
-                            const buttonColor = association.color || (isActive ? '#00CDAA' : '#007562');
+                            const buttonColor = association.color || 'var(--accent-color)';
                             const opacity = isActive ? '1' : '0.7';
                             
                             // Button-Gruppierung: Bestimme CSS-Klasse basierend auf Position
@@ -1449,7 +1670,7 @@
                                         onclick="requestAction('${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"}); debugLog('Multi-button clicked for variable: ${variable.id}, value: ${association.value}');" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
-                                        style="background-color: ${buttonColor} !important; border-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
                                     ${buttonText}
                                 </button>`;
                         });
@@ -1476,7 +1697,7 @@
                         
                         variable.stringAssociations.forEach((association, index) => {
                             const isActive = currentValue === String(association.value);
-                            const buttonColor = association.color || (isActive ? '#00CDAA' : '#007562');
+                            const buttonColor = association.color || 'var(--accent-color)';
                             const opacity = isActive ? '1' : '0.7';
                             
                             // Button-Gruppierung: Bestimme CSS-Klasse basierend auf Position
@@ -1509,7 +1730,7 @@
                                         onclick="requestAction('${variable.id}', '${association.value}'); debugLog('String multi-button clicked for variable: ${variable.id}, value: ${association.value}');" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
-                                        style="background-color: ${buttonColor} !important; border-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
                                     ${buttonText}
                                 </button>`;
                         });

@@ -1,4 +1,16 @@
 <?php
+
+// Ensure all variable type constants are defined
+if (!defined('VARIABLETYPE_BOOLEAN')) {
+    define('VARIABLETYPE_BOOLEAN', 0);
+}
+if (!defined('VARIABLETYPE_INTEGER')) {
+    define('VARIABLETYPE_INTEGER', 1);
+}
+if (!defined('VARIABLETYPE_STRING')) {
+    define('VARIABLETYPE_STRING', 3);
+}
+
 class UniversalDeviceTile extends IPSModule
 {
     // Variablen-Zugriff und Status-Variable-ID
@@ -161,9 +173,8 @@ class UniversalDeviceTile extends IPSModule
         $fullUpdateMessageJson = $this->GetFullUpdateMessage(); // Gibt bereits JSON-String zurück
         $fullUpdateMessage = json_decode($fullUpdateMessageJson, true); // In Array umwandeln
         
-        // Füge Asset-Update hinzu wenn sich Bildauswahl geändert hat
-        $bildauswahl = $this->ReadPropertyInteger('Bildauswahl');
-        $assets = $this->GenerateAssets($bildauswahl);
+        // Füge Asset-Update hinzu für Custom Images und Fallback-Assets
+        $assets = $this->GenerateAssets();
         if (!empty($assets)) {
             $fullUpdateMessage['assets'] = $assets;
         }
@@ -224,59 +235,77 @@ class UniversalDeviceTile extends IPSModule
         return $result;
     }
 
-    // Hilfsmethode zur Asset-Generierung basierend auf Bildauswahl
-    private function GenerateAssets($bildauswahl) {
+    // Hilfsmethode zur Asset-Generierung für Custom Images und Fallback-Assets
+    private function GenerateAssets() {
         $assets = [];
         
         // Prüfe ob keine Statusvariable konfiguriert ist - dann brauchen wir Fallback-Assets
         $statusId = $this->ReadPropertyInteger('Status');
         $needsFallbackAssets = ($statusId <= 0 || !IPS_VariableExists($statusId));
         
-        if($bildauswahl == 0) {
-            // Waschmaschine - Option 0 soll Waschmaschinen-Bilder zeigen
-            $assets['img_wm_aus'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp'));
-            $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp'));
-        }
-        elseif($bildauswahl == 1) {
-            // Trockner - Option 1 soll Trockner-Bilder zeigen
-            $assets['img_wm_aus'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_aus.webp'));
-            $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_an.webp'));
-        }
-        elseif($bildauswahl == 2) {
-            // Custom Images
-            $imageID_Bild_An = $this->ReadPropertyInteger('Bild_An');
-            if (IPS_MediaExists($imageID_Bild_An)) {
-                $image = IPS_GetMedia($imageID_Bild_An);
-                if ($image['MediaType'] === MEDIATYPE_IMAGE) {
-                    $imageFile = explode('.', $image['MediaFile']);
-                    $imageContent = $this->GetImageDataUri(end($imageFile));
-                    if ($imageContent) {
-                        $assets['img_wm_an'] = $imageContent . IPS_GetMediaContent($imageID_Bild_An);
+        // Sammle alle benötigten Assets basierend auf ProfilAssoziazionen
+        $profilAssoziazionen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+        $neededAssets = [];
+        
+        if (is_array($profilAssoziazionen)) {
+            foreach ($profilAssoziazionen as $assoziation) {
+                $bildauswahl = $assoziation['Bildauswahl'] ?? 'none';
+                
+                if ($bildauswahl === 'custom' && isset($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
+                    // Custom Images
+                    $mediaId = $assoziation['EigenesBild'];
+                    if (IPS_MediaExists($mediaId)) {
+                        $media = IPS_GetMedia($mediaId);
+                        if ($media['MediaType'] === MEDIATYPE_IMAGE) {
+                            $imageFile = explode('.', $media['MediaFile']);
+                            $imageContent = $this->GetImageDataUri(end($imageFile));
+                            if ($imageContent) {
+                                $assets['img_custom_' . $mediaId] = $imageContent . IPS_GetMediaContent($mediaId);
+                                $this->DebugLog('Added custom image asset: img_custom_' . $mediaId, 'GenerateAssets');
+                            }
+                        }
                     }
+                } elseif (in_array($bildauswahl, ['wm_an', 'wm_aus', 'dryer_on', 'dryer_off'])) {
+                    // Sammle benötigte vorkonfigurierte Assets
+                    $neededAssets[$bildauswahl] = true;
                 }
             }
-            
-            $imageID_Bild_Aus = $this->ReadPropertyInteger('Bild_Aus');
-            if (IPS_MediaExists($imageID_Bild_Aus)) {
-                $image = IPS_GetMedia($imageID_Bild_Aus);
-                if ($image['MediaType'] === MEDIATYPE_IMAGE) {
-                    $imageFile = explode('.', $image['MediaFile']);
-                    $imageContent = $this->GetImageDataUri(end($imageFile));
-                    if ($imageContent) {
-                        $assets['img_wm_aus'] = $imageContent . IPS_GetMediaContent($imageID_Bild_Aus);
-                    }
-                }
+        }
+        
+        // Lade die benötigten vorkonfigurierten Assets
+        foreach ($neededAssets as $assetName => $needed) {
+            switch ($assetName) {
+                case 'wm_an':
+                    $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp'));
+                    $this->DebugLog('Added washing machine ON asset', 'GenerateAssets');
+                    break;
+                case 'wm_aus':
+                    $assets['img_wm_aus'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp'));
+                    $this->DebugLog('Added washing machine OFF asset', 'GenerateAssets');
+                    break;
+                case 'dryer_on':
+                    $assets['img_dryer_on'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_an.webp'));
+                    $this->DebugLog('Added dryer ON asset', 'GenerateAssets');
+                    break;
+                case 'dryer_off':
+                    $assets['img_dryer_off'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_aus.webp'));
+                    $this->DebugLog('Added dryer OFF asset', 'GenerateAssets');
+                    break;
             }
         }
         
         // Fallback: Wenn keine Statusvariable konfiguriert ist und noch kein img_wm_an Asset vorhanden, 
         // lade Standard-Waschmaschinen-Asset als Fallback
-        if ($needsFallbackAssets && !isset($assets['img_wm_an']) && $bildauswahl != 3) {
+        if ($needsFallbackAssets && !isset($assets['img_wm_an'])) {
             $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp'));
             $this->DebugLog('Added fallback asset img_wm_an for missing status variable', 'GenerateAssets');
         }
         
-        // Bei bildauswahl == 3 ("kein Bild") werden keine Assets benötigt
+        // Debug: Zeige alle generierten Assets
+        $this->DebugLog('GenerateAssets completed. Total assets generated: ' . count($assets), 'GenerateAssets');
+        foreach ($assets as $assetName => $assetData) {
+            $this->DebugLog('Generated asset: ' . $assetName . ' (size: ' . strlen($assetData) . ' bytes)', 'GenerateAssets');
+        }
         
         return $assets;
     }
@@ -426,23 +455,42 @@ class UniversalDeviceTile extends IPSModule
 
 
 
+        // Asset-System vereinheitlicht: Verwende dynamische Asset-Generierung statt hardcoded Assets
+        $generatedAssets = $this->GenerateAssets();
+        $assets = '<script>';
+        $assets .= 'window.assets = {};' . PHP_EOL;
+        
+        // Dynamische Asset-Generierung basierend auf aktueller Konfiguration
+        foreach ($generatedAssets as $assetName => $assetData) {
+            $assets .= 'window.assets.' . $assetName . ' = "' . $assetData . '";' . PHP_EOL;
+        }
+        
+        // Fallback-Assets basierend auf bildauswahl für Backward-Kompatibilität
         if($bildauswahl == '0') {
-            $assets = '<script>';
-            $assets .= 'window.assets = {};' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_aus = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp')) . '";' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_an = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp')) . '";' . PHP_EOL;
-            $assets .= '</script>';
+            // Waschmaschine: Stelle sicher, dass WM-Assets verfügbar sind
+            if (!isset($generatedAssets['img_wm_an'])) {
+                $assets .= 'window.assets.img_wm_an = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp')) . '";' . PHP_EOL;
+            }
+            if (!isset($generatedAssets['img_wm_aus'])) {
+                $assets .= 'window.assets.img_wm_aus = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp')) . '";' . PHP_EOL;
+            }
         }
         elseif($bildauswahl == '1') {
-            $assets = '<script>';
-            $assets .= 'window.assets = {};' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_aus = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_aus.webp')) . '";' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_an = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_an.webp')) . '";' . PHP_EOL;
-            $assets .= '</script>';
+            // Trockner: Korrekte Asset-Namen verwenden!
+            if (!isset($generatedAssets['img_dryer_on'])) {
+                $assets .= 'window.assets.img_dryer_on = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_an.webp')) . '";' . PHP_EOL;
+            }
+            if (!isset($generatedAssets['img_dryer_off'])) {
+                $assets .= 'window.assets.img_dryer_off = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_aus.webp')) . '";' . PHP_EOL;
+            }
         }
-        else {
-
-        // Prüfe vorweg, ob ein Bild ausgewählt wurde
+        
+        // Script-Tag schließen für das vereinheitlichte Asset-System
+        $assets .= '</script>';
+        
+        // Custom image handling (legacy support)
+        if ($bildauswahl != '0' && $bildauswahl != '1') {
+            // Prüfe vorweg, ob ein Bild ausgewählt wurde
         $imageID_Bild_An = $this->ReadPropertyInteger('Bild_An');
         if (IPS_MediaExists($imageID_Bild_An)) {
             $image = IPS_GetMedia($imageID_Bild_An);
@@ -544,11 +592,8 @@ class UniversalDeviceTile extends IPSModule
                     
                 }  
 
-            $assets = '<script>';
-            $assets .= 'window.assets = {};' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_aus = "' . $imageContent2 . '";' . PHP_EOL;
-            $assets .= 'window.assets.img_wm_an = "' . $imageContent . '";' . PHP_EOL;
-            $assets .= '</script>';
+            // Custom image assets already handled by unified asset system above
+            // No need for separate hardcoded assets - this is now integrated
         }
 
 
@@ -638,6 +683,7 @@ class UniversalDeviceTile extends IPSModule
 
         // Status-Daten (werden immer oben angezeigt)
         $statusId = $this->ReadPropertyInteger('Status');
+        $this->DebugLog('Processing status variable: ' . $statusId, 'GetFullUpdateMessage');
         if ($statusId > 0 && IPS_VariableExists($statusId)) {
             $result['status'] = GetValueFormatted($statusId);
             $result['statusValue'] = GetValue($statusId);
@@ -655,11 +701,53 @@ class UniversalDeviceTile extends IPSModule
             
             // Verwende Profilassoziationen für Status-Konfiguration
             $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+            $statusBildauswahlSet = false; // Flag to track if statusBildauswahl was set
+            
+            // NEW: Check if ALL associations have Bildauswahl = "none" to hide image column completely
+            $hideImageColumn = true; // Assume we should hide until we find an image
+            if (is_array($profilAssoziationen)) {
+                foreach ($profilAssoziationen as $assoz) {
+                    $bildauswahl = $assoz['Bildauswahl'] ?? 'wm_aus';
+                    if ($bildauswahl !== 'none') {
+                        $hideImageColumn = false; // Found at least one association with an image
+                        break;
+                    }
+                }
+            } else {
+                $hideImageColumn = false; // No associations = show image column with default
+            }
+            $result['hideImageColumn'] = $hideImageColumn;
+            $this->DebugLog('Image column visibility - hideImageColumn: ' . ($hideImageColumn ? 'true' : 'false'), 'GetFullUpdateMessage');
+            
             if (is_array($profilAssoziationen)) {
                 $currentValue = GetValue($statusId);
                 foreach ($profilAssoziationen as $assoziation) {
                     if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentValue) {
-                        $result['statusBildauswahl'] = $assoziation['Bildauswahl'] ?? 'wm_aus';
+                        // Neue erweiterte Bildauswahl-Logik
+                        $bildauswahl = $assoziation['Bildauswahl'] ?? 'wm_aus';
+                        
+                        if ($bildauswahl === 'custom') {
+                            // Verwende eigenes Bild aus SelectMedia-Feld
+                            if (isset($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
+                                // Asset-Name für Custom Image (wird in GenerateAssets() als base64 geladen)
+                                $result['statusBildauswahl'] = 'img_custom_' . $assoziation['EigenesBild'];
+                                $this->DebugLog('Set statusBildauswahl to custom image: img_custom_' . $assoziation['EigenesBild'], 'GetFullUpdateMessage');
+                            } else {
+                                // Fallback wenn kein eigenes Bild konfiguriert
+                                $result['statusBildauswahl'] = 'none';
+                                $this->DebugLog('Custom image selected but no EigenesBild configured - fallback to none', 'GetFullUpdateMessage');
+                            }
+                        } elseif ($bildauswahl === 'none') {
+                            // Kein Bild anzeigen
+                            $result['statusBildauswahl'] = 'none';
+                            $this->DebugLog('Set statusBildauswahl to none', 'GetFullUpdateMessage');
+                        } else {
+                            // Verwende vorkonfigurierte Bilder (wm_an, wm_aus, dryer_on, dryer_off, etc.)
+                            $result['statusBildauswahl'] = $bildauswahl;
+                            $this->DebugLog('Set statusBildauswahl to predefined image: ' . $bildauswahl, 'GetFullUpdateMessage');
+                        }
+                        
+                        $statusBildauswahlSet = true;
                         $statusColor = $assoziation['StatusColor'] ?? -1;
                         $result['statusColor'] = isset($assoziation['StatusColor']) ? '#' . sprintf('%06X', $assoziation['StatusColor']) : '#000000';
                         $result['isStatusColorTransparent'] = isset($assoziation['StatusColor']) && ($assoziation['StatusColor'] == -1 || $assoziation['StatusColor'] == 16777215);
@@ -667,9 +755,27 @@ class UniversalDeviceTile extends IPSModule
                     }
                 }
             }
+            
+            // CRITICAL FIX: Ensure statusBildauswahl is ALWAYS set if we have a status variable
+            if (!$statusBildauswahlSet) {
+                $result['statusBildauswahl'] = 'none'; // Default fallback
+                $this->DebugLog('FALLBACK: No matching association found - set statusBildauswahl to none', 'GetFullUpdateMessage');
+            }
         } else {
             // Fallback: Wenn keine Statusvariable konfiguriert ist, verwende img_wm_an als Standard
-            $result['statusBildauswahl'] = 'wm_an';
+            $result['statusBildauswahl'] = 'none';
+            $this->DebugLog('No status variable configured - fallback to none', 'GetFullUpdateMessage');
+        }
+        
+        // UNIVERSAL GUARANTEE: statusBildauswahl MUST ALWAYS be set
+        if (!isset($result['statusBildauswahl'])) {
+            $result['statusBildauswahl'] = 'none';
+            $this->DebugLog('EMERGENCY FALLBACK: statusBildauswahl was not set - forcing to none', 'GetFullUpdateMessage');
+        }
+        
+        // DEBUG: Zeige final gesetzte statusBildauswahl
+        if (isset($result['statusBildauswahl'])) {
+            $this->DebugLog('FINAL statusBildauswahl sent to frontend: ' . $result['statusBildauswahl'], 'GetFullUpdateMessage');
         }
 
         // Lade die konfigurierte Variablenliste
@@ -766,7 +872,7 @@ class UniversalDeviceTile extends IPSModule
                     
                     // Extrahiere Variable-Associations für Button-Erstellung (Integer + String)
                     $variableAssociations = null;
-                    $this->DebugLog('Variable Association Check for Variable ID: ' . $variable['Variable'] . ' - VariableType: ' . $variableInfo['VariableType'] . ' (INTEGER=' . VARIABLETYPE_INTEGER . ', STRING=' . VARIABLETYPE_STRING . '), DisplayType: "' . ($variable['DisplayType'] ?? 'text') . '"');
+                    $this->DebugLog('Variable Association Check for Variable ID: ' . $variable['Variable'] . ' - VariableType: ' . $variableInfo['VariableType'] . ' (INTEGER=' . VARIABLETYPE_INTEGER . ', STRING=' . VARIABLETYPE_STRING . ', BOOLEAN=' . VARIABLETYPE_BOOLEAN . '), DisplayType: "' . ($variable['DisplayType'] ?? 'text') . '"');
                     
                     // Spezielle Debug-Ausgabe für Variable 11998
                     if ($variable['Variable'] == 11998) {
@@ -783,6 +889,21 @@ class UniversalDeviceTile extends IPSModule
                             $this->DebugLog('Calling GetStringAssociations for Variable ID: ' . $variable['Variable']);
                             $variableAssociations = $this->GetStringAssociations($variable['Variable']);
                             $this->DebugLog('GetStringAssociations returned: ' . ($variableAssociations ? json_encode($variableAssociations) : 'null'));
+                        } elseif ($variableInfo['VariableType'] === VARIABLETYPE_BOOLEAN) {
+                            // SPECIAL: Nur für Boolean-Variablen mit PRESENTATION GUID, nicht für Standard-Profile
+                            $variable_data = IPS_GetVariable($variable['Variable']);
+                            if (isset($variable_data['VariableCustomPresentation']) && !empty($variable_data['VariableCustomPresentation'])) {
+                                $customPresentation = $variable_data['VariableCustomPresentation'];
+                                if (isset($customPresentation['PRESENTATION']) || isset($customPresentation['ICON_TRUE']) || isset($customPresentation['ICON_FALSE'])) {
+                                    $this->DebugLog('Calling GetBooleanAssociations for Variable ID with PRESENTATION GUID: ' . $variable['Variable']);
+                                    $variableAssociations = $this->GetBooleanAssociations($variable['Variable']);
+                                    $this->DebugLog('GetBooleanAssociations returned: ' . ($variableAssociations ? json_encode($variableAssociations) : 'null'));
+                                } else {
+                                    $this->DebugLog('Skipping Boolean associations for Variable ID: ' . $variable['Variable'] . ' - using standard profile (GetValueFormatted)');
+                                }
+                            } else {
+                                $this->DebugLog('Skipping Boolean associations for Variable ID: ' . $variable['Variable'] . ' - using standard profile (GetValueFormatted)');
+                            }
                         } else {
                             $this->DebugLog('Skipping Variable Associations for Variable ID: ' . $variable['Variable'] . ' - unsupported variable type: ' . $variableInfo['VariableType']);
                         }
@@ -809,6 +930,18 @@ class UniversalDeviceTile extends IPSModule
                         }
                     }
                     
+                    // SPECIAL: Für Boolean-Variablen mit PRESENTATION GUID, bei denen GetIcon leer ist
+                    // aber die Assoziationen Icons enthalten, verwende das Association-Icon als Haupt-Icon
+                    if (($icon === '' || $icon === 'Transparent') && $variableInfo['VariableType'] == VARIABLETYPE_BOOLEAN && !empty($variableAssociations)) {
+                        foreach ($variableAssociations as $assoc) {
+                            if (!empty($assoc['icon'])) {
+                                $icon = $assoc['icon'];
+                                $this->DebugLog('GetFullUpdateMessage: Using association icon for Boolean variable ' . $variable['Variable'] . ': ' . $icon);
+                                break;
+                            }
+                        }
+                    }
+                    
                     $variableData = [
                         'id' => $variable['Variable'],
                         'label' => $label,
@@ -824,8 +957,8 @@ class UniversalDeviceTile extends IPSModule
                         'isTextColorTransparent' => isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215),
                         'progressColor1' => isset($variable['ProgressColor1']) ? '#' . sprintf('%06X', $variable['ProgressColor1']) : '#4CAF50',
                         'progressColor2' => isset($variable['ProgressColor2']) ? '#' . sprintf('%06X', $variable['ProgressColor2']) : '#2196F3',
-                        'buttonColorActive' => $buttonColors['active'],
-                        'buttonColorInactive' => $buttonColors['inactive'],
+                        'boolButtonColor' => isset($variable['boolButtonColor']) ? '#' . sprintf('%06X', $variable['boolButtonColor']) : '#CCCCCC',
+                        'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
                         'buttonWidth' => $variable['ButtonWidth'] ?? 120,
                         'showBorderLine' => $variable['ShowBorderLine'] ?? false,
                         'progressMin' => $progressMinMax['min'],
@@ -835,14 +968,26 @@ class UniversalDeviceTile extends IPSModule
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
-                        'integerAssociations' => $variableAssociations // Backward compatibility
                     ];
                     
                     // Zweite Variable für Progress-Bars hinzufügen
                     if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0 && IPS_VariableExists($variable['SecondVariable'])) {
-                        // Icon für zweite Variable ermitteln (vollständige Icon-Suche wie bei Hauptvariablen)
+                        // Icon für zweite Variable ermitteln
                         $secondIcon = $this->GetIcon($variable['SecondVariable']);
-                        $this->DebugLog('GetFullUpdateMessage: Second variable icon search result: ' . $secondIcon . ' for variable ID: ' . $variable['SecondVariable']);
+                        $this->DebugLog('GetFullUpdateMessage: Icon search result: ' . $secondIcon . ' for variable ID: ' . $variable['SecondVariable']);
+                        
+                        // SPECIAL: Für Boolean-Variablen mit PRESENTATION GUID, bei denen GetIcon leer ist
+                        // aber die Assoziationen Icons enthalten, verwende das Association-Icon als Haupt-Icon
+                        if (($secondIcon === '' || $secondIcon === 'Transparent') && $variableInfo['VariableType'] == VARIABLETYPE_BOOLEAN && !empty($variableAssociations)) {
+                            foreach ($variableAssociations as $assoc) {
+                                if (!empty($assoc['icon'])) {
+                                    $secondIcon = $assoc['icon'];
+                                    $this->DebugLog('GetFullUpdateMessage: Using association icon for Boolean variable ' . $variable['Variable'] . ': ' . $secondIcon);
+                                    $this->DebugLog('GetFullUpdateMessage: Using association icon for Boolean variable ' . $variable['Variable'] . ': ' . $icon);
+                                    break;
+                                }
+                            }
+                        }
                         
                         // Label für zweite Variable ermitteln
                         $secondLabel = !empty($variable['SecondVariableLabel']) ? $variable['SecondVariableLabel'] : IPS_GetName($variable['SecondVariable']);
@@ -913,7 +1058,7 @@ class UniversalDeviceTile extends IPSModule
         ];
         
         // Bild-Konfiguration
-        $result['bildauswahl'] = $this->ReadPropertyInteger('Bildauswahl');
+        // Note: bildauswahl is now handled per-association in status rendering logic above
         $result['BildBreite'] = $this->ReadPropertyFloat('BildBreite');
         $result['bildtransparenz'] = $this->ReadPropertyFloat('Bildtransparenz');
         $result['kachelhintergrundfarbe'] = '#' . sprintf('%06X', $this->ReadPropertyInteger('Kachelhintergrundfarbe'));
@@ -1440,6 +1585,12 @@ class UniversalDeviceTile extends IPSModule
         }
         
         $variable = IPS_GetVariable($variableId);
+        
+        // Nur für den erwarteten Variablentyp
+        if ($variable['VariableType'] !== VARIABLETYPE_INTEGER) {
+            return $defaultMinMax;
+        }
+        
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
         
         // VORAB-PRÜFUNG: Hat die Variable überhaupt ein Profil oder eine Darstellung?
@@ -1451,16 +1602,53 @@ class UniversalDeviceTile extends IPSModule
             $hasPresentation = isset($object['ObjectVisualization']) && !empty($object['ObjectVisualization']);
         }
         
-        // WICHTIG: Prüfe auch VariableCustomPresentation (neue IP-Symcon Darstellungen)
-        $hasCustomPresentation = isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation']);
-        
-        // Wenn weder Profil noch Darstellung noch Custom Presentation vorhanden: Standard-Fallback verwenden
-        if (!$hasProfile && !$hasPresentation && !$hasCustomPresentation) {
-            $this->DebugLog('Variable ' . $variableId . ' has no profile, presentation or custom presentation - using default MinMax (0-100)');
+        // Wenn weder Profil noch Darstellung vorhanden: Standard-Fallback verwenden
+        if (!$hasProfile && !$hasPresentation) {
+            $this->DebugLog('Variable ' . $variableId . ' has no profile or presentation - using default MinMax (0-100)');
             return $defaultMinMax;
         }
         
-        $this->DebugLog('Variable ' . $variableId . ' validation: hasProfile=' . ($hasProfile ? 'true' : 'false') . ', hasPresentation=' . ($hasPresentation ? 'true' : 'false') . ', hasCustomPresentation=' . ($hasCustomPresentation ? 'true' : 'false'));
+        $this->DebugLog('Variable ' . $variableId . ' validation: hasProfile=' . ($hasProfile ? 'true' : 'false') . ', hasPresentation=' . ($hasPresentation ? 'true' : 'false'));
+        
+        // ERSTE PRIORITÄT: Prüfe VariableCustomPresentation (neue IP-Symcon Darstellungen)
+        // Boolean-Variablen: Versuche Assoziationen aus den Präsentationsparametern zu extrahieren
+        if ($variable['VariableType'] == VARIABLETYPE_BOOLEAN) {
+            $customPresentation = $variable['VariableCustom']['CustomPresentation'] ?? [];
+            $this->DebugLog('Boolean variable ' . $variableId . ' customPresentation: ' . json_encode($customPresentation));
+            
+            // Extra Debug für Variable 26746
+            if ($variableId == 26746) {
+                $this->DebugLog('VARIABLE 26746 DEBUG: Starting icon extraction');
+                $this->DebugLog('VARIABLE 26746 DEBUG: ICON_TRUE exists = ' . (isset($customPresentation['ICON_TRUE']) ? 'YES' : 'NO'));
+                $this->DebugLog('VARIABLE 26746 DEBUG: ICON_FALSE exists = ' . (isset($customPresentation['ICON_FALSE']) ? 'YES' : 'NO'));
+                $this->DebugLog('VARIABLE 26746 DEBUG: USE_ICON_FALSE exists = ' . (isset($customPresentation['USE_ICON_FALSE']) ? 'YES' : 'NO'));
+                if (isset($customPresentation['ICON_TRUE'])) {
+                    $this->DebugLog('VARIABLE 26746 DEBUG: ICON_TRUE value = ' . $customPresentation['ICON_TRUE']);
+                }
+                if (isset($customPresentation['ICON_FALSE'])) {
+                    $this->DebugLog('VARIABLE 26746 DEBUG: ICON_FALSE value = ' . $customPresentation['ICON_FALSE']);
+                }
+                if (isset($customPresentation['USE_ICON_FALSE'])) {
+                    $this->DebugLog('VARIABLE 26746 DEBUG: USE_ICON_FALSE value = ' . ($customPresentation['USE_ICON_FALSE'] ? 'TRUE' : 'FALSE'));
+                }
+            }
+            
+            // Prüfe auf presentationParameters in der customPresentation (beide Strukturen unterstützen)
+            $params = null;
+            
+            // Prüfe zuerst auf direktes VariableProfile
+            if (isset($variable['VariableProfile']) && !empty($variable['VariableProfile'])) {
+                $profileName = $variable['VariableProfile'];
+                $profile = @IPS_GetVariableProfile($profileName);
+                if ($profile !== false && isset($profile['Associations'])) {
+                    $this->DebugLog('Found VariableProfile for Boolean variable: ' . $profileName);
+                    if ($variableId == 26746) {
+                        $this->DebugLog('VARIABLE 26746 DEBUG: Using VariableProfile associations: ' . json_encode($profile['Associations']));
+                    }
+                    return $profile['Associations'];
+                }
+            }
+        }
         
         // ERSTE PRIORITÄT: Prüfe VariableCustomPresentation (neue IP-Symcon Darstellungen)
         if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
@@ -1629,7 +1817,15 @@ class UniversalDeviceTile extends IPSModule
     }
     
     /**
-     * Generische Funktion zum Extrahieren von Associations für Integer- und String-Variablen
+     * Extrahiert Associations einer Boolean-Variable für Button-Erstellung
+     * Unterstützt 4 Fälle: Alte Variablenprofile, CustomPresentation mit OPTIONS/TEMPLATE/PRESENTATION GUID
+     */
+    private function GetBooleanAssociations($variableId) {
+        return $this->GetVariableAssociations($variableId, VARIABLETYPE_BOOLEAN);
+    }
+    
+    /**
+     * Generische Funktion zum Extrahieren von Associations für Boolean-, Integer- und String-Variablen
      * Unterstützt 4 Fälle: Alte Variablenprofile, CustomPresentation mit OPTIONS/TEMPLATE/PRESENTATION GUID
      */
     private function GetVariableAssociations($variableId, $expectedVariableType) {
@@ -1645,25 +1841,42 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // Bestimme den Gruppennamen für FALL 4 basierend auf Variablentyp
-        $groupName = ($expectedVariableType === VARIABLETYPE_INTEGER) ? 'Numeric' : 'String';
+        $groupName = ($expectedVariableType === VARIABLETYPE_INTEGER) ? 'Numeric' : 
+                     (($expectedVariableType === VARIABLETYPE_BOOLEAN) ? 'Boolean' : 'String');
         
         // **FALL 1: Alte Variablenprofile**
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
         if (!empty($profile) && IPS_VariableProfileExists($profile)) {
             $profileData = IPS_GetVariableProfile($profile);
+            $this->DebugLog('STANDARD PROFILE DEBUG for variable ' . $variableId . ': Profile = ' . $profile);
+            $this->DebugLog('STANDARD PROFILE DEBUG: ProfileData = ' . json_encode($profileData));
             
             if (isset($profileData['Associations']) && is_array($profileData['Associations'])) {
                 $associations = [];
                 foreach ($profileData['Associations'] as $association) {
                     if (isset($association['Value']) && isset($association['Name'])) {
+                        // SPECIAL: Boolean-Wert-Normalisierung für korrektes Association-Matching
+                        $normalizedValue = $association['Value'];
+                        if ($expectedVariableType === VARIABLETYPE_BOOLEAN) {
+                            // Normalisiere Boolean-Werte: false kann als "" oder 0 kommen, true als 1 oder true
+                            if ($association['Value'] === '' || $association['Value'] === 0 || $association['Value'] === false) {
+                                $normalizedValue = false;
+                            } elseif ($association['Value'] === 1 || $association['Value'] === true) {
+                                $normalizedValue = true;
+                            }
+                            $this->DebugLog('BOOLEAN VALUE NORMALIZATION: Original=' . json_encode($association['Value']) . ' → Normalized=' . json_encode($normalizedValue));
+                        }
+                        
                         $associations[] = [
-                            'value' => $association['Value'], // Kann Integer oder String sein
+                            'value' => $normalizedValue, // Normalisierte Werte für Boolean-Variablen
                             'name' => $association['Name'],
                             'color' => isset($association['Color']) && $association['Color'] !== -1 ? '#' . sprintf('%06X', $association['Color']) : null,
                             'icon' => isset($association['Icon']) ? $association['Icon'] : null
                         ];
+                        $this->DebugLog('STANDARD PROFILE ASSOCIATION: Original Value=' . json_encode($association['Value']) . ' → Normalized Value=' . json_encode($normalizedValue) . ', Name=' . $association['Name'] . ', Icon=' . ($association['Icon'] ?? 'NULL'));
                     }
                 }
+                $this->DebugLog('STANDARD PROFILE DEBUG: Returning ' . count($associations) . ' associations');
                 return $associations;
             }
         }
@@ -1674,6 +1887,46 @@ class UniversalDeviceTile extends IPSModule
         }
         
         $customPresentation = $variable['VariableCustomPresentation'];
+        
+        // **FALL 1.5: Boolean-Präsentationen mit direkten ICON_TRUE/ICON_FALSE Parametern**
+        if ($expectedVariableType === VARIABLETYPE_BOOLEAN) {
+            $this->DebugLog('Checking Boolean presentation parameters for variable: ' . $variableId);
+            $this->DebugLog('CustomPresentation structure: ' . json_encode($customPresentation));
+            
+            // Spezielle Debug-Logs für Variable 26746
+            if ($variableId == 26746) {
+                $this->DebugLog('VARIABLE 26746 DEBUG: Starting icon extraction');
+                $this->DebugLog('VARIABLE 26746 DEBUG: ICON_TRUE exists = ' . (isset($customPresentation['ICON_TRUE']) ? 'YES' : 'NO'));
+                $this->DebugLog('VARIABLE 26746 DEBUG: ICON_FALSE exists = ' . (isset($customPresentation['ICON_FALSE']) ? 'YES' : 'NO'));
+                $this->DebugLog('VARIABLE 26746 DEBUG: USE_ICON_FALSE exists = ' . (isset($customPresentation['USE_ICON_FALSE']) ? 'YES' : 'NO'));
+                if (isset($customPresentation['ICON_TRUE'])) {
+                    $this->DebugLog('VARIABLE 26746 DEBUG: ICON_TRUE value = ' . $customPresentation['ICON_TRUE']);
+                }
+                if (isset($customPresentation['ICON_FALSE'])) {
+                    $this->DebugLog('VARIABLE 26746 DEBUG: ICON_FALSE value = ' . $customPresentation['ICON_FALSE']);
+                }
+                if (isset($customPresentation['USE_ICON_FALSE'])) {
+                    $this->DebugLog('VARIABLE 26746 DEBUG: USE_ICON_FALSE value = ' . ($customPresentation['USE_ICON_FALSE'] ? 'TRUE' : 'FALSE'));
+                }
+            }
+            
+            // Prüfe auf presentationParameters in der customPresentation (beide Strukturen unterstützen)
+            $params = null;
+            
+            // Prüfe zuerst auf direktes VariableProfile
+            if (isset($variable['VariableProfile']) && !empty($variable['VariableProfile'])) {
+                $profileName = $variable['VariableProfile'];
+                $profile = @IPS_GetVariableProfile($profileName);
+                if ($profile !== false && isset($profile['Associations'])) {
+                    $this->DebugLog('Found VariableProfile for Boolean variable: ' . $profileName);
+                    if ($variableId == 26746) {
+                        $this->DebugLog('VARIABLE 26746 DEBUG: Using VariableProfile associations: ' . json_encode($profile['Associations']));
+                    }
+                    return $profile['Associations'];
+                }
+            }
+        }
+        
         // **FALL 2: CustomPresentation mit direkten OPTIONS**
         if (isset($customPresentation['OPTIONS'])) {
             $options = is_string($customPresentation['OPTIONS']) ? json_decode($customPresentation['OPTIONS'], true) : $customPresentation['OPTIONS'];

@@ -100,7 +100,15 @@
         "Font Size": "Schriftgröße",
         "Progressbar/Button": "Fortschrittsbalken/Button",
         "Separator line": "Trennlinie",
-        "Text-Variable": "Text-Variable"
+        "Text-Variable": "Text-Variable",
+        "Enable debug logging": "Debug-Protokollierung aktivieren",
+        "Custom": "Benutzerdefiniert",
+        "None": "Kein Bild",
+        "Washing Machine - Off": "Waschmaschine - Aus",
+        "Washing Machine - On": "Waschmaschine - An",
+        "Dryer - Off": "Trockner - Aus",
+        "Dryer - On": "Trockner - An",
+        "Custom Image": "Benutzerdefiniertes Bild"
         }
     }
   }
