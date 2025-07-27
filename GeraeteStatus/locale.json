@@ -88,8 +88,8 @@
         "Button": "Schalter",
         "Group": "Gruppe",
         "(No Group)": "(Keine Gruppe)",
-        "Progress bar color 1 or Button = active": "Fortschrittsbalken-Farbe 1 oder Button = aktiv",
-        "Progress bar color 2 or Button = inactive": "Fortschrittsbalken-Farbe 2 oder Button = inaktiv",
+        "Progress bar color 1": "Fortschrittsbalken-Farbe 1",
+        "Progress bar color 2": "Fortschrittsbalken-Farbe 2",
         "Custom Icon": "Benutzerdefiniertes Icon",
         "Button Content": "Button-Inhalt",
         "Icon + Label": "Icon + Beschriftung",
@@ -109,7 +109,8 @@
         "Dryer - Off": "Trockner - Aus",
         "Dryer - On": "Trockner - An",
         "Custom Image": "Benutzerdefiniertes Bild",
-        "Bool Button Color": "Schalter Farbe"
+        "Bool Button Color": "Schalter Farbe",
+        "Progressbar": "Fortschrittsbalken"
         }
     }
   }

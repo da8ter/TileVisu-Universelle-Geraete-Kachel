@@ -744,17 +744,13 @@
             },
             {
               "type": "ExpansionPanel",
-              "caption": "Progressbar/Button",
+              "caption": "Progressbar",
               "items": [
-                {
-                  "type": "Label",
-                  "caption": "For display type “Progress Bar”: First and second color of the gradient. For display type “Button”: First color = button active, second color = button inactive."
-                },
                 {
                   "type": "RowLayout",
                   "items": [
                     {
-                      "caption": "Progress bar color 1 or Button = active",
+                      "caption": "Progress bar color 1",
                       "name": "ProgressColor1",
                       "type": "SelectColor",
                       "allowTransparent": true,
@@ -764,7 +760,7 @@
                       "visible": true
                     },
                     {
-                      "caption": "Progress bar color 2 or Button = inactive",
+                      "caption": "Progress bar color 2",
                       "name": "ProgressColor2",
                       "type": "SelectColor",
                       "allowTransparent": true,
@@ -774,16 +770,6 @@
                       "visible": true
                     }
                   ]
-                },
-                {
-                  "caption": "Bool Button Color",
-                  "name": "boolButtonColor",
-                  "type": "SelectColor",
-                  "allowTransparent": true,
-                  "save": true,
-                  "add": -1,
-                  "value": -1,
-                  "visible": true
                 },
                 {
                   "type": "Label",
@@ -837,6 +823,22 @@
                   "width": "100%",
                   "save": true,
                   "add": "",
+                  "visible": true
+                }
+              ]
+            },
+            {
+              "type": "ExpansionPanel",
+              "caption": "Button",
+              "items": [
+                {
+                  "caption": "Bool Button Color",
+                  "name": "boolButtonColor",
+                  "type": "SelectColor",
+                  "allowTransparent": true,
+                  "save": true,
+                  "add": -1,
+                  "value": -1,
                   "visible": true
                 },
                 {
