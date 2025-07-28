@@ -1683,9 +1683,14 @@
                             // Button-Text basierend auf Association-Name
                             let buttonText = association.name || `Wert ${association.value}`;
                             
-                            // Icon hinzufügen falls vorhanden
-                            if (association.icon && association.icon !== 'Transparent') {
-                                const iconClass = prepareIconForDisplay(association.icon);
+                            // Icon hinzufügen falls vorhanden, mit Fallback auf Standard-Icon
+                            let iconToUse = association.icon;
+                            if (!iconToUse || iconToUse === 'Transparent' || iconToUse === null) {
+                                iconToUse = variable.icon; // Fallback auf Standard-Icon der Variable
+                            }
+                            
+                            if (iconToUse && iconToUse !== 'Transparent') {
+                                const iconClass = prepareIconForDisplay(iconToUse);
                                 if (iconClass) {
                                     buttonText = `<i class="${iconClass}" style="margin-right: 4px;"></i>${buttonText}`;
                                 }
@@ -1743,9 +1748,14 @@
                             // Button-Text basierend auf Association-Name
                             let buttonText = association.name || String(association.value);
                             
-                            // Icon hinzufügen falls vorhanden
-                            if (association.icon && association.icon !== 'Transparent') {
-                                const iconClass = prepareIconForDisplay(association.icon);
+                            // Icon hinzufügen falls vorhanden, mit Fallback auf Standard-Icon
+                            let iconToUse = association.icon;
+                            if (!iconToUse || iconToUse === 'Transparent' || iconToUse === null) {
+                                iconToUse = variable.icon; // Fallback auf Standard-Icon der Variable
+                            }
+                            
+                            if (iconToUse && iconToUse !== 'Transparent') {
+                                const iconClass = prepareIconForDisplay(iconToUse);
                                 if (iconClass) {
                                     buttonText = `<i class="${iconClass}" style="margin-right: 4px;"></i>${buttonText}`;
                                 }

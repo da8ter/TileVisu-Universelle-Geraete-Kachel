@@ -1984,6 +1984,30 @@ class UniversalDeviceTile extends IPSModule
             }
         }
         
+        // **STRING/INTEGER PRESENTATION GUID AUFLÖSUNG für Profile ohne direkte OPTIONS**
+        if (($expectedVariableType === VARIABLETYPE_STRING || $expectedVariableType === VARIABLETYPE_INTEGER) && 
+            isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
+            $presentationGuid = trim($customPresentation['PRESENTATION'], '{}');
+            $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Attempting STRING/INTEGER PRESENTATION GUID resolution: ' . $presentationGuid);
+            
+            try {
+                if (function_exists('IPS_GetPresentation')) {
+                    $presentationData = @IPS_GetPresentation($presentationGuid);
+                    if ($presentationData !== false && !empty($presentationData)) {
+                        $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: STRING/INTEGER PRESENTATION GUID resolved successfully');
+                        
+                        // Prüfe auf Associations in den Presentation-Daten
+                        if (isset($presentationData['Associations']) && is_array($presentationData['Associations'])) {
+                            $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Found ' . count($presentationData['Associations']) . ' associations in STRING/INTEGER PRESENTATION');
+                            return $presentationData['Associations'];
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: STRING/INTEGER PRESENTATION GUID resolution failed: ' . $e->getMessage());
+            }
+        }
+        
         // **FALL 2: CustomPresentation mit direkten OPTIONS**
         if (isset($customPresentation['OPTIONS'])) {
             $options = is_string($customPresentation['OPTIONS']) ? json_decode($customPresentation['OPTIONS'], true) : $customPresentation['OPTIONS'];
