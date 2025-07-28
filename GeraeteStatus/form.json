@@ -388,7 +388,7 @@
               "width": "200px",
               "save": true,
               "add": "keine Gruppe",
-              "visible": true,
+              "visible": false,
               "edit": {
                 "type": "Select",
                 "options": [
@@ -438,6 +438,14 @@
                   }
                 ]
               }
+            },
+            {
+              "caption": "Group Name",
+              "name": "GroupName",
+              "width": "200px",
+              "save": false,
+              "add": "",
+              "visible": true
             },
             {
               "caption": "Font Size",
@@ -917,6 +925,14 @@
             {
               "name": "line",
               "caption": "Show Line Under Group",
+              "width": "200px",
+              "edit": {
+                "type": "CheckBox"
+              }
+            },
+            {
+              "name": "stretch",
+              "caption": "Stretch Buttons",
               "width": "200px",
               "edit": {
                 "type": "CheckBox"

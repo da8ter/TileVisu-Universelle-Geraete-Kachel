@@ -114,6 +114,11 @@
             margin-top: 0;
         }
         
+        /* Stretch-Gruppen: variable-item braucht volle Breite */
+        .variable-group.stretch-buttons .variable-group-item .variable-item {
+            width: 100% !important;
+        }
+        
         /* AUSNAHME: Progress-Balken brauchen volle Breite, auch in Gruppen */
         .variable-group-item .variable-item .progress-container {
             width: 100%;
@@ -253,21 +258,100 @@
             padding-bottom: 0px;
             margin-bottom: 0px;
         }
-        
-        /* Für Gruppen mit Grenzlinie */
-        .variable-group.with-border-line {
-            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
-            padding-bottom: 0px;
-            margin-bottom: 0px;
-        }
+
         
         /* Linie unter Gruppen wenn showLine aktiviert ist */
         .group-line {
             width: 100%;
             border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
-            margin-top: 8px;
+            margin-top: 0px;
             margin-bottom: 8px;
         }
+        
+        /* Stretch-Modus für Gruppen-Buttons - Robuste CSS-Lösung */
+        
+        /* Container-Level: Stretch-Gruppen brauchen volle Breite */
+        .variable-group.stretch-buttons {
+            width: 100% !important;
+            display: flex !important;
+        }
+        
+        /* Items-Container: Flex-Layout mit korrektem Gap */
+        .variable-group.stretch-buttons .variable-group-items {
+            display: flex !important;
+            width: 100% !important;
+            gap: 16px !important;
+            flex-wrap: nowrap !important;
+            align-items: flex-start !important; /* Behält natürliche Höhen bei */
+        }
+        
+        /* === REINE BOOL-GRUPPEN: Gleichmäßige Verteilung === */
+        
+        /* Reine Bool-Gruppen: Items gleichmäßig verteilen */
+        .variable-group.stretch-buttons:not(:has(.variable-multi-button-container)) .variable-group-item {
+            flex: 1 !important;
+            display: flex !important;
+            min-width: 0 !important;
+        }
+        
+        /* Reine Bool-Gruppen: Button-Container volle Breite */
+        .variable-group.stretch-buttons:not(:has(.variable-multi-button-container)) .variable-group-item .variable-button-container {
+            width: 100% !important;
+            display: flex !important;
+            /* Margins beibehalten für konsistente vertikale Abstände */
+        }
+        
+        /* Reine Bool-Gruppen: Buttons volle Container-Breite */
+        .variable-group.stretch-buttons:not(:has(.variable-multi-button-container)) .variable-group-item .variable-button-container .variable-button {
+            width: 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            flex: none !important;
+        }
+        
+        /* === GEMISCHTE GRUPPEN: Bool feste Breite, Integer restlicher Platz === */
+        
+        /* Gemischte Gruppen: Bool-Button Items feste Breite */
+        .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item:has(.variable-button-container) {
+            flex: none !important;
+            display: flex !important;
+        }
+        
+        /* Gemischte Gruppen: Bool-Button Container */
+        .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item .variable-button-container {
+            display: flex !important;
+            /* Margins beibehalten für konsistente vertikale Abstände */
+            /* Keine width: 100% - Button behält seine konfigurierte Breite */
+        }
+        
+        /* Gemischte Gruppen: Bool-Buttons behalten buttonWidth */
+        .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item .variable-button-container .variable-button {
+            /* Bool-Button behält seine eingestellte Button Width - explizit keine Überschreibung der width */
+            /* width wird durch Inline-Styles aus buttonWidth gesetzt - nicht überschreiben */
+            max-width: none !important;
+        }
+        
+        /* Gemischte Gruppen: Integer/String Items nutzen restlichen Platz */
+        .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item:has(.variable-multi-button-container) {
+            flex: 1 !important;
+            display: flex !important;
+            min-width: 0 !important;
+        }
+        
+        /* Multi-Button-Container für Integer/String-Variablen */
+        .variable-group.stretch-buttons .variable-group-item .variable-multi-button-container {
+            width: 100% !important;
+            display: flex !important;
+            /* Margins beibehalten für konsistente vertikale Abstände */
+        }
+        
+        /* Multi-Buttons: Gleichmäßige Verteilung innerhalb des Containers */
+        .variable-group.stretch-buttons .variable-group-item .variable-multi-button-container .variable-multi-button {
+            flex: 1 !important;
+            min-width: 0 !important;
+        }
+        
+
         
         /* Spezifische Regel für gruppierte Text-Variablen: Überschreibt die 0-Margin-Regel */
         .variable-group-item .variable-item.text-variable {
@@ -392,16 +476,7 @@
         // Globale Debug-Steuerung für Frontend
         let debugEnabled = false; // Wird über handleMessage gesetzt
         
-        /**
-         * Zentrale Debug-Funktion für Frontend - alle Debug-Ausgaben laufen über diese Funktion
-         * @param {string} message Debug-Nachricht
-         * @param {string} category Optional: Kategorie für bessere Übersicht
-         */
-        function debugLog(message, category = 'TileVisu Frontend') {
-            if (debugEnabled) {
-                console.log(`[${category}] ${message}`);
-            }
-        }
+
         
         // Icons werden direkt vom Server gemappt, wir müssen nur noch die richtigen CSS-Klassen hinzufügen
         
@@ -423,7 +498,6 @@
                 iconClass = 'fa-fw fa-light ' + iconClass;
             }
             
-            debugLog('Prepared icon for display: ' + iconName + ' → ' + iconClass, 'prepareIconForDisplay');
             return iconClass;
         }
         
@@ -438,25 +512,11 @@
 
         // Hilfsfunktion zur Bildanzeige-Steuerung basierend auf Bildauswahl und Bildbreite
         function updateImageVisibility() {
-            debugLog('=== updateImageVisibility START ===', 'updateImageVisibility');
             const div1 = document.getElementById('div1');
             const div2 = document.getElementById('div2');
             const mainContainer = document.querySelector('.main_container');
             const bildauswahl = window.currentBildauswahl;
             const bildbreite = window.currentBildbreite;
-            debugLog('Current values - bildauswahl: ' + bildauswahl + ' (type: ' + typeof bildauswahl + '), bildbreite: ' + bildbreite + ' (type: ' + typeof bildbreite + ')', 'updateImageVisibility');
-            
-            // DEBUG: DOM-Elemente prüfen
-            debugLog('DOM elements - div1: ' + (div1 ? 'found' : 'NOT FOUND'), 'updateImageVisibility');
-            debugLog('DOM elements - div2: ' + (div2 ? 'found' : 'NOT FOUND'), 'updateImageVisibility');
-            
-            // HINWEIS: bildauswahl === undefined ist normal im neuen per-Assoziation-System
-            
-            // EXPLICIT NONE CHECK FOR DEBUGGING
-            debugLog('updateImageVisibility: Checking if bildauswahl is NONE. Current value: ' + bildauswahl + ' (type: ' + typeof bildauswahl + ')', 'updateImageVisibility');
-            if (bildauswahl === 'none') {
-                debugLog('*** NONE DETECTED *** bildauswahl is exactly "none" - HIDING IMAGE!', 'updateImageVisibility');
-            }
             
             // SEPARATED LOGIC: Column hiding vs Image hiding
             const hideImageColumn = window.hideImageColumn || false;
@@ -471,99 +531,47 @@
             // Hide just IMAGE (keep column) when: current status is "none"
             const shouldHideImageOnly = currentImageIsNone && !shouldHideColumn;
             
-            // DEBUG: Detaillierte Bedingungsprüfung
-            debugLog('Condition checks:', 'updateImageVisibility');
-            debugLog('  hideImageColumn (all associations none): ' + hideImageColumn, 'updateImageVisibility');
-            debugLog('  currentImageIsNone (current status none): ' + currentImageIsNone, 'updateImageVisibility');
-            debugLog('  bildauswahl value: ' + bildauswahl, 'updateImageVisibility');
-            debugLog('  bildbreite === 0: ' + (bildbreite === 0), 'updateImageVisibility');
-            debugLog('  bildbreite === "0": ' + (bildbreite === '0'), 'updateImageVisibility');
-            debugLog('  shouldHideColumn (entire column): ' + shouldHideColumn, 'updateImageVisibility');
-            debugLog('  shouldHideImageOnly (image only, keep column): ' + shouldHideImageOnly, 'updateImageVisibility');
-            
             if (shouldHideColumn) {
-                debugLog('*** EXECUTING COLUMN HIDE (entire column) ***', 'updateImageVisibility');
                 if (div1) {
-                    debugLog('Setting div1.style.display = "none"', 'updateImageVisibility');
                     div1.style.display = 'none';
-                    debugLog('Setting div1.className = "hidden"', 'updateImageVisibility');
                     div1.className = 'hidden';
-                    debugLog('Current div1.style.display after change: ' + div1.style.display, 'updateImageVisibility');
-                } else {
-                    debugLog('ERROR: div1 not found, cannot hide column!', 'updateImageVisibility');
                 }
                 if (div2) {
-                    debugLog('Setting div2 single-column layout', 'updateImageVisibility');
                     div2.style.padding = '10px';
                     div2.style.width = '100%'; // div2 nimmt gesamte Breite ein
-                } else {
-                    debugLog('ERROR: div2 not found, cannot adjust layout!', 'updateImageVisibility');
                 }
-                debugLog('Column hidden, single-column layout: hideImageColumn=' + hideImageColumn + ', bildbreite=' + bildbreite, 'updateImageVisibility');
             } else if (shouldHideImageOnly) {
-                debugLog('*** EXECUTING IMAGE HIDE ONLY (keep column) ***', 'updateImageVisibility');
                 if (div1) {
-                    debugLog('Keeping div1 visible but hiding image content', 'updateImageVisibility');
                     div1.style.display = 'block';  // Keep column visible
                     div1.className = 'div1';        // Keep normal column class
                     // Hide the actual image element inside div1
                     const imageElement = div1.querySelector('#image');
                     if (imageElement) {
                         imageElement.style.display = 'none';
-                        debugLog('Hidden image element inside div1', 'updateImageVisibility');
                     }
-                } else {
-                    debugLog('ERROR: div1 not found, cannot hide image content!', 'updateImageVisibility');
                 }
                 if (div2) {
-                    debugLog('Keeping div2 two-column layout', 'updateImageVisibility');
                     div2.style.padding = '0px 5px 5px 2.5%'; // Standard two-column padding
                     div2.style.width = '100%';
-                } else {
-                    debugLog('ERROR: div2 not found, cannot maintain layout!', 'updateImageVisibility');
                 }
-                debugLog('Image content hidden, two-column layout maintained: bildauswahl=' + bildauswahl, 'updateImageVisibility');
             } else {
-                debugLog('*** EXECUTING IMAGE SHOW ***', 'updateImageVisibility');
                 if (div1) {
-                    debugLog('Setting div1.style.display = "block"', 'updateImageVisibility');
                     div1.style.display = 'block';
-                    debugLog('Setting div1.className = "div1"', 'updateImageVisibility');
                     div1.className = 'div1';
                     // Show the image element inside div1
                     const imageElement = div1.querySelector('#image');
                     if (imageElement) {
                         imageElement.style.display = 'block';
-                        debugLog('Shown image element inside div1', 'updateImageVisibility');
                     }
-                    debugLog('Current div1.style.display after change: ' + div1.style.display, 'updateImageVisibility');
-                } else {
-                    debugLog('ERROR: div1 not found, cannot show image!', 'updateImageVisibility');
                 }
                 if (div2) {
-                    debugLog('Setting div2 two-column layout', 'updateImageVisibility');
                     div2.style.padding = '0px 5px 5px 2.5%'; // Standard-Padding wiederherstellen
                     div2.style.width = '100%'; // div2 bleibt flexibel
-                } else {
-                    debugLog('ERROR: div2 not found, cannot adjust layout!', 'updateImageVisibility');
                 }
-                debugLog('Image shown, two-column layout: bildauswahl=' + bildauswahl + ', bildbreite=' + bildbreite, 'updateImageVisibility');
-            }
-            debugLog('=== updateImageVisibility END ===', 'updateImageVisibility');
-            
-            // DEBUG: Final DOM state check
-            if (div1) {
-                debugLog('FINAL STATE - div1.style.display: ' + div1.style.display, 'updateImageVisibility');
-                debugLog('FINAL STATE - div1.className: ' + div1.className, 'updateImageVisibility');
-            }
-            if (div2) {
-                debugLog('FINAL STATE - div2.style.padding: ' + div2.style.padding, 'updateImageVisibility');
-                debugLog('FINAL STATE - div2.style.width: ' + div2.style.width, 'updateImageVisibility');
             }
         }
 
         function updateProgressBarStyles(config) {
-            debugLog('Updating progress bar styles with config:', config);
             const root = document.documentElement;
             
             // Setze CSS-Variablen für die zentrale Konfiguration
@@ -590,45 +598,25 @@
         }
 
         function handleMessage(data) {
-            // --- DEBUG: Log all contents of handleMessage input ---
-            try {
-                debugLog('handleMessage: FULL INPUT (JSON): ' + JSON.stringify(data, null, 2), 'handleMessage');
-                if (data && typeof data === 'object') {
-                    Object.keys(data).forEach(function(key) {
-                        debugLog('handleMessage: Property: ' + key + ' | Value: ' + JSON.stringify(data[key]) + ' | Type: ' + typeof data[key], 'handleMessage');
-                    });
-                } else {
-                    debugLog('handleMessage: data is not an object! Type: ' + typeof data, 'handleMessage');
-                }
-            } catch (e) {
-                debugLog('handleMessage: ERROR while logging input: ' + e, 'handleMessage');
-            }
-            // --- END DEBUG ---
-            debugLog('handleMessage called with raw data: ' + data, 'handleMessage');
             const decodedData = JSON.parse(data);
-            debugLog('Decoded data: ' + JSON.stringify(decodedData), 'handleMessage');
             const root = document.documentElement;
             
             // Setze InstanceID für RequestAction-Aufrufe
             if (decodedData.instanceid) {
                 window.InstanceID = decodedData.instanceid;
-                debugLog('Set window.InstanceID to: ' + window.InstanceID, 'handleMessage');
             }
 
             // Verarbeite die neuen Parameter
             for (const parameter in decodedData) {
                 const value = decodedData[parameter];
-                debugLog('Processing parameter: ' + parameter + ' with value: ' + value, 'handleMessage');
                 
                 switch (parameter.toLowerCase()) {
                     case 'debugenabled':
                         debugEnabled = value;
-                        debugLog('Debug mode ' + (value ? 'enabled' : 'disabled'), 'Debug System');
                         break;
                     case 'elementspacing':
                         // Setze CSS-Variable für element-spacing
                         root.style.setProperty('--element-spacing', value + 'px');
-                        debugLog('Set element-spacing to: ' + value + 'px', 'handleMessage');
                         break;
                         
                     case 'status':
@@ -638,7 +626,6 @@
                         // Set global currentBildauswahl for updateImageVisibility
                         if (decodedData.hasOwnProperty('statusBildauswahl')) {
                             window.currentBildauswahl = decodedData.statusBildauswahl;
-                            debugLog('Global currentBildauswahl now set to: ' + window.currentBildauswahl, 'handleMessage');
                         }
                         renderStatus(decodedData);
                         updateImageVisibility();
@@ -647,7 +634,6 @@
                         // NEW: Handle hideImageColumn flag for complete image column visibility
                         if (decodedData.hasOwnProperty('hideImageColumn')) {
                             window.hideImageColumn = decodedData.hideImageColumn;
-                            debugLog('Global hideImageColumn set to: ' + window.hideImageColumn, 'handleMessage');
                             updateImageVisibility();
                         }
                         break;
@@ -664,10 +650,8 @@
                         if (!hasGroupedVariables || window.groupNames) {
                             // Keine Gruppen mit showGroupName ODER groupNames sind verfügbar
                             renderVariables(value);
-                            debugLog('Variables rendered immediately. hasGroupedVariables: ' + hasGroupedVariables + ', groupNames available: ' + !!window.groupNames);
                         } else {
                             // Warte auf groupNames - wird später von groupNames case gerendert
-                            debugLog('Variables rendering delayed - waiting for groupNames');
                         }
                         
                         break;
@@ -683,13 +667,11 @@
                         if (typeof value === 'object') {
                             window.assets = window.assets || {};
                             Object.assign(window.assets, value);
-                            debugLog('Assets updated:', Object.keys(value));
                         }
                         break;
                     case 'groupnames':
                         // Speichere Gruppennamen für Frontend-Verwendung
                         window.groupNames = value;
-                        debugLog('Group names updated: ' + JSON.stringify(value));
                         // Re-render variables wenn bereits geladen, damit neue Gruppennamen angezeigt werden
                         if (window.lastVariablesData) {
                             renderVariables(window.lastVariablesData);
@@ -697,9 +679,7 @@
                         break;
                     case 'bildbreite':
                         root.style.setProperty('--bildbreite', value + '%');
-                        debugLog('Setting bildbreite to: ' + value + ' (type: ' + typeof value + ')', 'handleMessage');
                         window.currentBildbreite = value;
-                        debugLog('Global bildbreite is now: ' + window.currentBildbreite, 'handleMessage');
                         updateImageVisibility();
                         break;
                     case 'bildtransparenz':
@@ -717,21 +697,16 @@
                         mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
                         break;
                     default:
-                        debugLog('Processing parameter: ' + parameter + ' with value: ' + value, 'handleMessage');
                         // Prüfe auf Variable-Updates (Parameter endet mit '_value')
                         if (parameter.endsWith('_value')) {
-                            debugLog('Variable value update detected: ' + parameter + ' = ' + value, 'handleMessage');
-                            
                             // Extrahiere Variable-ID aus Parameter (z.B. 'var_3_value' -> 'var_3')
                             const varKey = parameter.replace('_value', '');
-                            debugLog('Looking for button with variable key:', varKey);
                             
                             // Aktualisiere rawValue im Cache
                             if (window.variableDataCache) {
                                 const targetVariableId = window.varKeyToIdMapping?.[varKey];
                                 if (targetVariableId && window.variableDataCache[targetVariableId]) {
                                     window.variableDataCache[targetVariableId].rawValue = value;
-                                    debugLog('Updated raw value in cache for variable:', targetVariableId);
                                 }
                             }
                             
@@ -740,19 +715,13 @@
                         }
                         // Prüfe auf formatierte Werte (Parameter ist z.B. 'var_3')
                         else {
-                            debugLog('  - startsWith("var_"):', parameter.startsWith('var_'));
-                            debugLog('  - endsWith("_value"):', parameter.endsWith('_value'));
-                            debugLog('  - !endsWith("_value"):', !parameter.endsWith('_value'));
-                            debugLog('  - both conditions:', parameter.startsWith('var_') && !parameter.endsWith('_value'));
                             if (parameter.startsWith('var_') && !parameter.endsWith('_value')) {
-                                debugLog('Formatted value update detected:', parameter, '=', value);
                             
                             // Aktualisiere formatierte Werte im Cache
                             if (window.variableDataCache) {
                                 const targetVariableId = window.varKeyToIdMapping?.[parameter];
                                 if (targetVariableId && window.variableDataCache[targetVariableId]) {
                                     window.variableDataCache[targetVariableId].formattedValue = value;
-                                    debugLog('Updated formatted value in cache for variable:', targetVariableId);
                                     
                                     // Aktualisiere Variable-Darstellung mit neuem formatiertem Wert
                                     updateVariable(parameter, value, 'formattedValue');
@@ -766,27 +735,20 @@
         }
 
         // Universelle Variable-Update-Funktion für gruppierte und einzelne Variablen
-        function updateVariable(varKey, newValue, updateType = 'rawValue') {
-            debugLog('updateVariable called with varKey:', varKey, 'newValue:', newValue, 'updateType:', updateType);
-            
-            // Finde Variable-ID aus Mapping
+        function updateVariable(varKey, newValue, updateType) {
+            // Find target variable ID using mapping
             if (!window.varKeyToIdMapping || !window.varKeyToIdMapping[varKey]) {
-                debugLog('No mapping found for varKey:', varKey);
-                debugLog('Available mappings:', window.varKeyToIdMapping);
                 return;
             }
             
             const targetVariableId = window.varKeyToIdMapping[varKey];
-            debugLog('Target variable ID for', varKey, ':', targetVariableId);
             
             // Finde Variable-Daten aus Cache
             if (!window.variableDataCache || !window.variableDataCache[targetVariableId]) {
-                debugLog('Variable not found in cache for ID:', targetVariableId);
                 return;
             }
             
             const variable = window.variableDataCache[targetVariableId];
-            debugLog('Found variable in cache:', variable.id, 'label:', variable.label, 'displayType:', variable.displayType);
             
             // Update cache based on updateType
             if (updateType === 'rawValue') {
@@ -809,7 +771,6 @@
         
         // Hilfsfunktion für Button-Display-Update
         function updateButtonDisplay(buttonElement, variable) {
-            debugLog('Updating button display for variable:', variable.id);
             
             // Check if this is a multi-button container (Integer or String variable)
             const multiButtonContainer = buttonElement.querySelector('.variable-multi-button-container');
@@ -845,12 +806,11 @@
                     }
                 });
                 
-                debugLog('Multi-buttons updated for variable:', variable.id, 'current value:', currentValue);
+
             } else {
                 // Boolean variable: Single button update
                 const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
                 const currentBoolValue = isActive; // Use actual boolean value for Association-Matching
-                debugLog('Button color update - isActive:', isActive, 'for value:', variable.rawValue, 'currentBoolValue:', currentBoolValue);
                 
                 // Bool Buttons verwenden ausschließlich boolButtonColor
                 let buttonColor = 'var(--accent-color)';
@@ -864,11 +824,7 @@
                     buttonColor = variable.boolButtonColor || 'var(--accent-color)';
                 }
                 
-                debugLog('Bool Button using exclusive boolButtonColor:', {
-                    boolButtonColor: variable.boolButtonColor,
-                    isTransparent: variable.isBoolButtonColorTransparent,
-                    finalColor: buttonColor
-                });
+
                 
                 // Association-Icon und Name für Bool Buttons (nur für Icon/Name, nicht für Farbe)
                 const associations = variable.variableAssociations;
@@ -877,10 +833,7 @@
                     if (currentAssociation) {
                         associationIcon = currentAssociation.icon;
                         associationName = currentAssociation.name;
-                        debugLog('Boolean button using association icon/name only:', {
-                            icon: associationIcon,
-                            name: associationName
-                        });
+
                     }
                 }                
                 const opacity = isActive ? '1' : '0.7';
@@ -897,46 +850,14 @@
                 // Icon-Verarbeitung für Button-Update - Verwende Association-Icon falls vorhanden
                 let finalIcon = associationIcon || variable.icon; // Association-Icon hat Priorität
         
-                // SPECIAL DEBUG for Variable 37220 - FRONTEND ICON RENDERING
-                if (variable.id === 37220) {
-                    debugLog('VARIABLE 37220 FRONTEND DEBUG: Icon rendering check:', {
-                        showIcon: variable.showIcon,
-                        associationIcon: associationIcon,
-                        variableIcon: variable.icon,
-                        finalIcon: finalIcon,
-                        isTransparent: finalIcon === 'Transparent'
-                    });
-                }
+
         
                 if (variable.showIcon && finalIcon && finalIcon !== 'Transparent') {
                     const iconClass = prepareIconForDisplay(finalIcon);
-                    
-                    // SPECIAL DEBUG for Variable 37220 - ICON CLASS PREPARATION
-                    if (variable.id === 37220) {
-                        debugLog('VARIABLE 37220 FRONTEND DEBUG: Icon class preparation:', {
-                            finalIcon: finalIcon,
-                            iconClass: iconClass,
-                            willRenderIcon: !!iconClass
-                        });
-                    }
+                
                     
                     if (iconClass) {
                         iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
-                        
-                        // SPECIAL DEBUG for Variable 37220 - FINAL ICON HTML
-                        if (variable.id === 37220) {
-                            debugLog('VARIABLE 37220 FRONTEND DEBUG: Final icon HTML generated:', iconHtml);
-                        }
-                    }
-                } else {
-                    // SPECIAL DEBUG for Variable 37220 - WHY NO ICON
-                    if (variable.id === 37220) {
-                        debugLog('VARIABLE 37220 FRONTEND DEBUG: Icon NOT rendered because:', {
-                            showIcon: variable.showIcon,
-                            hasFinalIcon: !!finalIcon,
-                            finalIcon: finalIcon,
-                            isNotTransparent: finalIcon !== 'Transparent'
-                        });
                     }
                 }
                 let textParts = [];
@@ -961,13 +882,11 @@
                 }
                 
                 buttonElement.innerHTML = buttonText;
-                debugLog('Single button updated successfully for variable:', variable.id);
             }
         }
         
         // Hilfsfunktion für Text- und Progress-Display-Update
         function updateTextDisplay(targetVariableId, variable) {
-            debugLog('Updating display for variable:', variable.id, 'displayType:', variable.displayType);
             
             const container = document.getElementById('variables-container');
             if (!container) return;
@@ -983,17 +902,14 @@
         
         // Hilfsfunktion für Progress-Bar-Update
         function updateProgressDisplay(targetVariableId, variable) {
-            debugLog('Updating progress bar for variable:', variable.id);
+
             
             // Finde Progress-Container mit der entsprechenden Variable-ID
             const progressContainer = document.querySelector(`[data-variable-id="${targetVariableId}"].progress-container`);
             
             if (!progressContainer) {
-                debugLog('Progress container not found for variable ID:', targetVariableId);
                 return;
             }
-            
-            debugLog('Found progress container for variable:', variable.id);
             
             // Aktualisiere Progress-Bar-Breite
             const progressBar = progressContainer.querySelector('.progress-bar');
@@ -1012,12 +928,6 @@
                 }
                 
                 progressBar.style.width = progressPercent + '%';
-                debugLog('Updated progress bar for variable', variable.id + ':', {
-                    rawValue: rawValue,
-                    minValue: minValue,
-                    maxValue: maxValue,
-                    progressPercent: progressPercent.toFixed(1) + '%'
-                });
             }
             
             // Aktualisiere Progress-Text
@@ -1029,7 +939,6 @@
         
         // Hilfsfunktion für Progress-Text-Update
         function updateProgressText(progressTextContainer, variable) {
-            debugLog('Updating progress text for variable:', variable.id);
             
             // Progress-Bar Inhalt basierend auf Konfiguration
             let progressIconHtml = '';
@@ -1065,7 +974,6 @@
             const mainText = progressTextContainer.querySelector('.progress-main-text');
             if (mainText) {
                 mainText.innerHTML = progressText;
-                debugLog('Updated progress main text to:', progressText);
             }
             
             // Aktualisiere zweite Variable falls vorhanden
@@ -1099,7 +1007,6 @@
                     
                     if (secondVariableParts.length > 0) {
                         secondVariableSpan.innerHTML = secondVariableParts.join(' ');
-                        debugLog('Updated progress second variable text to:', secondVariableParts.join(' '));
                     }
                 }
             }
@@ -1107,7 +1014,6 @@
         
         // Hilfsfunktion für Text-Variable-Update
         function updateTextVariableDisplay(targetVariableId, variable) {
-            debugLog('Updating text variable for variable:', variable.id);
             
             const container = document.getElementById('variables-container');
             if (!container) return;
@@ -1133,7 +1039,6 @@
                     valueSpans.forEach(valueSpan => {
                         if (valueSpan.classList.contains('variable-text')) {
                             valueSpan.textContent = variable.formattedValue;
-                            debugLog('Updated text value for variable:', variable.id, 'to:', variable.formattedValue);
                         }
                     });
                 }
@@ -1141,13 +1046,11 @@
         }
 
         function renderStatus(data) {
-            debugLog('renderStatus called with data:', data);
             const statusContainer = document.getElementById('status-container');
             const root = document.documentElement;
             
             // Zeige Status-Container nur wenn Status vorhanden ist
             if (data.status) {
-                debugLog('Rendering status:', data.status);
                 statusContainer.style.display = 'block';
                 // Bestimme Status-Farbe: verwende --content-color wenn transparent, ansonsten konfigurierte Farbe
                 const statusColor = data.isStatusColorTransparent ? 'var(--content-color)' : (data.statusColor || 'var(--content-color)');
@@ -1164,7 +1067,6 @@
                     const iconClass = prepareIconForDisplay(data.statusIcon);
                     if (iconClass) {
                         statusParts.push(`<i class="${iconClass}" style="color: var(--status-color); margin-right: 4px;"></i>`);
-                        debugLog('Status icon rendered:', data.statusIcon, '→', iconClass);
                     }
                 }
                 
@@ -1194,9 +1096,7 @@
             if (data.statusBildauswahl) {
                 let imageUrl = null;
                 
-                // FRONTEND DEBUG: Zeige empfangene Daten und verfügbare Assets
-                debugLog('FRONTEND DEBUG: statusBildauswahl received:', data.statusBildauswahl);
-                debugLog('FRONTEND DEBUG: Available window.assets:', Object.keys(window.assets || {}));
+               
                 
                 // DOM-Elemente ZUERST definieren, bevor sie verwendet werden
                 const deviceImgContainer = document.getElementById('div1');
@@ -1204,7 +1104,7 @@
                 
                 if (data.statusBildauswahl === 'none') {
                     // Kein Bild anzeigen
-                    debugLog('No image selected (none option)');
+
                     if (deviceImgContainer) {
                         deviceImgContainer.classList.add('hidden');
                         deviceImgContainer.classList.remove('div1');
@@ -1214,7 +1114,7 @@
                 } else if (data.statusBildauswahl.startsWith('img_custom_')) {
                     // Custom Image über Asset-System verwenden
                     imageUrl = window.assets[data.statusBildauswahl];
-                    debugLog('Using custom image asset:', data.statusBildauswahl);
+
                 } else {
                     // Vorkonfigurierte Bilder verwenden (wm_an, wm_aus, dryer_on, dryer_off, etc.)
                     imageUrl = window.assets[`img_${data.statusBildauswahl}`];
@@ -1224,9 +1124,9 @@
                     deviceImg.src = imageUrl;
                     deviceImgContainer.classList.remove('hidden');
                     deviceImgContainer.classList.add('div1');
-                    debugLog('Device image added:', imageUrl);
+
                 } else {
-                    debugLog('No image URL found for:', data.statusBildauswahl);
+
                     if (deviceImgContainer) {
                         deviceImgContainer.classList.add('hidden');
                         deviceImgContainer.classList.remove('div1');
@@ -1236,8 +1136,8 @@
         }
 
         function renderVariables(variables) {
-            debugLog('renderVariables called with ' + (variables ? variables.length : 0) + ' variables');
-            console.log('DIRECT DEBUG: renderVariables called with variables:', variables);
+
+
             const container = document.getElementById('variables-container');
             if (!container) return;
             
@@ -1248,7 +1148,7 @@
             window.varKeyToIdMapping = {};
             window.variableDataCache = {};
             
-            debugLog('renderVariables called with:', variables);
+
             
             // PHASE 1: Berechne maximale Gruppenname-Breite für Alignment
             let maxGroupNameWidth = 0;
@@ -1277,22 +1177,13 @@
                     if (shouldShowGroupName) {
                         // Bestimme Anzeigenamen
                         let displayGroupName = groupKey;
-                        debugLog('Group name mapping - groupKey: "' + groupKey + '"');
-                        debugLog('Group name mapping - window.groupNames available: ' + !!window.groupNames);
-                        if (window.groupNames) {
-                            debugLog('Group name mapping - available groupNames:', window.groupNames);
-                        }
                         const groupMatch = groupKey.match(/Gruppe (\d+)/);
-                        debugLog('Group name mapping - groupMatch result:', groupMatch);
                         if (groupMatch && window.groupNames) {
                             const groupNumber = parseInt(groupMatch[1]);
-                            debugLog('Group name mapping - groupNumber: ' + groupNumber);
-                            debugLog('Group name mapping - looking up: window.groupNames[' + groupNumber + ']');
                             const groupConfig = window.groupNames[groupNumber];
                             displayGroupName = (groupConfig && groupConfig.name) ? groupConfig.name : groupKey;
-                            debugLog('Group name mapping - final displayGroupName: "' + displayGroupName + '"');
+
                         } else {
-                            debugLog('Group name mapping - no match or no groupNames, using original: "' + displayGroupName + '"');
                         }
                         
                         // Verwende die gleiche Schriftgröße wie die erste Variable
@@ -1303,12 +1194,11 @@
                         const width = tempDiv.offsetWidth;
                         maxGroupNameWidth = Math.max(maxGroupNameWidth, width);
                         
-                        debugLog('Group name "' + displayGroupName + '" width: ' + width + 'px');
                     }
                 });
                 
                 document.body.removeChild(tempDiv);
-                debugLog('Maximum group name width for alignment: ' + maxGroupNameWidth + 'px');
+
             }
             
             // Track welche Gruppen bereits gerendert wurden
@@ -1321,10 +1211,7 @@
                 const varKey = 'var_' + index;
                 window.varKeyToIdMapping[varKey] = variable.id;
                 window.variableDataCache[variable.id] = variable;
-                debugLog('Mapping created: ' + varKey + ' → ' + variable.id, 'renderVariables');
-                debugLog('Processing variable: ' + JSON.stringify(variable), 'renderVariables');
-                debugLog('  - displayType: ' + variable.displayType, 'renderVariables');
-                debugLog('  - group: ' + variable.group, 'renderVariables');
+                
                 
                 // Prüfe ob Variable gruppiert ist - alle Darstellungstypen unterstützen jetzt Gruppen
                 if (variable.group && variable.group !== 'keine Gruppe' && variable.group.trim() !== '') {
@@ -1337,25 +1224,10 @@
                             v.group === variable.group && v.group !== 'keine Gruppe' && v.group.trim() !== ''
                         );
                         
-                        debugLog('Rendering group: ' + variable.group + ' with ' + groupVariables.length + ' variables', 'renderVariables');
                         
-                        // Prüfe ob eine Variable in der Gruppe showBorderLine aktiviert hat
-                        const groupHasBorderLine = groupVariables.some(v => v.showBorderLine && v.displayType === 'text');
-                        const groupCssClasses = groupHasBorderLine ? 'variable-group with-border-line' : 'variable-group';
                         
                         // Prüfe ob eine Variable in der Gruppe ShowGroupName aktiviert hat
                         const shouldShowGroupName = groupVariables.some(v => v.showGroupName === true);
-                        
-                        // Debug: Zeige showGroupName Status für alle Variablen in der Gruppe
-                        debugLog('Group "' + variable.group + '" showGroupName status:');
-                        groupVariables.forEach(v => {
-                            debugLog('  Variable ' + v.id + ': showGroupName = ' + v.showGroupName);
-                        });
-                        debugLog('shouldShowGroupName result: ' + shouldShowGroupName);
-                        debugLog('window.groupNames available: ' + (window.groupNames ? 'yes' : 'no'));
-                        if (window.groupNames) {
-                            debugLog('Available group names:', window.groupNames);
-                        }
                         
                         // Bestimme den Gruppennamen basierend auf der Gruppenbezeichnung
                         // WICHTIG: Mapping erfolgt immer wenn window.groupNames verfügbar ist,
@@ -1363,6 +1235,7 @@
                         let displayGroupName = variable.group;
                         let showAbove = false;
                         let showLine = false;
+                        let stretch = false;
                         if (window.groupNames) {
                             // Extrahiere Gruppennummer aus "Gruppe X" Format
                             const groupMatch = variable.group.match(/Gruppe (\d+)/);
@@ -1373,13 +1246,32 @@
                                     displayGroupName = groupConfig.name || variable.group;
                                     showAbove = groupConfig.showAbove || false;
                                     showLine = groupConfig.showLine || false;
+                                    stretch = groupConfig.stretch || false;
                                 }
-                                debugLog('Group mapping: Gruppe ' + groupNumber + ' -> "' + displayGroupName + '" (showGroupName: ' + shouldShowGroupName + ', showAbove: ' + showAbove + ', showLine: ' + showLine + ')');
+
                             } else {
-                                debugLog('No group number found in: "' + variable.group + '"');
+
                             }
-                        } else {
-                            debugLog('window.groupNames not available, using default: "' + displayGroupName + '"');
+                        }
+                        
+                        // Bestimme CSS-Klassen für die Gruppe
+                        let groupCssClasses = 'variable-group';
+                        
+                        // Prüfe ob die Gruppe Button-Variablen enthält (Bool, Integer, String) und stretch aktiviert ist
+                        const hasButtons = groupVariables.some(v => {
+                            return v.displayType === 'button' && (v.variableType === 0 || v.variableType === 1 || v.variableType === 3);
+                        });
+                        
+                        console.log('GROUP STRETCH DEBUG:', {
+                            group: variable.group,
+                            stretch: stretch,
+                            hasButtons: hasButtons,
+                            groupCssClasses: groupCssClasses
+                        });
+                        
+                        if (stretch && hasButtons) {
+                            groupCssClasses += ' stretch-buttons';
+                            console.log('STRETCH CSS CLASS ADDED:', groupCssClasses);
                         }
                         
                         // Alternative Darstellung: Gruppenname über der Gruppe
@@ -1394,7 +1286,6 @@
                                 </div>
                             `;
                             
-                            debugLog('Group name "' + displayGroupName + '" displayed above group with reduced font size: ' + groupNameFontSize + 'px (30% smaller, 30% transparent)');
                         }
                         
                         // Container für die Gruppe - flexDirection je nach showAbove
@@ -1420,7 +1311,6 @@
                                 </div>
                             `;
                             
-                            debugLog('Group name "' + displayGroupName + '" displayed beside group with font size: ' + firstVariableFontSize + 'px, aligned width: ' + groupNameWidth);
                         }
                         
                         content += `
@@ -1443,7 +1333,6 @@
                             content += `
                                 <div class="group-line"></div>
                             `;
-                            debugLog('Added line under group "' + displayGroupName + '"');
                         }
                     }
                     // Andernfalls überspringen (Gruppe bereits gerendert)
@@ -1453,7 +1342,6 @@
                 }
             });
             
-            debugLog('Rendered groups: ' + Array.from(renderedGroups).join(','));
             
             // Rufe updateImageVisibility() nach dem initialen Rendering auf
             // um sicherzustellen, dass die Bildanzeige korrekt gesetzt wird
@@ -1516,7 +1404,6 @@
                         const suffix = suffixMatch ? suffixMatch[0] : '';
                         
                         displayValue = '0 ' + suffix;
-                        debugLog('Progress bar disabled for variable ' + variable.id + ' - showing zero values with suffix: "' + suffix + '"');
                     } else {
                         // Progressbar aktiv - normale Berechnung
                         rawValue = parseFloat(variable.rawValue) || 0;
@@ -1536,11 +1423,6 @@
                     // Berechne Prozentsatz basierend auf Min/Max-Werten
                     const progressPercent = progressValue.toFixed(1) + '%';
                     
-                    debugLog('Progress bar calculation for variable', variable.id + ':', {
-                        rawValue: rawValue,
-                        progressPercent: progressPercent,
-                        progressbarActive: variable.progressbarActive
-                    });
                     
                     // Progress-Bar Inhalt basierend auf Konfiguration
                     let progressIconHtml = '';
@@ -1612,7 +1494,6 @@
                         
                         if (secondVariableParts.length > 0) {
                             secondVariableText = `<span class="progress-second-variable">${secondVariableParts.join(' ')}</span>`;
-                            debugLog('Second variable for progress bar:', variable.secondVariable.id, '→', secondVariableParts.join(' '));
                         }
                     }
                     
@@ -1635,16 +1516,12 @@
                     // Button für Bool-Variablen (VARIABLETYPE_BOOLEAN = 0) und Integer-Variablen (VARIABLETYPE_INTEGER = 1)
                     if (variable.variableType === 0) {
                         // Boolean-Variable: Einzelner Button
-                        console.log('=== BOOLEAN BUTTON DEBUG START ===');
-                        console.log('Variable ID:', variable.id, 'Variable Type:', variable.variableType);
-                        console.log('Raw Value:', variable.rawValue, 'Type:', typeof variable.rawValue);
                         
                         // Erweiterte Bool-Wert-Erkennung
                         const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
                         // Verwende den tatsächlichen Boolean-Wert für Association-Matching (nicht Integer-Konvertierung!)
                         const currentBoolValue = variable.rawValue; // Direkt verwenden, da Associations auch Boolean-Werte haben
                         
-                        console.log('isActive:', isActive, 'currentBoolValue for matching:', currentBoolValue, 'type:', typeof currentBoolValue);
                         
                         // Bool Buttons verwenden ausschließlich boolButtonColor (initial rendering)
                         let buttonColor = 'var(--accent-color)';
@@ -1658,11 +1535,7 @@
                             buttonColor = variable.boolButtonColor || 'var(--accent-color)';
                         }
                         
-                        debugLog('Bool Button initial rendering using exclusive boolButtonColor:', {
-                            boolButtonColor: variable.boolButtonColor,
-                            isTransparent: variable.isBoolButtonColorTransparent,
-                            finalColor: buttonColor
-                        });
+
                         
                         // Association-Icon und Name für Bool Buttons (nur für Icon/Name, nicht für Farbe)
                         const associations = variable.variableAssociations;
@@ -1671,15 +1544,25 @@
                             if (currentAssociation) {
                                 associationIcon = currentAssociation.icon;
                                 associationName = currentAssociation.name;
-                                debugLog('Boolean button initial rendering using association icon/name only:', {
-                                    icon: associationIcon,
-                                    name: associationName
-                                });
+
                             }
                         }
                         
                         const opacity = isActive ? '1' : '0.7';
                         const buttonWidth = variable.buttonWidth || 120;
+                        
+                        // Prüfe ob die aktuelle Gruppe im stretch-Modus ist
+                        let isGroupStretched = false;
+                        if (isGrouped && variable.group && window.groupNames) {
+                            const groupMatch = variable.group.match(/Gruppe (\d+)/);
+                            if (groupMatch) {
+                                const groupNumber = parseInt(groupMatch[1]);
+                                const groupConfig = window.groupNames[groupNumber];
+                                if (groupConfig && groupConfig.stretch) {
+                                    isGroupStretched = true;
+                                }
+                            }
+                        }
                         
                         let buttonText = '';
                         let iconHtml = '';
@@ -1728,38 +1611,33 @@
                             buttonText = iconHtml.replace('margin-right: 6px;', '');
                         }
                         
-                        // Debug-Ausgaben
-                        debugLog('Button Debug for variable: ' + variable.id, 'renderSingleVariable');
-                        debugLog('  - showIcon: ' + variable.showIcon, 'renderSingleVariable');
-                        debugLog('  - showLabel: ' + variable.showLabel, 'renderSingleVariable');
-                        debugLog('  - showValue: ' + variable.showValue, 'renderSingleVariable');
-                        debugLog('  - buttonWidth: ' + buttonWidth, 'renderSingleVariable');
-                        debugLog('  - isActive: ' + isActive, 'renderSingleVariable');
-                        debugLog('  - buttonColor: ' + buttonColor, 'renderSingleVariable');
-                        debugLog('  - opacity: ' + opacity, 'renderSingleVariable');
-                        debugLog('  - buttonText: ' + buttonText, 'renderSingleVariable');
+                        // Button-Styles: Bool-Button soll IMMER seine buttonWidth verwenden
+                        let buttonStyleExtras = `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`;
+                        console.log('BOOL BUTTON STYLES:', {
+                            variableId: variable.id,
+                            isGroupStretched: isGroupStretched,
+                            buttonWidth: buttonWidth,
+                            buttonStyleExtras: buttonStyleExtras
+                        });
                         
                         content += `
                             <div class="variable-button-container">
                                 <button class="variable-button" 
-                                        onclick="requestAction('${variable.id}', 1); debugLog('Button clicked for variable: ${variable.id}');" 
+                                        onclick="requestAction('${variable.id}', 1);" 
                                         data-variable-id="${variable.id}"
-                                        style="background-color: ${buttonColor} !important; opacity: ${opacity} !important; color: ${getTextColor(variable)} !important; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                        style="background-color: ${buttonColor} !important; opacity: ${opacity} !important; color: ${getTextColor(variable)} !important; ${buttonStyleExtras}">
                                     ${buttonText}
                                 </button>
                             </div>
                         `;
                         
-                        debugLog('  - FINAL: Button rendered with color:', buttonColor, 'opacity:', opacity, 'width:', buttonWidth + 'px');
                     } else if ((variable.variableType === 1 || variable.variableType === 3) && (variable.variableAssociations || variable.integerAssociations)) {
                         // Integer/String-Variable: Multi-Button für jede Association
                         const associations = variable.variableAssociations || variable.integerAssociations;
                         const variableTypeLabel = variable.variableType === 1 ? 'Integer' : 'String';
-                        debugLog('Rendering multi-buttons for', variableTypeLabel, 'variable:', variable.id, 'with', associations.length, 'associations');
                         
                         // ButtonWidth aus Variablenkonfiguration verwenden (wie bei Boolean-Buttons)
                         const buttonWidth = variable.buttonWidth || 80; // Etwas schmaler für Multi-Buttons
-                        debugLog('Multi-button width for variable:', variable.id, '→', buttonWidth + 'px');
                         
                         let buttonsHtml = '';
                         const currentValue = variable.variableType === 1 ? parseInt(variable.rawValue) : variable.rawValue;
@@ -1801,7 +1679,7 @@
                             
                             buttonsHtml += `
                                 <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
-                                        onclick="requestAction('${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"}); debugLog('Multi-button clicked for variable: ${variable.id}, value: ${association.value}');" 
+                                        onclick="requestAction('${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"});" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
                                         style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
@@ -1817,14 +1695,11 @@
                             </div>
                         `;
                         
-                        debugLog('Multi-buttons rendered for variable:', variable.id, 'current value:', currentValue);
                     } else if (variable.variableType === 3 && variable.stringAssociations && variable.stringAssociations.length > 0) {
                         // String-Variable: Multi-Button für jede Association
-                        debugLog('Rendering multi-buttons for String variable:', variable.id, 'with', variable.stringAssociations.length, 'associations');
                         
                         // ButtonWidth aus Variablenkonfiguration verwenden (wie bei Boolean-Buttons)
                         const buttonWidth = variable.buttonWidth || 80; // Etwas schmaler für Multi-Buttons
-                        debugLog('Multi-button width for string variable:', variable.id, '→', buttonWidth + 'px');
                         
                         let buttonsHtml = '';
                         const currentValue = String(variable.rawValue); // String-Wert als String behandeln
@@ -1866,7 +1741,7 @@
                             
                             buttonsHtml += `
                                 <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
-                                        onclick="requestAction('${variable.id}', '${association.value}'); debugLog('String multi-button clicked for variable: ${variable.id}, value: ${association.value}');" 
+                                        onclick="requestAction('${variable.id}', '${association.value}');" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
                                         style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
@@ -1882,7 +1757,6 @@
                             </div>
                         `;
                         
-                        debugLog('String multi-buttons rendered for variable:', variable.id, 'current value:', currentValue);
                     } else {
                         // Fallback für Nicht-Bool/Integer/String-Variablen oder Variablen ohne Associations: Zeige als Text
                         if (variable.variableType === 1) {
@@ -1921,7 +1795,6 @@
                         const iconClass = prepareIconForDisplay(variable.icon);
                         if (iconClass) {
                             textParts.push(`<i class="${iconClass} variable-icon" style="color: var(--accent-color);"></i>`);
-                            debugLog(`Text variable icon rendered: ${variable.label}: ${variable.icon} → ${iconClass}`);
                         }
                     }
                     

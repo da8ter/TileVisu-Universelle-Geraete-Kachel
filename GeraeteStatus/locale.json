@@ -112,7 +112,10 @@
         "Bool Button Color": "Schalter Farbe",
         "Progressbar": "Fortschrittsbalken",
         "Group Configuration": "Gruppenkonfiguration",
-        "Show Name Above Group": "Name über Gruppe anzeigen"
+        "Stretch Buttons": "Buttons auf volle Breite",
+        "Show Name Above Group": "Name über Gruppe",
+        "Show Line Under Group": "Linie unter Gruppe"
+
         }
     }
   }
