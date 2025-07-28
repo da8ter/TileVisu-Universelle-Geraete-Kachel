@@ -569,8 +569,8 @@
               "visible": false,
               "edit": {
                 "type": "NumberSpinner",
-                "minimum": 50,
-                "maximum": 300,
+                "minimum": 20,
+                "maximum": 500,
                 "suffix": "px"
               }
             }
