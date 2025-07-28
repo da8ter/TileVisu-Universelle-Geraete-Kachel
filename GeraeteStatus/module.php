@@ -786,6 +786,14 @@ class UniversalDeviceTile extends IPSModule
             foreach ($variablesList as $index => $variable) {
                 $this->DebugLog('FOREACH START: Processing index ' . $index . ' (Target: find index 11 with Variable 11998)');
                 
+                // SPECIAL DEBUG for Variable 37220 - TRACE WHERE IT GOES
+                if (isset($variable['Variable']) && $variable['Variable'] == 37220) {
+                    $this->DebugLog('VARIABLE 37220 TRACE: Found in variablesList at index ' . $index);
+                    $this->DebugLog('VARIABLE 37220 TRACE: Variable data: ' . json_encode($variable));
+                    $exists = IPS_VariableExists(37220) ? 'EXISTS' : 'NOT_EXISTS';
+                    $this->DebugLog('VARIABLE 37220 TRACE: IPS_VariableExists(37220): ' . $exists);
+                }
+                
                 // CLEANUP: Removed temporary bypass - GetIcon() now has proper error handling
                 
                 try {
@@ -799,6 +807,19 @@ class UniversalDeviceTile extends IPSModule
                 $this->DebugLog('DEBUG FOREACH: Index ' . $index . ', Variable ID: ' . $varId . ', Type: ' . $typeString);
 
                 $this->DebugLog('DEBUG VARIABLE CHECK: Index ' . $index . ', Variable ID: ' . ($variable['Variable'] ?? 'NONE') . ', Group: ' . ($variable['Group'] ?? 'NONE'));
+                
+                // SPECIAL DEBUG for Variable 37220 - CHECK VALIDATION
+                if (isset($variable['Variable']) && $variable['Variable'] == 37220) {
+                    $varExists = IPS_VariableExists($variable['Variable']);
+                    $varId = $variable['Variable'];
+                    $this->DebugLog('VARIABLE 37220 TRACE: Validation check - Variable ID: ' . $varId . ', > 0: ' . ($varId > 0 ? 'YES' : 'NO') . ', Exists: ' . ($varExists ? 'YES' : 'NO'));
+                    if (!$varExists) {
+                        $this->DebugLog('VARIABLE 37220 TRACE: VALIDATION FAILED - Variable does not exist! This is why GetIcon is not called.');
+                    } else {
+                        $this->DebugLog('VARIABLE 37220 TRACE: VALIDATION PASSED - Variable will be processed.');
+                    }
+                }
+                
                 if (isset($variable['Variable']) && $variable['Variable'] > 0 && IPS_VariableExists($variable['Variable'])) {
                     $this->DebugLog('DEBUG VARIABLE PROCESSING: Variable ID ' . $variable['Variable'] . ' passed validation and will be processed');
                     $this->DebugLog('GetFullUpdateMessage: Processing variable ID: ' . $variable['Variable']);
@@ -821,6 +842,11 @@ class UniversalDeviceTile extends IPSModule
                     }
                     
                     $this->DebugLog('GetFullUpdateMessage: About to call GetIcon for Variable ID: ' . $variable['Variable'] . ', Index: ' . $index);
+                    
+                    // SPECIAL DEBUG for Variable 37220 - CONFIRM GetIcon CALL
+                    if ($variable['Variable'] == 37220) {
+                        $this->DebugLog('VARIABLE 37220 TRACE: ABOUT TO CALL GetIcon() - This should trigger GetIcon debug logs');
+                    }
                     
                     // PROTECTION: Try-Catch um GetIcon call, um Abstürze zu verhindern
                     try {
@@ -851,6 +877,12 @@ class UniversalDeviceTile extends IPSModule
                     }
                     
                     $this->DebugLog('GetFullUpdateMessage: GetIcon returned for Variable ID: ' . $variable['Variable'] . ', Index: ' . $index . ', Icon: "' . $icon . '"');
+                    
+                    // SPECIAL DEBUG for Variable 37220 - TRACE ICON TRANSFER
+                    if ($variable['Variable'] == 37220) {
+                        $this->DebugLog('VARIABLE 37220 TRACE: Icon after GetIcon() call: "' . $icon . '"');
+                        $this->DebugLog('VARIABLE 37220 TRACE: About to process special Boolean logic...');
+                    }
                     
                     // GRANULARE DIAGNOSE für Index 6 - IPS_GetVariable
                     if ($index == 6) {
@@ -927,6 +959,14 @@ class UniversalDeviceTile extends IPSModule
                         }
                     }
                     
+                    // SPECIAL DEBUG for Variable 37220 - BEFORE Boolean special logic
+                    if ($variable['Variable'] == 37220) {
+                        $this->DebugLog('VARIABLE 37220 TRACE: Before Boolean special logic - Icon: "' . $icon . '"');
+                        $this->DebugLog('VARIABLE 37220 TRACE: VariableType: ' . $variableInfo['VariableType'] . ' (VARIABLETYPE_BOOLEAN=' . VARIABLETYPE_BOOLEAN . ')');
+                        $this->DebugLog('VARIABLE 37220 TRACE: variableAssociations: ' . json_encode($variableAssociations));
+                        $this->DebugLog('VARIABLE 37220 TRACE: Condition check: icon empty? ' . (($icon === '' || $icon === 'Transparent') ? 'YES' : 'NO'));
+                    }
+                    
                     // SPECIAL: Für Boolean-Variablen mit PRESENTATION GUID, bei denen GetIcon leer ist
                     // aber die Assoziationen Icons enthalten, verwende das Association-Icon als Haupt-Icon
                     if (($icon === '' || $icon === 'Transparent') && $variableInfo['VariableType'] == VARIABLETYPE_BOOLEAN && !empty($variableAssociations)) {
@@ -937,6 +977,14 @@ class UniversalDeviceTile extends IPSModule
                                 break;
                             }
                         }
+                    }
+                    
+                    // SPECIAL DEBUG for Variable 37220 - AFTER Boolean special logic
+                    if ($variable['Variable'] == 37220) {
+                        $this->DebugLog('VARIABLE 37220 TRACE: After Boolean special logic - Icon: "' . $icon . '"');
+                        $this->DebugLog('VARIABLE 37220 TRACE: Final icon value going into variableData: "' . $icon . '"');
+                        $this->DebugLog('VARIABLE 37220 TRACE: ShowIcon calculation: ($variable[ShowIcon] ?? true) = ' . ($variable['ShowIcon'] ?? true) . ', !empty($icon) = ' . (!empty($icon) ? 'true' : 'false') . ', $icon !== "Transparent" = ' . ($icon !== 'Transparent' ? 'true' : 'false'));
+                        $this->DebugLog('VARIABLE 37220 TRACE: Final showIcon result: ' . ((($variable['ShowIcon'] ?? true) && !empty($icon) && $icon !== 'Transparent') ? 'true' : 'false'));
                     }
                     
                     $variableData = [
@@ -1229,6 +1277,11 @@ class UniversalDeviceTile extends IPSModule
         try {
             $this->DebugLog('GetIcon called for Variable ID: ' . $id, 'GetIcon');
             
+            // SPECIAL DEBUG for Variable 37220
+            if ($id == 37220) {
+                $this->DebugLog('VARIABLE 37220 DEBUG: GetIcon called for problem variable');
+            }
+            
             $variable = IPS_GetVariable($id);
             $this->DebugLog('GetIcon: Got variable data for ID: ' . $id, 'GetIcon');
             
@@ -1254,18 +1307,137 @@ class UniversalDeviceTile extends IPSModule
         // Prüfe VariableCustomPresentation für Icon
         if ($icon == "" && !empty($variable['VariableCustomPresentation'])) {
             $customPresentation = $variable['VariableCustomPresentation'];
+            $this->DebugLog('Variable ID ' . $id . ': Processing VariableCustomPresentation: ' . json_encode($customPresentation), 'GetIcon');
+            
+            // Zuerst nach direktem Icon suchen (Standard-Icon)
             if (isset($customPresentation['ICON']) && $customPresentation['ICON'] != "") {
                 $icon = $customPresentation['ICON'];
-                $this->DebugLog('Found icon in VariableCustomPresentation: ' . $icon, 'GetIcon');
+                $this->DebugLog('Variable ID ' . $id . ': Found standard icon in VariableCustomPresentation[ICON]: ' . $icon, 'GetIcon');
             } elseif (isset($customPresentation['Icon']) && $customPresentation['Icon'] != "") {
                 // Fallback für kleingeschriebenes 'icon' Schlüsselwort
                 $icon = $customPresentation['Icon'];
-                $this->DebugLog('Found icon in VariableCustomPresentation (lowercase): ' . $icon);
-            } elseif (isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
-                // PRESENTATION GUID Auflösung für Icons - TEMPORÄR DEAKTIVIERT WEGEN GUID PROBLEMEN
+                $this->DebugLog('Variable ID ' . $id . ': Found standard icon in VariableCustomPresentation[Icon]: ' . $icon, 'GetIcon');
+            }
+            
+            // Prüfe auch direkt nach Icon-Feldern ohne PRESENTATION GUID (für einfache Darstellungen)
+            if ($icon == "") {
+                // SPECIAL: Für Boolean-Variablen mit ICON_TRUE/ICON_FALSE, prüfe USE_ICON_FALSE
+                if ($variable['VariableType'] == 0 && (isset($customPresentation['ICON_TRUE']) || isset($customPresentation['ICON_FALSE']))) {
+                    $this->DebugLog('Variable ID ' . $id . ': Boolean variable with direct ICON_TRUE/ICON_FALSE fields detected', 'GetIcon');
+                    
+                    // Prüfe USE_ICON_FALSE direkt aus VariableCustomPresentation
+                    $useIconFalse = true; // Default
+                    if (isset($customPresentation['USE_ICON_FALSE'])) {
+                        $useIconFalse = $customPresentation['USE_ICON_FALSE'];
+                        $this->DebugLog('Variable ID ' . $id . ': Found USE_ICON_FALSE=' . ($useIconFalse ? 'true' : 'false') . ' directly from VariableCustomPresentation', 'GetIcon');
+                    } else {
+                        // Fallback: Prüfe USE_ICON_FALSE aus PRESENTATION GUID falls vorhanden
+                        if (isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
+                            try {
+                                $presentationGuid = trim($customPresentation['PRESENTATION'], '{}');
+                                if (@IPS_PresentationExists($presentationGuid)) {
+                                    $presentationData = IPS_GetPresentation($presentationGuid);
+                                    if ($presentationData && is_string($presentationData)) {
+                                        $presentationArray = json_decode($presentationData, true);
+                                        if (isset($presentationArray['presentationParameters']['USE_ICON_FALSE'])) {
+                                            $useIconFalse = $presentationArray['presentationParameters']['USE_ICON_FALSE'];
+                                            $this->DebugLog('Variable ID ' . $id . ': Found USE_ICON_FALSE=' . ($useIconFalse ? 'true' : 'false') . ' from PRESENTATION GUID', 'GetIcon');
+                                        }
+                                    }
+                                }
+                            } catch (Exception $e) {
+                                $this->DebugLog('Variable ID ' . $id . ': Could not determine USE_ICON_FALSE from PRESENTATION GUID', 'GetIcon');
+                            }
+                        }
+                    }
+                    
+                    // Icon basierend auf USE_ICON_FALSE wählen
+                    if ($useIconFalse) {
+                        // Wertbasierte Icon-Auswahl
+                        $currentValue = GetValue($id);
+                        $iconKey = $currentValue ? 'ICON_TRUE' : 'ICON_FALSE';
+                        $this->DebugLog('Variable ID ' . $id . ': USE_ICON_FALSE=true, using value-based icon: ' . $iconKey, 'GetIcon');
+                    } else {
+                        // Immer ICON_TRUE
+                        $iconKey = 'ICON_TRUE';
+                        $this->DebugLog('Variable ID ' . $id . ': USE_ICON_FALSE=false, always using ICON_TRUE', 'GetIcon');
+                    }
+                    
+                    if (isset($customPresentation[$iconKey]) && $customPresentation[$iconKey] != "") {
+                        $icon = $customPresentation[$iconKey];
+                        $this->DebugLog('Variable ID ' . $id . ': Found Boolean icon in VariableCustomPresentation[' . $iconKey . ']: ' . $icon, 'GetIcon');
+                    }
+                } else {
+                    // Normale Icon-Feldsuche für Nicht-Boolean oder ohne ICON_TRUE/FALSE
+                    $iconFields = ['ICON', 'Icon', 'icon'];
+                    foreach ($iconFields as $field) {
+                        if (isset($customPresentation[$field]) && $customPresentation[$field] != "") {
+                            $icon = $customPresentation[$field];
+                            $this->DebugLog('Variable ID ' . $id . ': Found standard icon in VariableCustomPresentation[' . $field . ']: ' . $icon, 'GetIcon');
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Nur wenn noch kein Standard-Icon gefunden wurde, prüfe PRESENTATION GUID und Associations
+            if ($icon == "" && isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
+                // PRESENTATION GUID Auflösung für Icons - REAKTIVIERT für Variable 37220
                 $presentationGuid = trim($customPresentation['PRESENTATION'], '{}');
                 $this->DebugLog('Variable ID ' . $id . ': Found PRESENTATION GUID for icon extraction: ' . $presentationGuid, 'GetIcon');
-                $this->DebugLog('Variable ID ' . $id . ': PRESENTATION GUID icon extraction temporarily disabled due to GUID format issues', 'GetIcon');
+                
+                // IPS_GetPresentation für GUID-Auflösung verwenden - mit Validation
+                try {
+                    $this->DebugLog('Variable ID ' . $id . ': Attempting IPS_GetPresentation for GUID: ' . $presentationGuid, 'GetIcon');
+                    
+                    // GUID VALIDATION: Prüfe ob GUID im System existiert
+                    if (@IPS_PresentationExists($presentationGuid)) {
+                        $presentationData = IPS_GetPresentation($presentationGuid);
+                        $this->DebugLog('Variable ID ' . $id . ': IPS_GetPresentation returned: ' . json_encode($presentationData), 'GetIcon');
+                    } else {
+                        $this->DebugLog('Variable ID ' . $id . ': GUID not registered in system, skipping IPS_GetPresentation: ' . $presentationGuid, 'GetIcon');
+                        throw new Exception('GUID not registered in system');
+                    }
+                    
+                    if ($presentationData && is_string($presentationData)) {
+                        $presentationArray = json_decode($presentationData, true);
+                        if ($presentationArray && is_array($presentationArray)) {
+                            $this->DebugLog('Variable ID ' . $id . ': Decoded presentation data: ' . json_encode($presentationArray), 'GetIcon');
+                            
+                            // Boolean Variable: Icons sind in presentationParameters gespeichert
+                            if ($variable['VariableType'] == 0) { // Boolean
+                                if (isset($presentationArray['presentationParameters']) && is_array($presentationArray['presentationParameters'])) {
+                                    $params = $presentationArray['presentationParameters'];
+                                    $currentValue = GetValue($id);
+                                    
+                                    // CORRECT LOGIC: Prüfe USE_ICON_FALSE Flag
+                                    $useIconFalse = isset($params['USE_ICON_FALSE']) ? $params['USE_ICON_FALSE'] : true;
+                                    
+                                    if ($useIconFalse) {
+                                        // Verwende beide Icons basierend auf Wert
+                                        $iconKey = $currentValue ? 'ICON_TRUE' : 'ICON_FALSE';
+                                        $this->DebugLog('Variable ID ' . $id . ': USE_ICON_FALSE=true, using value-based icon: ' . $iconKey, 'GetIcon');
+                                    } else {
+                                        // Verwende immer ICON_TRUE
+                                        $iconKey = 'ICON_TRUE';
+                                        $this->DebugLog('Variable ID ' . $id . ': USE_ICON_FALSE=false, always using ICON_TRUE', 'GetIcon');
+                                    }
+                                    
+                                    if (isset($params[$iconKey]) && !empty($params[$iconKey])) {
+                                        $icon = $params[$iconKey];
+                                        $this->DebugLog('Variable ID ' . $id . ': Found Boolean icon from presentationParameters[' . $iconKey . ']: ' . $icon, 'GetIcon');
+                                    } else {
+                                        $this->DebugLog('Variable ID ' . $id . ': No icon found in presentationParameters[' . $iconKey . ']', 'GetIcon');
+                                    }
+                                } else {
+                                    $this->DebugLog('Variable ID ' . $id . ': No presentationParameters found in PRESENTATION GUID data', 'GetIcon');
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    $this->DebugLog('Variable ID ' . $id . ': IPS_GetPresentation failed: ' . $e->getMessage(), 'GetIcon');
+                }
                 
                 // ALTERNATIVE: Prüfe ob GetBooleanAssociations bereits Icons extrahiert hat
                 $this->DebugLog('Variable ID ' . $id . ': Starting alternative GetBooleanAssociations approach', 'GetIcon');
@@ -1380,6 +1552,14 @@ class UniversalDeviceTile extends IPSModule
         $this->DebugLog('BEFORE MapIconToFontAwesome - Variable ID: ' . $id . ', Icon: "' . $icon . '"');
         $mappedIcon = $this->MapIconToFontAwesome($icon);
         $this->DebugLog('AFTER MapIconToFontAwesome - Variable ID: ' . $id . ', Mapped Icon: "' . $mappedIcon . '"');
+        
+        // SPECIAL DEBUG for Variable 37220 - FINAL RESULT TRACKING
+        if ($id == 37220) {
+            $this->DebugLog('VARIABLE 37220 FINAL: Original Icon before mapping: "' . $icon . '"');
+            $this->DebugLog('VARIABLE 37220 FINAL: Mapped Icon after mapping: "' . $mappedIcon . '"');
+            $this->DebugLog('VARIABLE 37220 FINAL: Current value was: ' . json_encode(GetValue($id)));
+            $this->DebugLog('VARIABLE 37220 FINAL: This icon will be sent to frontend');
+        }
         
         // Debug-Ausgabe
         $this->DebugLog('GetIcon RESULT - Variable ID: ' . $id . ', Original Icon: "' . $icon . '", Mapped Icon: "' . $mappedIcon . '"');
@@ -1921,6 +2101,11 @@ class UniversalDeviceTile extends IPSModule
             $iconFalseSet = isset($customPresentation['ICON_FALSE']) && trim($customPresentation['ICON_FALSE']) !== '';
             if ($iconTrueSet || $iconFalseSet) {
                 $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Building associations from ICON_TRUE/ICON_FALSE');
+                
+                // CRITICAL FIX: Prüfe USE_ICON_FALSE Flag um Icon-Behavior zu bestimmen
+                $useIconFalse = isset($customPresentation['USE_ICON_FALSE']) ? $customPresentation['USE_ICON_FALSE'] : true;
+                $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: USE_ICON_FALSE=' . ($useIconFalse ? 'true' : 'false') . ' - determines association icon behavior');
+                
                 $associations = [];
                 // FALSE Association (Wert 0/false)
                 if ($iconFalseSet) {
@@ -1928,9 +2113,10 @@ class UniversalDeviceTile extends IPSModule
                         'value' => false,
                         'name' => 'Aus',
                         'color' => null,
-                        'icon' => $customPresentation['ICON_FALSE']
+                        'icon' => $useIconFalse ? $customPresentation['ICON_FALSE'] : null // Kein Icon wenn USE_ICON_FALSE=false
                     ];
-                    $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Added FALSE association with icon: ' . $customPresentation['ICON_FALSE']);
+                    $iconUsed = $useIconFalse ? $customPresentation['ICON_FALSE'] : 'NULL (USE_ICON_FALSE=false)';
+                    $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Added FALSE association with icon: ' . $iconUsed);
                 }
                 // TRUE Association (Wert 1/true)
                 if ($iconTrueSet) {
@@ -1938,9 +2124,10 @@ class UniversalDeviceTile extends IPSModule
                         'value' => true,
                         'name' => 'An',
                         'color' => null,
-                        'icon' => $customPresentation['ICON_TRUE']
+                        'icon' => $useIconFalse ? $customPresentation['ICON_TRUE'] : null // Kein Icon wenn USE_ICON_FALSE=false
                     ];
-                    $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Added TRUE association with icon: ' . $customPresentation['ICON_TRUE']);
+                    $iconUsed = $useIconFalse ? $customPresentation['ICON_TRUE'] : 'NULL (USE_ICON_FALSE=false)';
+                    $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Added TRUE association with icon: ' . $iconUsed);
                 }
                 if (!empty($associations)) {
                     $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Returning ' . count($associations) . ' built associations');

@@ -888,13 +888,49 @@
                 
                 // Icon-Verarbeitung für Button-Update - Verwende Association-Icon falls vorhanden
                 let finalIcon = associationIcon || variable.icon; // Association-Icon hat Priorität
+        
+                // SPECIAL DEBUG for Variable 37220 - FRONTEND ICON RENDERING
+                if (variable.id === 37220) {
+                    debugLog('VARIABLE 37220 FRONTEND DEBUG: Icon rendering check:', {
+                        showIcon: variable.showIcon,
+                        associationIcon: associationIcon,
+                        variableIcon: variable.icon,
+                        finalIcon: finalIcon,
+                        isTransparent: finalIcon === 'Transparent'
+                    });
+                }
+        
                 if (variable.showIcon && finalIcon && finalIcon !== 'Transparent') {
                     const iconClass = prepareIconForDisplay(finalIcon);
+                    
+                    // SPECIAL DEBUG for Variable 37220 - ICON CLASS PREPARATION
+                    if (variable.id === 37220) {
+                        debugLog('VARIABLE 37220 FRONTEND DEBUG: Icon class preparation:', {
+                            finalIcon: finalIcon,
+                            iconClass: iconClass,
+                            willRenderIcon: !!iconClass
+                        });
+                    }
+                    
                     if (iconClass) {
                         iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                        
+                        // SPECIAL DEBUG for Variable 37220 - FINAL ICON HTML
+                        if (variable.id === 37220) {
+                            debugLog('VARIABLE 37220 FRONTEND DEBUG: Final icon HTML generated:', iconHtml);
+                        }
+                    }
+                } else {
+                    // SPECIAL DEBUG for Variable 37220 - WHY NO ICON
+                    if (variable.id === 37220) {
+                        debugLog('VARIABLE 37220 FRONTEND DEBUG: Icon NOT rendered because:', {
+                            showIcon: variable.showIcon,
+                            hasFinalIcon: !!finalIcon,
+                            finalIcon: finalIcon,
+                            isNotTransparent: finalIcon !== 'Transparent'
+                        });
                     }
                 }
-                
                 let textParts = [];
                 if (variable.showIcon && iconHtml) {
                     textParts.push(iconHtml);
