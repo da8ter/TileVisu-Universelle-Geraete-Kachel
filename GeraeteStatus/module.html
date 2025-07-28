@@ -261,6 +261,14 @@
             margin-bottom: 0px;
         }
         
+        /* Linie unter Gruppen wenn showLine aktiviert ist */
+        .group-line {
+            width: 100%;
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+        
         /* Spezifische Regel für gruppierte Text-Variablen: Überschreibt die 0-Margin-Regel */
         .variable-group-item .variable-item.text-variable {
             margin-bottom: 0px; /* +5px mehr Abstand auch für gruppierte */
@@ -1354,6 +1362,7 @@
                         // shouldShowGroupName kontrolliert nur die Anzeige!
                         let displayGroupName = variable.group;
                         let showAbove = false;
+                        let showLine = false;
                         if (window.groupNames) {
                             // Extrahiere Gruppennummer aus "Gruppe X" Format
                             const groupMatch = variable.group.match(/Gruppe (\d+)/);
@@ -1363,8 +1372,9 @@
                                 if (groupConfig) {
                                     displayGroupName = groupConfig.name || variable.group;
                                     showAbove = groupConfig.showAbove || false;
+                                    showLine = groupConfig.showLine || false;
                                 }
-                                debugLog('Group mapping: Gruppe ' + groupNumber + ' -> "' + displayGroupName + '" (showGroupName: ' + shouldShowGroupName + ', showAbove: ' + showAbove + ')');
+                                debugLog('Group mapping: Gruppe ' + groupNumber + ' -> "' + displayGroupName + '" (showGroupName: ' + shouldShowGroupName + ', showAbove: ' + showAbove + ', showLine: ' + showLine + ')');
                             } else {
                                 debugLog('No group number found in: "' + variable.group + '"');
                             }
@@ -1427,6 +1437,14 @@
                                 </div>
                             </div>
                         `;
+                        
+                        // Füge Linie unter der Gruppe hinzu wenn showLine aktiviert ist
+                        if (showLine) {
+                            content += `
+                                <div class="group-line"></div>
+                            `;
+                            debugLog('Added line under group "' + displayGroupName + '"');
+                        }
                     }
                     // Andernfalls überspringen (Gruppe bereits gerendert)
                 } else {

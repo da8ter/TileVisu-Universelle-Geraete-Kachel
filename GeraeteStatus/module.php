@@ -194,7 +194,7 @@ class UniversalDeviceTile extends IPSModule
 
     
     /**
-     * Gibt alle Gruppennamen und ShowAbove Konfiguration als Array zurück für Frontend-Verwendung
+     * Gibt alle Gruppennamen und ShowAbove/Line Konfiguration als Array zurück für Frontend-Verwendung
      * @return array Assoziatives Array mit Gruppennummer als Key und Konfiguration als Value
      */
     public function GetAllGroupNames()
@@ -210,10 +210,12 @@ class UniversalDeviceTile extends IPSModule
                 if (isset($group['GroupName'])) {
                     $groupNumber = $index + 1; // Array-Index 0 = Gruppe 1
                     $showAbove = isset($group['ShowAbove']) ? (bool)$group['ShowAbove'] : false;
-                    $this->DebugLog('GetAllGroupNames - Adding group: ' . $groupNumber . ' => ' . $group['GroupName'] . ' (ShowAbove: ' . ($showAbove ? 'true' : 'false') . ')');
+                    $showLine = isset($group['line']) ? (bool)$group['line'] : false;
+                    $this->DebugLog('GetAllGroupNames - Adding group: ' . $groupNumber . ' => ' . $group['GroupName'] . ' (ShowAbove: ' . ($showAbove ? 'true' : 'false') . ', ShowLine: ' . ($showLine ? 'true' : 'false') . ')');
                     $result[$groupNumber] = [
                         'name' => $group['GroupName'],
-                        'showAbove' => $showAbove
+                        'showAbove' => $showAbove,
+                        'showLine' => $showLine
                     ];
                 }
             }
@@ -224,7 +226,8 @@ class UniversalDeviceTile extends IPSModule
             if (!isset($result[$i])) {
                 $result[$i] = [
                     'name' => "Group $i",
-                    'showAbove' => false
+                    'showAbove' => false,
+                    'showLine' => false
                 ];
             }
         }

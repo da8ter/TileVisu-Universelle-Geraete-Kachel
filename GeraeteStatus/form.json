@@ -909,7 +909,15 @@
             {
               "name": "ShowAbove",
               "caption": "Show Name Above Group",
-              "width": "300px",
+              "width": "200px",
+              "edit": {
+                "type": "CheckBox"
+              }
+            },
+            {
+              "name": "line",
+              "caption": "Show Line Under Group",
+              "width": "200px",
               "edit": {
                 "type": "CheckBox"
               }
