@@ -884,24 +884,34 @@
     },
     {
       "type": "ExpansionPanel",
-      "caption": "Group Names",
+      "caption": "Group Configuration",
       "items": [
         {
           "type": "List",
           "name": "GroupNamesList",
-          "caption": "Group Names Configuration",
+          "caption": "Groups",
+          "width": "500px",
           "columns": [
             {
               "name": "Group",
               "caption": "Group",
-              "width": "100px"
+              "width": "100px",
+              "visible": false
             },
             {
               "name": "GroupName",
               "caption": "Group Name",
-              "width": "auto",
+              "width": "200px",
               "edit": {
                 "type": "ValidationTextBox"
+              }
+            },
+            {
+              "name": "ShowAbove",
+              "caption": "Show Name Above Group",
+              "width": "300px",
+              "edit": {
+                "type": "CheckBox"
               }
             }
           ],

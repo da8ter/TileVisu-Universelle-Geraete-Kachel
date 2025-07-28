@@ -95,6 +95,15 @@ class UniversalDeviceTile extends IPSModule
         }
     }
 
+    /**
+     * Gibt die Konfigurationsform zurück
+     * @return string JSON-String der Konfigurationsform
+     */
+    public function GetConfigurationForm()
+    {
+        return file_get_contents(__DIR__ . '/form.json');
+    }
+    
     public function ApplyChanges()
     {
         parent::ApplyChanges();
@@ -182,30 +191,11 @@ class UniversalDeviceTile extends IPSModule
         $this->UpdateVisualizationValue(json_encode($fullUpdateMessage));
     }
 
-    /**
-     * Gibt den benutzerdefinierten Gruppennamen für eine Gruppennummer zurück
-     * @param int $groupNumber Die Gruppennummer (1-10)
-     * @return string Der benutzerdefinierte Gruppenname oder Fallback
-     */
-    public function GetGroupName($groupNumber)
-    {
-        $groupNamesList = json_decode($this->ReadPropertyString('GroupNamesList'), true);
-        
-        if (is_array($groupNamesList)) {
-            foreach ($groupNamesList as $group) {
-                if (isset($group['Group']) && $group['Group'] == $groupNumber) {
-                    return $group['GroupName'] ?? "Group $groupNumber";
-                }
-            }
-        }
-        
-        // Fallback falls keine Konfiguration gefunden wurde
-        return "Group $groupNumber";
-    }
+
     
     /**
-     * Gibt alle Gruppennamen als Array zurück für Frontend-Verwendung
-     * @return array Assoziatives Array mit Gruppennummer als Key und Name als Value
+     * Gibt alle Gruppennamen und ShowAbove Konfiguration als Array zurück für Frontend-Verwendung
+     * @return array Assoziatives Array mit Gruppennummer als Key und Konfiguration als Value
      */
     public function GetAllGroupNames()
     {
@@ -219,8 +209,12 @@ class UniversalDeviceTile extends IPSModule
             foreach ($groupNamesList as $index => $group) {
                 if (isset($group['GroupName'])) {
                     $groupNumber = $index + 1; // Array-Index 0 = Gruppe 1
-                    $this->DebugLog('GetAllGroupNames - Adding group: ' . $groupNumber . ' => ' . $group['GroupName']);
-                    $result[$groupNumber] = $group['GroupName'];
+                    $showAbove = isset($group['ShowAbove']) ? (bool)$group['ShowAbove'] : false;
+                    $this->DebugLog('GetAllGroupNames - Adding group: ' . $groupNumber . ' => ' . $group['GroupName'] . ' (ShowAbove: ' . ($showAbove ? 'true' : 'false') . ')');
+                    $result[$groupNumber] = [
+                        'name' => $group['GroupName'],
+                        'showAbove' => $showAbove
+                    ];
                 }
             }
         }
@@ -228,7 +222,10 @@ class UniversalDeviceTile extends IPSModule
         // Stelle sicher, dass alle Gruppen 1-10 existieren
         for ($i = 1; $i <= 10; $i++) {
             if (!isset($result[$i])) {
-                $result[$i] = "Group $i";
+                $result[$i] = [
+                    'name' => "Group $i",
+                    'showAbove' => false
+                ];
             }
         }
         

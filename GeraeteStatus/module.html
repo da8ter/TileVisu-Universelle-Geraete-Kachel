@@ -1207,7 +1207,8 @@
                             const groupNumber = parseInt(groupMatch[1]);
                             debugLog('Group name mapping - groupNumber: ' + groupNumber);
                             debugLog('Group name mapping - looking up: window.groupNames[' + groupNumber + ']');
-                            displayGroupName = window.groupNames[groupNumber] || groupKey;
+                            const groupConfig = window.groupNames[groupNumber];
+                            displayGroupName = (groupConfig && groupConfig.name) ? groupConfig.name : groupKey;
                             debugLog('Group name mapping - final displayGroupName: "' + displayGroupName + '"');
                         } else {
                             debugLog('Group name mapping - no match or no groupNames, using original: "' + displayGroupName + '"');
@@ -1279,13 +1280,18 @@
                         // WICHTIG: Mapping erfolgt immer wenn window.groupNames verfügbar ist,
                         // shouldShowGroupName kontrolliert nur die Anzeige!
                         let displayGroupName = variable.group;
+                        let showAbove = false;
                         if (window.groupNames) {
                             // Extrahiere Gruppennummer aus "Gruppe X" Format
                             const groupMatch = variable.group.match(/Gruppe (\d+)/);
                             if (groupMatch) {
                                 const groupNumber = parseInt(groupMatch[1]);
-                                displayGroupName = window.groupNames[groupNumber] || variable.group;
-                                debugLog('Group mapping: Gruppe ' + groupNumber + ' -> "' + displayGroupName + '" (showGroupName: ' + shouldShowGroupName + ')');
+                                const groupConfig = window.groupNames[groupNumber];
+                                if (groupConfig) {
+                                    displayGroupName = groupConfig.name || variable.group;
+                                    showAbove = groupConfig.showAbove || false;
+                                }
+                                debugLog('Group mapping: Gruppe ' + groupNumber + ' -> "' + displayGroupName + '" (showGroupName: ' + shouldShowGroupName + ', showAbove: ' + showAbove + ')');
                             } else {
                                 debugLog('No group number found in: "' + variable.group + '"');
                             }
@@ -1293,12 +1299,32 @@
                             debugLog('window.groupNames not available, using default: "' + displayGroupName + '"');
                         }
                         
+                        // Alternative Darstellung: Gruppenname über der Gruppe
+                        if (shouldShowGroupName && showAbove) {
+                            // Verwende 30% kleinere Schriftgröße als die erste Variable der Gruppe
+                            const firstVariableFontSize = groupVariables[0]?.fontSize || 14;
+                            const groupNameFontSize = Math.round(firstVariableFontSize * 0.8); // 30% kleiner
+                            
+                            content += `
+                                <div class="group-name-above" style="font-weight: bold; color: var(--content-color); font-size: ${groupNameFontSize}px; margin-bottom: 0px; text-align: left; opacity: 0.5;">
+                                    ${displayGroupName}:
+                                </div>
+                            `;
+                            
+                            debugLog('Group name "' + displayGroupName + '" displayed above group with reduced font size: ' + groupNameFontSize + 'px (30% smaller, 30% transparent)');
+                        }
+                        
+                        // Container für die Gruppe - flexDirection je nach showAbove
+                        const containerStyle = showAbove && shouldShowGroupName 
+                            ? "margin-bottom: var(--element-spacing, 8px); margin-top: var(--element-spacing, 8px); display: flex; flex-direction: column; align-items: flex-start;"
+                            : "margin-bottom: var(--element-spacing, 8px); margin-top: var(--element-spacing, 8px); display: flex; align-items: flex-start; gap: 16px;";
+                        
                         content += `
-                            <div class="${groupCssClasses}" style="margin-bottom: var(--element-spacing, 8px); margin-top: var(--element-spacing, 8px); display: flex; align-items: flex-start; gap: 16px;">
+                            <div class="${groupCssClasses}" style="${containerStyle}">
                         `;
                         
-                        // Füge Gruppennamen links hinzu wenn gewünscht
-                        if (shouldShowGroupName) {
+                        // Füge Gruppennamen links hinzu wenn gewünscht (nur wenn NICHT showAbove)
+                        if (shouldShowGroupName && !showAbove) {
                             // Verwende die gleiche Schriftgröße wie die erste Variable der Gruppe
                             const firstVariableFontSize = groupVariables[0]?.fontSize || 14;
                             
@@ -1311,7 +1337,7 @@
                                 </div>
                             `;
                             
-                            debugLog('Group name "' + displayGroupName + '" using font size: ' + firstVariableFontSize + 'px, aligned width: ' + groupNameWidth);
+                            debugLog('Group name "' + displayGroupName + '" displayed beside group with font size: ' + firstVariableFontSize + 'px, aligned width: ' + groupNameWidth);
                         }
                         
                         content += `

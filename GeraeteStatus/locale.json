@@ -110,7 +110,9 @@
         "Dryer - On": "Trockner - An",
         "Custom Image": "Benutzerdefiniertes Bild",
         "Bool Button Color": "Schalter Farbe",
-        "Progressbar": "Fortschrittsbalken"
+        "Progressbar": "Fortschrittsbalken",
+        "Group Configuration": "Gruppenkonfiguration",
+        "Show Name Above Group": "Name über Gruppe anzeigen"
         }
     }
   }
