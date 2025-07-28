@@ -1261,6 +1261,40 @@ class UniversalDeviceTile extends IPSModule
                 // Fallback für kleingeschriebenes 'icon' Schlüsselwort
                 $icon = $customPresentation['Icon'];
                 $this->DebugLog('Found icon in VariableCustomPresentation (lowercase): ' . $icon);
+            } elseif (isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
+                // PRESENTATION GUID Auflösung für Icons - TEMPORÄR DEAKTIVIERT WEGEN GUID PROBLEMEN
+                $presentationGuid = trim($customPresentation['PRESENTATION'], '{}');
+                $this->DebugLog('Variable ID ' . $id . ': Found PRESENTATION GUID for icon extraction: ' . $presentationGuid, 'GetIcon');
+                $this->DebugLog('Variable ID ' . $id . ': PRESENTATION GUID icon extraction temporarily disabled due to GUID format issues', 'GetIcon');
+                
+                // ALTERNATIVE: Prüfe ob GetBooleanAssociations bereits Icons extrahiert hat
+                $this->DebugLog('Variable ID ' . $id . ': Starting alternative GetBooleanAssociations approach', 'GetIcon');
+                if ($variable['VariableType'] == 0) { // Boolean Variable
+                    $this->DebugLog('Variable ID ' . $id . ': Confirmed Boolean variable, calling GetBooleanAssociations', 'GetIcon');
+                    $associations = $this->GetBooleanAssociations($id);
+                    $this->DebugLog('Variable ID ' . $id . ': GetBooleanAssociations returned: ' . json_encode($associations), 'GetIcon');
+                    if (is_array($associations) && count($associations) > 0) {
+                        $currentValue = GetValue($id);
+                        $this->DebugLog('Variable ID ' . $id . ': Current value for icon matching: ' . json_encode($currentValue), 'GetIcon');
+                        foreach ($associations as $assoc) {
+                            $this->DebugLog('Variable ID ' . $id . ': Checking association: ' . json_encode($assoc), 'GetIcon');
+                            if (isset($assoc['value']) && $assoc['value'] == $currentValue && isset($assoc['icon']) && !empty($assoc['icon'])) {
+                                $icon = $assoc['icon'];
+                                $this->DebugLog('Variable ID ' . $id . ': MATCH! Using icon from Boolean associations: ' . $icon, 'GetIcon');
+                                break;
+                            } else {
+                                $this->DebugLog('Variable ID ' . $id . ': No match for this association', 'GetIcon');
+                            }
+                        }
+                        if ($icon == "") {
+                            $this->DebugLog('Variable ID ' . $id . ': No matching icon found in associations', 'GetIcon');
+                        }
+                    } else {
+                        $this->DebugLog('Variable ID ' . $id . ': GetBooleanAssociations returned empty or null', 'GetIcon');
+                    }
+                } else {
+                    $this->DebugLog('Variable ID ' . $id . ': Not a Boolean variable, skipping GetBooleanAssociations', 'GetIcon');
+                }
             }
         }
         
@@ -1878,15 +1912,41 @@ class UniversalDeviceTile extends IPSModule
             }
         }
         
-        // Prüfe VariableCustomPresentation für Fälle 2-4
-        if (!isset($variable['VariableCustomPresentation']) || empty($variable['VariableCustomPresentation'])) {
-            return null;
-        }
-        
-        $customPresentation = $variable['VariableCustomPresentation'];
-        
-        // **FALL 1.5: Boolean-Präsentationen mit direkten ICON_TRUE/ICON_FALSE Parametern**
+        $customPresentation = isset($variable['VariableCustomPresentation']) ? $variable['VariableCustomPresentation'] : [];
+// **FALL 1.5: Boolean-Präsentationen mit direkten ICON_TRUE/ICON_FALSE Parametern**
         if ($expectedVariableType === VARIABLETYPE_BOOLEAN) {
+            // **KRITISCHER FIX: Baue ASSOCIATIONS aus ICON_TRUE/ICON_FALSE auf**
+            // Prüfe, ob ICON_TRUE oder ICON_FALSE wirklich gesetzt und nicht leer sind
+            $iconTrueSet = isset($customPresentation['ICON_TRUE']) && trim($customPresentation['ICON_TRUE']) !== '';
+            $iconFalseSet = isset($customPresentation['ICON_FALSE']) && trim($customPresentation['ICON_FALSE']) !== '';
+            if ($iconTrueSet || $iconFalseSet) {
+                $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Building associations from ICON_TRUE/ICON_FALSE');
+                $associations = [];
+                // FALSE Association (Wert 0/false)
+                if ($iconFalseSet) {
+                    $associations[] = [
+                        'value' => false,
+                        'name' => 'Aus',
+                        'color' => null,
+                        'icon' => $customPresentation['ICON_FALSE']
+                    ];
+                    $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Added FALSE association with icon: ' . $customPresentation['ICON_FALSE']);
+                }
+                // TRUE Association (Wert 1/true)
+                if ($iconTrueSet) {
+                    $associations[] = [
+                        'value' => true,
+                        'name' => 'An',
+                        'color' => null,
+                        'icon' => $customPresentation['ICON_TRUE']
+                    ];
+                    $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Added TRUE association with icon: ' . $customPresentation['ICON_TRUE']);
+                }
+                if (!empty($associations)) {
+                    $this->DebugLog('VARIABLE ' . $variableId . ' DEBUG: Returning ' . count($associations) . ' built associations');
+                    return $associations;
+                }
+            }
             $this->DebugLog('Checking Boolean presentation parameters for variable: ' . $variableId);
             $this->DebugLog('CustomPresentation structure: ' . json_encode($customPresentation));
             
