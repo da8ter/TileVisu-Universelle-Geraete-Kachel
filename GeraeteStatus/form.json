@@ -697,7 +697,7 @@
               "type": "RowLayout",
               "items": [
                 {
-                  "caption": "Group (All elements in a group are displayed in a single row. Only for button and text display.)",
+                  "caption": "Group (All elements in a group are displayed in a single row.)",
                   "name": "Group",
                   "type": "Select",
                   "width": "600px",
@@ -749,15 +749,6 @@
                   ],
                   "save": true,
                   "add": "keine Gruppe",
-                  "visible": true
-                },
-                {
-                  "caption": "Show Group Name",
-                  "name": "ShowGroupName",
-                  "type": "CheckBox",
-                  "width": "200px",
-                  "save": true,
-                  "add": false,
                   "visible": true
                 }
               ]
@@ -953,6 +944,14 @@
               "width": "200px",
               "edit": {
                 "type": "ValidationTextBox"
+              }
+            },
+            {
+              "name": "ShowGroupName",
+              "caption": "Show Group Name",
+              "width": "200px",
+              "edit": {
+                "type": "CheckBox"
               }
             },
             {

@@ -1186,7 +1186,15 @@
                 // Berechne Breite für jeden sichtbaren Gruppennamen
                 Object.keys(groupedVariables).forEach(groupKey => {
                     const groupVariables = groupedVariables[groupKey];
-                    const shouldShowGroupName = groupVariables.some(v => v.showGroupName === true);
+                    
+                    // Prüfe ShowGroupName aus Gruppenkonfiguration statt aus Variablen
+                    let shouldShowGroupName = false;
+                    const groupMatch = groupKey.match(/Gruppe (\d+)/);
+                    if (groupMatch && window.groupNames) {
+                        const groupNumber = parseInt(groupMatch[1]);
+                        const groupConfig = window.groupNames[groupNumber];
+                        shouldShowGroupName = groupConfig && groupConfig.showGroupName === true;
+                    }
                     
                     if (shouldShowGroupName) {
                         // Bestimme Anzeigenamen
@@ -1240,8 +1248,14 @@
                         
                         
                         
-                        // Prüfe ob eine Variable in der Gruppe ShowGroupName aktiviert hat
-                        const shouldShowGroupName = groupVariables.some(v => v.showGroupName === true);
+                        // Prüfe ShowGroupName aus Gruppenkonfiguration statt aus Variablen
+                        let shouldShowGroupName = false;
+                        const groupMatch = variable.group.match(/Gruppe (\d+)/);
+                        if (groupMatch && window.groupNames) {
+                            const groupNumber = parseInt(groupMatch[1]);
+                            const groupConfig = window.groupNames[groupNumber];
+                            shouldShowGroupName = groupConfig && groupConfig.showGroupName === true;
+                        }
                         
                         // Bestimme den Gruppennamen basierend auf der Gruppenbezeichnung
                         // WICHTIG: Mapping erfolgt immer wenn window.groupNames verfügbar ist,

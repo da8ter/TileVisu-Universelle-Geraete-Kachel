@@ -57,7 +57,7 @@
         "Image Selection": "Bildauswahl",
         "Status Color": "Status-Farbe",
         "Progressbar active": "Fortschrittsbalken aktiv",
-        "Group (All elements in a group are displayed in a single row. Only for button and text display.)": "Gruppe (Alle Elemente in einer Gruppe werden in einer Zeile angezeigt. Nur für Schalter und Textanzeige.)",
+        "Group (All elements in a group are displayed in a single row.)": "Gruppe (Alle Elemente in einer Gruppe werden in einer Zeile angezeigt.)",
         "Progress Bar Configuration": "Fortschrittsbalken-Konfiguration",
         "Global progress bar settings": "Globale Fortschrittsbalken-Einstellungen",
         "Height": "Balken-Höhe",
@@ -116,7 +116,8 @@
         "Show Name Above Group": "Name über Gruppe",
         "Show Line Under Group": "Linie unter Gruppe",
         "Button height": "Schalter Höhe",
-        "Buttonconfiguration": "Scha lterkonfiguration"
+        "Buttonconfiguration": "Scha lterkonfiguration",
+        "Group Name Size": "Gruppennamen-Größe"
 
         }
     }

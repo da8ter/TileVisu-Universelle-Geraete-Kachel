@@ -389,11 +389,13 @@ class UniversalDeviceTile extends IPSModule
                     $showAbove = isset($group['ShowAbove']) ? (bool)$group['ShowAbove'] : false;
                     $showLine = isset($group['line']) ? (bool)$group['line'] : false;
                     $stretch = isset($group['stretch']) ? (bool)$group['stretch'] : false;
+                    $showGroupName = isset($group['ShowGroupName']) ? (bool)$group['ShowGroupName'] : false;
                     $result[$groupNumber] = [
                         'name' => $group['GroupName'],
                         'showAbove' => $showAbove,
                         'showLine' => $showLine,
                         'stretch' => $stretch,
+                        'showGroupName' => $showGroupName,
                         'fontSize' => $this->ReadPropertyInteger('GroupNameSize') // Globale Schriftgröße für alle Gruppen
                     ];
                 }
@@ -408,6 +410,7 @@ class UniversalDeviceTile extends IPSModule
                     'showAbove' => false,
                     'showLine' => false,
                     'stretch' => false,
+                    'showGroupName' => false,
                     'fontSize' => $this->ReadPropertyInteger('GroupNameSize') // Globale Schriftgröße für alle Gruppen
                 ];
             }
