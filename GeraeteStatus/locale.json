@@ -44,7 +44,7 @@
         "Program:": "Programm:",
         "Button Width": "Schalter-Breite",
         "Label (Overrides the variable name)": "Beschriftung (Überschreibt den Variablenname)",
-        "Element spacing (vertical distance between items)": "Elementabstand (vertikaler Abstand zwischen Elementen)",
+        "Vertical distance between items": "Vertikaler Abstand zwischen Elementen",
         "Bild": "Bild",
         "Status variable": "Status-Variable",
         "Font size": "Schriftgröße",

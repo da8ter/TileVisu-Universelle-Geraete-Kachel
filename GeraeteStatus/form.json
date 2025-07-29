@@ -229,9 +229,20 @@
           "type": "NumberSpinner",
           "name": "ProgressBarBorderRadius",
           "caption": "Border radius Progressbar and Button",
+          "width": "400px",
           "minimum": 0,
           "maximum": 20,
           "add": 6,
+          "suffix": "px"
+        },
+        {
+          "type": "NumberSpinner",
+          "name": "ElementSpacing",
+          "caption": "Vertical distance between items",
+          "width": "400px",
+          "digits": 0,
+          "minimum": 0,
+          "maximum": 50,
           "suffix": "px"
         },
         {
@@ -906,16 +917,7 @@
         }
         
     ,
-    {
-      "type": "NumberSpinner",
-      "name": "ElementSpacing",
-      "caption": "Element spacing (vertical distance between items)",
-      "width": "400px",
-      "digits": 0,
-      "minimum": 0,
-      "maximum": 50,
-      "suffix": "px"
-    },
+
     {
       "type": "ExpansionPanel",
       "caption": "Group Configuration",
