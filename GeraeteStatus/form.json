@@ -223,72 +223,98 @@
     },
     {
       "type": "ExpansionPanel",
-      "caption": "Progress Bar Configuration",
+      "caption": "Globale Darstellungsoptionen",
       "items": [
         {
-          "type": "Image",
-          "image": ""
+          "type": "NumberSpinner",
+          "name": "ProgressBarBorderRadius",
+          "caption": "Border radius Progressbar and Button",
+          "minimum": 0,
+          "maximum": 20,
+          "add": 6,
+          "suffix": "px"
+        },
+        {
+          "type": "ExpansionPanel",
+          "caption": "Progress Bar",
+          "items": [
+            {
+              "type": "Image",
+              "image": ""
 
-        },
-        {
-          "type": "RowLayout",
-          "items": [
-            {
-              "type": "NumberSpinner",
-              "name": "ProgressBarHeight",
-              "caption": "Height",
-              "minimum": 10,
-              "maximum": 40,
-              "add": 25,
-              "suffix": "px"
             },
             {
-              "type": "NumberSpinner",
-              "name": "ProgressBarBorderRadius",
-              "caption": "Border radius",
-              "minimum": 0,
-              "maximum": 20,
-              "add": 6,
-              "suffix": "px"
+              "type": "RowLayout",
+              "items": [
+                {
+                  "type": "NumberSpinner",
+                  "name": "ProgressBarHeight",
+                  "caption": "Height",
+                  "minimum": 10,
+                  "maximum": 40,
+                  "add": 25,
+                  "suffix": "px"
+                }
+              ]
+            },
+            {
+              "type": "RowLayout",
+              "items": [
+                {
+                  "type": "SelectColor",
+                  "name": "ProgressBarBackgroundColor",
+                  "caption": "Background color",
+                  "allowTransparent": true
+                },
+                {
+                  "type": "NumberSpinner",
+                  "name": "ProgressBarBackgroundOpacity",
+                  "caption": "Background opacity",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "suffix": "%"
+                }
+              ]
+            },
+            {
+              "type": "RowLayout",
+              "items": [
+                {
+                  "type": "CheckBox",
+                  "name": "ProgressBarShowText",
+                  "caption": "Show text inside progress bar",
+                  "visible": false
+                },
+                {
+                  "type": "NumberSpinner",
+                  "name": "ProgressBarTextPadding",
+                  "caption": "Text padding",
+                  "minimum": 0,
+                  "maximum": 20,
+                  "suffix": "px",
+                  "visible": false
+                }
+              ]
             }
           ]
         },
         {
-          "type": "RowLayout",
+          "type": "ExpansionPanel",
+          "caption": "Button",
           "items": [
             {
-              "type": "SelectColor",
-              "name": "ProgressBarBackgroundColor",
-              "caption": "Background color",
-              "allowTransparent": true
-            },
-            {
-              "type": "NumberSpinner",
-              "name": "ProgressBarBackgroundOpacity",
-              "caption": "Background opacity",
-              "minimum": 0,
-              "maximum": 100,
-              "suffix": "%"
-            }
-          ]
-        },
-        {
-          "type": "RowLayout",
-          "items": [
-            {
-              "type": "CheckBox",
-              "name": "ProgressBarShowText",
-              "caption": "Show text inside progress bar",
-              "visible": false
-            },
-            {
-              "type": "NumberSpinner",
-              "name": "ProgressBarTextPadding",
-              "caption": "Text padding",
-              "minimum": 0,
-              "maximum": 20,
-              "suffix": "px",
-              "visible": false
+              "type": "RowLayout",
+              "items": [
+                {
+                  "type": "NumberSpinner",
+                  "name": "ButtonHeight",
+                  "caption": "Button height",
+                  "minimum": 10,
+                  "maximum": 1000,
+                  "add": 25,
+                  "suffix": "px"
+                }
+              ]
             }
           ]
         }
@@ -894,6 +920,15 @@
       "type": "ExpansionPanel",
       "caption": "Group Configuration",
       "items": [
+        {
+          "type": "NumberSpinner",
+          "name": "GroupNameSize",
+          "caption": "Group Name Size (applies to all groups)",
+          "width": "300px",
+          "minimum": 5,
+          "maximum": 100,
+          "suffix": "px"
+        },
         {
           "type": "List",
           "name": "GroupNamesList",

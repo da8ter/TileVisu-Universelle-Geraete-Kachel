@@ -47,6 +47,12 @@ class UniversalDeviceTile extends IPSModule
         $this->RegisterPropertyBoolean('ProgressBarShowText', true);
         $this->RegisterPropertyInteger('ProgressBarTextPadding', 12);
         
+        // Zentrale Button-Konfiguration
+        $this->RegisterPropertyInteger('ButtonHeight', 25);
+        
+        // Zentrale Gruppennamen-Konfiguration
+        $this->RegisterPropertyInteger('GroupNameSize', 16);
+        
         // Bildkonfiguration
         $this->RegisterPropertyInteger("Bildauswahl", 0);
         $this->RegisterPropertyFloat("BildBreite", 20);
@@ -387,7 +393,8 @@ class UniversalDeviceTile extends IPSModule
                         'name' => $group['GroupName'],
                         'showAbove' => $showAbove,
                         'showLine' => $showLine,
-                        'stretch' => $stretch
+                        'stretch' => $stretch,
+                        'fontSize' => $this->ReadPropertyInteger('GroupNameSize') // Globale Schriftgröße für alle Gruppen
                     ];
                 }
             }
@@ -400,7 +407,8 @@ class UniversalDeviceTile extends IPSModule
                     'name' => "Group $i",
                     'showAbove' => false,
                     'showLine' => false,
-                    'stretch' => false
+                    'stretch' => false,
+                    'fontSize' => $this->ReadPropertyInteger('GroupNameSize') // Globale Schriftgröße für alle Gruppen
                 ];
             }
         }
@@ -1112,6 +1120,11 @@ class UniversalDeviceTile extends IPSModule
             'backgroundOpacity' => $this->ReadPropertyInteger('ProgressBarBackgroundOpacity') / 100,
             'showText' => $this->ReadPropertyBoolean('ProgressBarShowText'),
             'textPadding' => $this->ReadPropertyInteger('ProgressBarTextPadding')
+        ];
+        
+        // Zentrale Button-Konfiguration
+        $result['buttonConfig'] = [
+            'height' => $this->ReadPropertyInteger('ButtonHeight')
         ];
         
         // Bild-Konfiguration

@@ -378,7 +378,7 @@
         .variable-button {
             display: inline-flex;
             align-items: center;
-            height: var(--progress-bar-height, 20px);
+            height: var(--button-height, 25px);
             padding: 0 12px;
             border: none;
             border-radius: var(--progress-bar-border-radius, 10px);
@@ -406,7 +406,7 @@
         .variable-multi-button {
             display: inline-flex;
             align-items: center;
-            height: var(--progress-bar-height, 20px);
+            height: var(--button-height, 25px);
             padding: 0 8px;
             border: none;
             border-radius: var(--progress-bar-border-radius, 10px);
@@ -597,6 +597,13 @@
             root.style.setProperty('--progress-bar-show-text', config.showText ? 'flex' : 'none');
         }
 
+        function updateButtonStyles(config) {
+            const root = document.documentElement;
+            
+            // Setze CSS-Variable für die zentrale Button-Konfiguration
+            root.style.setProperty('--button-height', config.height + 'px');
+        }
+
         function handleMessage(data) {
             const decodedData = JSON.parse(data);
             const root = document.documentElement;
@@ -658,6 +665,13 @@
                     case 'progressbarconfig':
                         updateProgressBarStyles(value);
                         // Nach Progress-Config-Update, re-render Variables wenn nötig
+                        if (window.lastVariablesData) {
+                            renderVariables(window.lastVariablesData);
+                        }
+                        break;
+                    case 'buttonconfig':
+                        updateButtonStyles(value);
+                        // Nach Button-Config-Update, re-render Variables wenn nötig
                         if (window.lastVariablesData) {
                             renderVariables(window.lastVariablesData);
                         }
@@ -1276,9 +1290,9 @@
                         
                         // Alternative Darstellung: Gruppenname über der Gruppe
                         if (shouldShowGroupName && showAbove) {
-                            // Verwende 30% kleinere Schriftgröße als die erste Variable der Gruppe
-                            const firstVariableFontSize = groupVariables[0]?.fontSize || 14;
-                            const groupNameFontSize = Math.round(firstVariableFontSize * 0.8); // 30% kleiner
+                            // Verwende konfigurierte Schriftgröße aus groupnamesize oder Fallback
+                            const groupConfig = window.groupNames?.[parseInt(variable.group.match(/Gruppe (\d+)/)?.[1])];
+                            const groupNameFontSize = groupConfig?.fontSize || 16; // Fallback zu 16px
                             
                             content += `
                                 <div class="group-name-above" style="font-weight: bold; color: var(--content-color); font-size: ${groupNameFontSize}px; margin-bottom: 0px; margin-top: 10px; text-align: left; opacity: 0.5;">
