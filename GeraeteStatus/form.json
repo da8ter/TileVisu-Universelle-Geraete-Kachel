@@ -925,11 +925,15 @@
         {
           "type": "NumberSpinner",
           "name": "GroupNameSize",
-          "caption": "Group Name Size (applies to all groups)",
+          "caption": "Group Name Size",
           "width": "300px",
           "minimum": 5,
           "maximum": 100,
           "suffix": "px"
+        },
+        {
+          "type": "Label",
+          "caption": "Passt die Schriftgröße der Gruppennamen an. (Nur wenn die Option \"Name über Gruppe\" aktiviert ist.)"
         },
         {
           "type": "List",
