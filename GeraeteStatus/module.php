@@ -30,7 +30,7 @@ class UniversalDeviceTile extends IPSModule
         // Alter Gerätestatus (immer oben angezeigt)
         $this->RegisterPropertyInteger('Status', 0);
         $this->RegisterPropertyString('ProfilAssoziazionen', '[]');
-        $this->RegisterPropertyInteger('StatusFontSize', 12);
+        $this->RegisterPropertyInteger('StatusFontSize', -1);
         $this->RegisterPropertyBoolean('StatusShowIcon', true);
         $this->RegisterPropertyBoolean('StatusShowLabel', true);
         $this->RegisterPropertyBoolean('StatusShowValue', true);
@@ -51,11 +51,14 @@ class UniversalDeviceTile extends IPSModule
         $this->RegisterPropertyInteger('ButtonHeight', 25);
         
         // Zentrale Gruppennamen-Konfiguration
-        $this->RegisterPropertyInteger('GroupNameSize', 16);
+        $this->RegisterPropertyInteger('GroupNameSize', -1);
         
         // Bildkonfiguration
         $this->RegisterPropertyInteger("Bildauswahl", 0);
         $this->RegisterPropertyFloat("BildBreite", 20);
+        $this->RegisterPropertyString("BildPosition", "left");
+        $this->RegisterPropertyBoolean("ShowBorderLine", true);
+        $this->RegisterPropertyString("ImageAlignment", "center");
         $this->RegisterPropertyInteger("Bild_An", 0);
         $this->RegisterPropertyInteger("Bild_Aus", 0);
         $this->RegisterPropertyBoolean('BG_Off', 1);
@@ -64,9 +67,7 @@ class UniversalDeviceTile extends IPSModule
         $this->RegisterPropertyInteger('Kachelhintergrundfarbe', -1);
         $this->RegisterPropertyInteger('ElementSpacing', 5); // Standardwert für Element-Abstand
         
-        // Debug-Steuerung
-        $this->RegisterPropertyBoolean('DebugEnabled', false);
-        
+         
         // Benutzerdefinierte Gruppennamen (Groups 1-10)
         $defaultGroupNames = json_encode([
             ['Group' => 1, 'GroupName' => 'Group 1'],
@@ -1133,15 +1134,16 @@ class UniversalDeviceTile extends IPSModule
         // Bild-Konfiguration
         // Note: bildauswahl is now handled per-association in status rendering logic above
         $result['BildBreite'] = $this->ReadPropertyFloat('BildBreite');
+        $result['BildPosition'] = $this->ReadPropertyString('BildPosition');
+        $result['ShowBorderLine'] = $this->ReadPropertyBoolean('ShowBorderLine');
+        $result['ImageAlignment'] = $this->ReadPropertyString('ImageAlignment');
         $result['bildtransparenz'] = $this->ReadPropertyFloat('Bildtransparenz');
         $result['kachelhintergrundfarbe'] = '#' . sprintf('%06X', $this->ReadPropertyInteger('Kachelhintergrundfarbe'));
         
         // Element-Spacing-Konfiguration
         $result['elementSpacing'] = $this->ReadPropertyInteger('ElementSpacing');
         
-        // Debug-Konfiguration für Frontend
-        $result['debugEnabled'] = $this->ReadPropertyBoolean('DebugEnabled');
-
+ 
             // Hintergrundbild verarbeiten
         $imageID = $this->ReadPropertyInteger('bgImage');
         if (IPS_MediaExists($imageID)) {
@@ -1586,7 +1588,14 @@ class UniversalDeviceTile extends IPSModule
             return $defaultColors;
         }
         
+        // Extrahiere Variable-Info
         $variable = IPS_GetVariable($variableId);
+        
+        // DEBUG: Log variable info  
+        $profileName = $variable['VariableProfile'] ?? 'NONE';
+        $customPresentation = is_array($variable['VariableCustomPresentation'] ?? null) ? json_encode($variable['VariableCustomPresentation']) : ($variable['VariableCustomPresentation'] ?? 'NONE');
+        error_log("TILEVISU DEBUG: Variable $variableId has VariableProfile: $profileName");
+        error_log("TILEVISU DEBUG: Variable $variableId has VariableCustomPresentation: $customPresentation");
         
         // Nur für Bool-Variablen
         if ($variable['VariableType'] !== VARIABLETYPE_BOOLEAN) {
@@ -1648,83 +1657,48 @@ class UniversalDeviceTile extends IPSModule
     
     /**
      * Extrahiert Min/Max-Werte aus Variablen-Profil oder Darstellung für Progress-Balken
+     * Verwendet die gleiche Presentation-Hierarchie wie Icons für konsistente Behandlung
      * @param int $variableId Die Variable-ID
      * @return array Array mit 'min' und 'max' Werten
      */
     private function GetProgressMinMax($variableId) {
+        // CRITICAL DEBUG: Always log this function call
+        error_log("TILEVISU CRITICAL DEBUG: GetProgressMinMax called for Variable ID: $variableId");
+        IPS_LogMessage('TileVisu CRITICAL', "GetProgressMinMax called for Variable ID: $variableId");
+        
         $defaultMinMax = [
             'min' => 0,
             'max' => 100
         ];
         
         if (!IPS_VariableExists($variableId)) {
+            IPS_LogMessage('TileVisu CRITICAL', "Variable $variableId does NOT exist - returning default");
             return $defaultMinMax;
         }
+        
+        IPS_LogMessage('TileVisu CRITICAL', "Variable $variableId exists - continuing");
         
         $variable = IPS_GetVariable($variableId);
         
-        // Nur für den erwarteten Variablentyp
-        if ($variable['VariableType'] !== VARIABLETYPE_INTEGER) {
+        // DEBUG: Log variable info
+        IPS_LogMessage('TileVisu DEBUG', "Variable $variableId has VariableProfile: " . ($variable['VariableProfile'] ?? 'NONE'));
+        IPS_LogMessage('TileVisu DEBUG', "Variable $variableId has VariableCustomProfile: " . ($variable['VariableCustomProfile'] ?? 'NONE'));
+        IPS_LogMessage('TileVisu DEBUG', "Variable $variableId has VariableType: " . $variable['VariableType']);
+        
+        // Unterstütze INTEGER und FLOAT Variablen für Progress Bars
+        if ($variable['VariableType'] !== VARIABLETYPE_INTEGER && $variable['VariableType'] !== VARIABLETYPE_FLOAT) {
+            IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Wrong type (${variable['VariableType']}), returning default");
             return $defaultMinMax;
         }
         
+        IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Correct type (${variable['VariableType']}), proceeding with extraction");
+        
+        // **PRESENTATION-HIERARCHIE wie bei Icons: Gleiche Taktik für konsistente Behandlung**
+        
+        // **FALL 1: Alte Variablenprofile (höchste Priorität wie bei Icons)**
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-        
-        // VORAB-PRÜFUNG: Hat die Variable überhaupt ein Profil oder eine Darstellung?
-        $hasProfile = !empty($profile) && IPS_VariableProfileExists($profile);
-        
-        $hasPresentation = false;
-        if (IPS_ObjectExists($variableId)) {
-            $object = IPS_GetObject($variableId);
-            $hasPresentation = isset($object['ObjectVisualization']) && !empty($object['ObjectVisualization']);
-        }
-        
-        // Wenn weder Profil noch Darstellung vorhanden: Standard-Fallback verwenden
-        if (!$hasProfile && !$hasPresentation) {
-            return $defaultMinMax;
-        }
-        
-        
-        
-        // ERSTE PRIORITÄT: Prüfe VariableCustomPresentation (neue IP-Symcon Darstellungen)
-        // Boolean-Variablen: Versuche Assoziationen aus den Präsentationsparametern zu extrahieren
-        if ($variable['VariableType'] == VARIABLETYPE_BOOLEAN) {
-            $customPresentation = $variable['VariableCustom']['CustomPresentation'] ?? [];
-            
-                        
-            // Prüfe auf presentationParameters in der customPresentation (beide Strukturen unterstützen)
-            $params = null;
-            
-            // Prüfe zuerst auf direktes VariableProfile
-            if (isset($variable['VariableProfile']) && !empty($variable['VariableProfile'])) {
-                $profileName = $variable['VariableProfile'];
-                $profile = @IPS_GetVariableProfile($profileName);
-                if ($profile !== false && isset($profile['Associations'])) {
-                    return $profile['Associations'];
-                }
-            }
-        }
-        
-        // ERSTE PRIORITÄT: Prüfe VariableCustomPresentation (neue IP-Symcon Darstellungen)
-        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
-            $customPresentation = $variable['VariableCustomPresentation'];
-            
-            if (isset($customPresentation['MIN']) && isset($customPresentation['MAX'])) {
-                if (is_numeric($customPresentation['MIN']) && is_numeric($customPresentation['MAX'])) {
-                    $minMax = [
-                        'min' => floatval($customPresentation['MIN']),
-                        'max' => floatval($customPresentation['MAX'])
-                    ];
-                    
-                    return $minMax;
-                }
-            }
-        }
-        
-        // ZWEITE PRIORITÄT: Versuche Profil-Min/Max zu verwenden
         if (!empty($profile) && IPS_VariableProfileExists($profile)) {
             $profileData = IPS_GetVariableProfile($profile);
-            
             
             if (isset($profileData['MinValue']) && isset($profileData['MaxValue'])) {
                 $minMax = [
@@ -1732,14 +1706,119 @@ class UniversalDeviceTile extends IPSModule
                     'max' => floatval($profileData['MaxValue'])
                 ];
                 
+                IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, PROFILE MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                 return $minMax;
             }
         }
         
-        // Fallback: Prüfe Darstellung/Visualisierung
-        $objectId = $variableId;
-        if (IPS_ObjectExists($objectId)) {
-            $object = IPS_GetObject($objectId);            
+        // **FALL 2: CustomPresentation mit direkten MIN/MAX Parametern**
+        $customPresentation = isset($variable['VariableCustomPresentation']) ? $variable['VariableCustomPresentation'] : [];
+        
+        if (!empty($customPresentation)) {
+            // Direkte MIN/MAX Parameter
+            if (isset($customPresentation['MIN']) && isset($customPresentation['MAX'])) {
+                if (is_numeric($customPresentation['MIN']) && is_numeric($customPresentation['MAX'])) {
+                    $minMax = [
+                        'min' => floatval($customPresentation['MIN']),
+                        'max' => floatval($customPresentation['MAX'])
+                    ];
+                    
+                    IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, CustomPresentation MIN: {$minMax['min']}, MAX: {$minMax['max']}");
+                    return $minMax;
+                }
+            }
+            
+            // **FALL 3: GUID-basierte Presentations (PRESENTATION)**
+            if (isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
+                $presentationGuid = $customPresentation['PRESENTATION'];
+                IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Checking PRESENTATION GUID: $presentationGuid");
+                
+                try {
+                    // GUID VALIDATION: Prüfe ob GUID im System existiert
+                    if (@IPS_PresentationExists($presentationGuid)) {
+                        $presentationData = IPS_GetPresentation($presentationGuid);
+                    } else {
+                        throw new Exception('GUID not registered in system');
+                    }
+                    
+                    if ($presentationData && is_string($presentationData)) {
+                        $presentationArray = json_decode($presentationData, true);
+                        
+                        if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
+                            $minMax = [
+                                'min' => floatval($presentationArray['MinValue']),
+                                'max' => floatval($presentationArray['MaxValue'])
+                            ];
+                            
+                            IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, PRESENTATION GUID MIN: {$minMax['min']}, MAX: {$minMax['max']}");
+                            return $minMax;
+                        }
+                    }
+                } catch (Exception $e) {
+                    IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - PRESENTATION GUID failed: " . $e->getMessage());
+                }
+            }
+            
+            // **FALL 4: OPTIONS-basierte Presentations**
+            if (isset($customPresentation['OPTIONS']) && !empty($customPresentation['OPTIONS'])) {
+                $optionsGuid = $customPresentation['OPTIONS'];
+                IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Checking OPTIONS GUID: $optionsGuid");
+                
+                try {
+                    if (@IPS_PresentationExists($optionsGuid)) {
+                        $presentationData = IPS_GetPresentation($optionsGuid);
+                        
+                        if ($presentationData && is_string($presentationData)) {
+                            $presentationArray = json_decode($presentationData, true);
+                            
+                            if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
+                                $minMax = [
+                                    'min' => floatval($presentationArray['MinValue']),
+                                    'max' => floatval($presentationArray['MaxValue'])
+                                ];
+                                
+                                IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, OPTIONS GUID MIN: {$minMax['min']}, MAX: {$minMax['max']}");
+                                return $minMax;
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - OPTIONS GUID failed: " . $e->getMessage());
+                }
+            }
+            
+            // **FALL 5: TEMPLATE-basierte Presentations**
+            if (isset($customPresentation['TEMPLATE']) && !empty($customPresentation['TEMPLATE'])) {
+                $templateGuid = $customPresentation['TEMPLATE'];
+                IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Checking TEMPLATE GUID: $templateGuid");
+                
+                try {
+                    if (@IPS_PresentationExists($templateGuid)) {
+                        $presentationData = IPS_GetPresentation($templateGuid);
+                        
+                        if ($presentationData && is_string($presentationData)) {
+                            $presentationArray = json_decode($presentationData, true);
+                            
+                            if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
+                                $minMax = [
+                                    'min' => floatval($presentationArray['MinValue']),
+                                    'max' => floatval($presentationArray['MaxValue'])
+                                ];
+                                
+                                IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, TEMPLATE GUID MIN: {$minMax['min']}, MAX: {$minMax['max']}");
+                                return $minMax;
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - TEMPLATE GUID failed: " . $e->getMessage());
+                }
+            }
+        }
+        
+        // **FALL 6: Fallback zu ObjectVisualization (wie bisher)**
+        if (IPS_ObjectExists($variableId)) {
+            $object = IPS_GetObject($variableId);            
             
             if (isset($object['ObjectVisualization']) && !empty($object['ObjectVisualization'])) {
                 $visualization = json_decode($object['ObjectVisualization'], true);
@@ -1751,14 +1830,11 @@ class UniversalDeviceTile extends IPSModule
                     
                     $foundMin = null;
                     $foundMax = null;
-                    $minFieldName = null;
-                    $maxFieldName = null;
                     
                     // Suche alle möglichen Min-Felder
                     foreach ($possibleMinFields as $field) {
                         if (isset($visualization[$field]) && is_numeric($visualization[$field])) {
                             $foundMin = floatval($visualization[$field]);
-                            $minFieldName = $field;
                             break;
                         }
                     }
@@ -1767,7 +1843,6 @@ class UniversalDeviceTile extends IPSModule
                     foreach ($possibleMaxFields as $field) {
                         if (isset($visualization[$field]) && is_numeric($visualization[$field])) {
                             $foundMax = floatval($visualization[$field]);
-                            $maxFieldName = $field;
                             break;
                         }
                     }
@@ -1779,19 +1854,16 @@ class UniversalDeviceTile extends IPSModule
                             'max' => $foundMax
                         ];
                         
+                        IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, Visualization MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                         return $minMax;
-                    } else {
-                        $hasMinValue = isset($visualization['MinValue']) ? 'YES (' . $visualization['MinValue'] . ')' : 'NO';
-                        $hasMaxValue = isset($visualization['MaxValue']) ? 'YES (' . $visualization['MaxValue'] . ')' : 'NO';
                     }
                     
                     // Fallback: Extrahiere Min/Max aus ValueMappings
                     if (isset($visualization['ValueMappings']) && is_array($visualization['ValueMappings'])) {
                         $values = [];
-                        foreach ($visualization['ValueMappings'] as $index => $mapping) {
+                        foreach ($visualization['ValueMappings'] as $mapping) {
                             if (isset($mapping['Value']) && is_numeric($mapping['Value'])) {
-                                $value = floatval($mapping['Value']);
-                                $values[] = $value;
+                                $values[] = floatval($mapping['Value']);
                             }
                         }
                         
@@ -1801,19 +1873,16 @@ class UniversalDeviceTile extends IPSModule
                                 'max' => max($values)
                             ];
                             
+                            IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, ValueMappings MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                             return $minMax;
-                        } else {
                         }
-                    } else {
-                        $hasValueMappings = isset($visualization['ValueMappings']) ? 'YES (not array)' : 'NO';
                     }
-                } else {
                 }
-            } else {
             }
-        } else {
         }
         
+        // **LETZTER FALLBACK: Standard Min/Max verwenden**
+        IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, Using DEFAULT MIN: {$defaultMinMax['min']}, MAX: {$defaultMinMax['max']}");
         return $defaultMinMax;
     }
     

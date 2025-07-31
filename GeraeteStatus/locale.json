@@ -16,7 +16,13 @@
         "Washing machine": "Waschmaschine",
         "Clothes dryer": "Wäschetrockner",
         "Custom images": "Eigene Bilder",
-        "Image width:": "Bild Breite:",
+        "Image width": "Bild Breite",
+        "Image position": "Bild Position",
+        "Show border line": "Trennlinie anzeigen",
+        "Alignment": "Ausrichtung",
+        "Links": "Links",
+        "Mitte": "Mitte",
+        "Rechts": "Rechts",
         "Custom image ON": "Eigenes Bild AN",
         "Custom image OFF": "Eigenes Bild AUS",
         "Device status": "Gerätestatus",
@@ -116,7 +122,7 @@
         "Show Name Above Group": "Name über Gruppe",
         "Show Line Under Group": "Linie unter Gruppe",
         "Button height": "Schalter Höhe",
-        "Buttonconfiguration": "Scha lterkonfiguration",
+        "Buttonconfiguration": "Schalterkonfiguration",
         "Group Name Size": "Gruppennamen-Größe"
 
         }

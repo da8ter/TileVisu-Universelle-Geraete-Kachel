@@ -52,29 +52,139 @@
             max-width: 100%;
             display: flex;
             flex-wrap: nowrap;
-            font-size: 12px;
             justify-content: center;
             box-sizing: border-box;
         }
 
         .div1 {
             width: var(--bildbreite);
+            min-width: var(--bildbreite);
+            max-width: var(--bildbreite);
             box-sizing: border-box;
             border-right: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
-            padding: 0px 2.5% 5px 0px;
+            padding-right: 10px;
         }
 
         .div1 img {
-            width: 100%;
+            width: var(--bildbreite);
+            max-width: var(--bildbreite);
         }
 
         .div2 {
-            width: 100%;
+            flex: 1;
             box-sizing: border-box;
-            padding: 0px 5px 5px 2.5%;
             margin: 0px 0px 0px 0px;
             border-radius: 0px;
         }
+
+        /* Bildposition: Links (Standard) */
+        .main_container.image-left {
+            flex-direction: row;
+            gap: 20px;
+        }
+
+        /* Bildposition: Rechts */
+        .main_container.image-right {
+            flex-direction: row-reverse;
+            gap: 20px;
+        }
+        
+        .main_container.image-right .div1 {
+            border-right: none;
+            border-left: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-left: 10px; 
+        }
+
+        /* Bildposition: Oben */
+        .main_container.image-top {
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .main_container.image-top .div1 {
+            width: 100% !important;
+            min-width: 100%;
+            max-width: 100%;
+            border-right: none;
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-right: 0;
+            padding-bottom: 20px;
+            display: flex;
+            justify-content: center; /* Standard: Zentriert */
+        }
+        
+        .main_container.image-top .div1 img {
+            width: var(--bildbreite);
+            max-width: var(--bildbreite);
+            display: block;
+        }
+
+        /* Bildposition: Unten */
+        .main_container.image-bottom {
+            flex-direction: column-reverse;
+            gap: 20px;
+        }
+        
+        .main_container.image-bottom .div1 {
+            width: 100% !important;
+            min-width: 100%;
+            max-width: 100%;
+            border-right: none;
+            border-top: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            border-bottom: none;
+            padding-right: 0;
+            padding-top: 20px;
+            display: flex;
+            justify-content: center; /* Standard: Zentriert */
+        }
+        
+        .main_container.image-bottom .div1 img {
+            width: var(--bildbreite);
+            max-width: var(--bildbreite);
+            display: block;
+        }
+        
+        .main_container.image-bottom .div2 {
+            width: 100%;
+        }
+        
+        /* Trennlinie ausblenden */
+        .main_container.hide-border-line .div1 {
+            border: none !important;
+        }
+        
+        /* Horizontale Bildausrichtung mit Flexbox für vertikale Positionen - MAXIMALE SPEZIFITÄT */
+        body .main_container.main_container.image-top.image-top .div1.div1.align-left.align-left {
+            justify-content: flex-start !important; /* Links */
+            border: 10px solid red !important; /* DEBUG: Links = Rot */
+        }
+        
+        body .main_container.main_container.image-top.image-top .div1.div1.align-center.align-center {
+            justify-content: center !important; /* Mitte */
+            border: 10px solid blue !important; /* DEBUG: Mitte = Blau */
+        }
+        
+        body .main_container.main_container.image-top.image-top .div1.div1.align-right.align-right {
+            justify-content: flex-end !important; /* Rechts */
+            border: 10px solid green !important; /* DEBUG: Rechts = Grün */
+        }
+        
+        body .main_container.main_container.image-bottom.image-bottom .div1.div1.align-left.align-left {
+            justify-content: flex-start !important; /* Links */
+            border: 10px solid red !important; /* DEBUG: Links = Rot */
+        }
+        
+        body .main_container.main_container.image-bottom.image-bottom .div1.div1.align-center.align-center {
+            justify-content: center !important; /* Mitte */
+            border: 10px solid blue !important; /* DEBUG: Mitte = Blau */
+        }
+        
+        body .main_container.main_container.image-bottom.image-bottom .div1.div1.align-right.align-right {
+            justify-content: flex-end !important; /* Rechts */
+            border: 10px solid green !important; /* DEBUG: Rechts = Grün */
+        }
+        
+
 
         /* Styles für dynamische Variablen */
         .variables-container {
@@ -193,7 +303,7 @@
         .progress-bar {
             height: 100%;
             border-radius: var(--progress-bar-border-radius, 10px) 0 0 var(--progress-bar-border-radius, 10px);
-            transition: width 0.3s ease;
+            transition: width 3s ease-in-out;
             background: linear-gradient(to right, var(--progress-color1), var(--progress-color2));
             min-height: var(--progress-bar-height, 20px);
         }
@@ -510,6 +620,37 @@
             return variable.textColor;
         }
 
+        // Hilfsfunktion zur Anwendung der Bildposition
+        function applyImagePosition(position) {
+            const mainContainer = document.querySelector('.main_container');
+            if (!mainContainer) {
+                return;
+            }
+            
+            // Entferne alle bisherigen Bildpositions-Klassen
+            mainContainer.classList.remove('image-left', 'image-right', 'image-top', 'image-bottom');
+            
+            // Füge die entsprechende Klasse hinzu
+            switch (position) {
+                case 'left':
+                    mainContainer.classList.add('image-left');
+                    break;
+                case 'right':
+                    mainContainer.classList.add('image-right');
+                    break;
+                case 'top':
+                    mainContainer.classList.add('image-top');
+                    break;
+                case 'bottom':
+                    mainContainer.classList.add('image-bottom');
+                    break;
+                default:
+                    // Fallback auf links
+                    mainContainer.classList.add('image-left');
+                    break;
+            }
+        }
+
         // Hilfsfunktion zur Bildanzeige-Steuerung basierend auf Bildauswahl und Bildbreite
         function updateImageVisibility() {
             const div1 = document.getElementById('div1');
@@ -551,7 +692,6 @@
                     }
                 }
                 if (div2) {
-                    div2.style.padding = '0px 5px 5px 2.5%'; // Standard two-column padding
                     div2.style.width = '100%';
                 }
             } else {
@@ -565,7 +705,6 @@
                     }
                 }
                 if (div2) {
-                    div2.style.padding = '0px 5px 5px 2.5%'; // Standard-Padding wiederherstellen
                     div2.style.width = '100%'; // div2 bleibt flexibel
                 }
             }
@@ -608,10 +747,15 @@
             const decodedData = JSON.parse(data);
             const root = document.documentElement;
             
+
+            
             // Setze InstanceID für RequestAction-Aufrufe
             if (decodedData.instanceid) {
                 window.InstanceID = decodedData.instanceid;
             }
+
+            // 🚀 BATCH-RENDERING: Flag um nur einmal zu rendern
+            let needsRerender = false;
 
             // Verarbeite die neuen Parameter
             for (const parameter in decodedData) {
@@ -625,7 +769,87 @@
                         // Setze CSS-Variable für element-spacing
                         root.style.setProperty('--element-spacing', value + 'px');
                         break;
+                    case 'bildposition':
+                        // Bildposition-Konfiguration verarbeiten
+                        applyImagePosition(value);
+                        break;
+                    case 'showborderline':
+                        // Trennlinie ein-/ausblenden
+                        const mainContainer = document.querySelector('.main_container');
+                        if (mainContainer) {
+                            if (value) {
+                                mainContainer.classList.remove('hide-border-line');
+                            } else {
+                                mainContainer.classList.add('hide-border-line');
+                            }
+                        }
+                        break;
+                    case 'imagealignment':
+                        // Speichere Alignment global und wende sofort an
+                        console.log('💾 STORING alignment globally:', value);
+                        window.currentImageAlignment = value;
                         
+                        // Wende Alignment sofort an - DIREKTES IMG-ELEMENT STYLING
+                        const div1 = document.querySelector('.main_container .div1');
+                        const imgElement = document.querySelector('.main_container .div1 img');
+                        const alignmentContainer = document.querySelector('.main_container');
+                        
+                        if (div1 && imgElement && alignmentContainer) {
+                            // Prüfe ob Bildposition oben oder unten ist (nur dann Alignment anwenden)
+                            const isVerticalPosition = alignmentContainer.classList.contains('image-top') || alignmentContainer.classList.contains('image-bottom');
+                            
+                            if (isVerticalPosition) {
+                                // STRATEGIE 1: Container mit Flexbox ausrichten
+                                let justifyContentValue;
+                                let debugBorderContainer;
+                                let debugBorderImg;
+                                
+                                switch (value) {
+                                    case 'left':
+                                        justifyContentValue = 'flex-start';
+                                        debugBorderContainer = '5px solid red';
+                                        debugBorderImg = '5px solid darkred';
+                                        break;
+                                    case 'center':
+                                        justifyContentValue = 'center';
+                                        debugBorderContainer = '5px solid blue';
+                                        debugBorderImg = '5px solid darkblue';
+                                        break;
+                                    case 'right':
+                                        justifyContentValue = 'flex-end';
+                                        debugBorderContainer = '5px solid green';
+                                        debugBorderImg = '5px solid darkgreen';
+                                        break;
+                                    default:
+                                        justifyContentValue = 'center';
+                                        debugBorderContainer = '5px solid gray';
+                                        debugBorderImg = '5px solid darkgray';
+                                }
+                                
+                                // DIREKTES BILD-ALIGNMENT mit Margins
+                                imgElement.style.display = 'block';
+                                
+                                // Margin-basierte Ausrichtung
+                                switch (value) {
+                                    case 'left':
+                                        imgElement.style.margin = '0 auto 0 0';  // Links
+                                        break;
+                                    case 'center':
+                                        imgElement.style.margin = '0 auto';      // Mitte
+                                        break;
+                                    case 'right':
+                                        imgElement.style.margin = '0 0 0 auto';  // Rechts
+                                        break;
+                                    default:
+                                        imgElement.style.margin = '0 auto';      // Standard: Mitte
+                                }
+                                
+                                console.log('✨ Image alignment applied:', value);
+                            } else {
+                                console.log('⚠️ Alignment ignored - only works with image-top/image-bottom positions');
+                            }
+                        }
+                        break;
                     case 'status':
                     case 'statusvalue':
                     case 'statuscolor':
@@ -636,6 +860,46 @@
                         }
                         renderStatus(decodedData);
                         updateImageVisibility();
+                        
+                        // Re-apply gespeicherte Bildausrichtung nach dem Rendering (Persistenz)
+                        if (window.currentImageAlignment) {
+                            console.log('🔄 RE-APPLYING persistent alignment after renderStatus:', window.currentImageAlignment);
+                            const div1Restore = document.querySelector('.main_container .div1');
+                            const mainContainerRestore = document.querySelector('.main_container');
+                            if (div1Restore && mainContainerRestore) {
+                                // Prüfe ob Bildposition oben oder unten ist
+                                const isVerticalPositionRestore = mainContainerRestore.classList.contains('image-top') || mainContainerRestore.classList.contains('image-bottom');
+                                
+                                if (isVerticalPositionRestore) {
+                                    // Verwende direktes JavaScript-Styling für Persistenz
+                                    let justifyContentValue;
+                                    let debugBorder;
+                                    
+                                    switch (window.currentImageAlignment) {
+                                        case 'left':
+                                            justifyContentValue = 'flex-start';
+                                            debugBorder = '10px solid red';
+                                            break;
+                                        case 'center':
+                                            justifyContentValue = 'center';
+                                            debugBorder = '10px solid blue';
+                                            break;
+                                        case 'right':
+                                            justifyContentValue = 'flex-end';
+                                            debugBorder = '10px solid green';
+                                            break;
+                                        default:
+                                            justifyContentValue = 'center';
+                                            debugBorder = '10px solid gray';
+                                    }
+                                    
+                                    div1Restore.style.justifyContent = justifyContentValue;
+                                    div1Restore.style.border = debugBorder;
+                                    
+                                    console.log('✨ PERSISTENT DIRECT STYLING restored:', window.currentImageAlignment, justifyContentValue);
+                                }
+                            }
+                        }
                         break;
                     case 'hideimagecolumn':
                         // NEW: Handle hideImageColumn flag for complete image column visibility
@@ -648,32 +912,123 @@
                         renderStatus(decodedData);
                         break;
                     case 'variables':
-                        // Speichere Variables-Daten für spätere Verwendung
-                        window.lastVariablesData = value;
-                        
-                        // Rendere nur wenn groupNames bereits verfügbar sind, oder wenn keine Gruppen verwendet werden
-                        const hasGroupedVariables = value && value.some(v => v.group && v.group !== 'keine Gruppe' && v.showGroupName);
-                        
-                        if (!hasGroupedVariables || window.groupNames) {
-                            // Keine Gruppen mit showGroupName ODER groupNames sind verfügbar
-                            renderVariables(value);
+                        if (window.lastVariablesData && window.variableDataCache) {
+                            let hasMinimalUpdates = false;
+                            let hasOtherChanges = false;
+                            
+
+                            
+                            // 🔧 FIX DATA STRUCTURE MISMATCH + DUPLICATE VARIABLE HANDLING: 
+                            // Incoming value is array-indexed (0,1,2,3...) 
+                            // Cache is variable-ID indexed (33670, 27157...)
+                            // Same variable can appear multiple times with different displayTypes!
+                            
+                            const processedVariables = new Set(); // Track which variables we've already processed
+                            const minimalUpdates = new Map(); // Store variables that can be updated minimally
+                            
+                            for (const arrayIndex in value) {
+                                const newVariable = value[arrayIndex];
+                                
+                                // Find matching variable in cache by variable ID, not array index
+                                const actualVariableId = newVariable?.variableId || newVariable?.id;
+                                const oldVariable = actualVariableId ? window.variableDataCache[actualVariableId] : null;
+                                
+
+                                
+                                // 🎯 DUPLICATE VARIABLE FIX: Skip if we already processed this variable ID
+                                if (processedVariables.has(actualVariableId)) {
+                                    continue;
+                                }
+                                processedVariables.add(actualVariableId);
+                                
+                                if (oldVariable && newVariable && actualVariableId) {
+                                    // Prüfe ob sich nur rawValue oder formattedValue geändert hat
+                                    const valueChanged = newVariable.rawValue !== oldVariable.rawValue;
+                                    const formattedValueChanged = newVariable.formattedValue !== oldVariable.formattedValue;
+                                    
+                                    if (valueChanged || formattedValueChanged) {
+                                        // Check display type and determine if minimal update is possible
+                                        const displayType = newVariable.displayType;
+                                        
+                                        if (displayType === 'progress') {
+                                            hasMinimalUpdates = true;
+                                            minimalUpdates.set(actualVariableId, { type: 'progress', variable: newVariable });
+                                        } else if (displayType === 'button') {
+                                            hasMinimalUpdates = true;
+                                            minimalUpdates.set(actualVariableId, { type: 'button', variable: newVariable });
+                                        } else if (displayType === 'text') {
+                                            hasMinimalUpdates = true;
+                                            minimalUpdates.set(actualVariableId, { type: 'text', variable: newVariable });
+                                        } else {
+                                            hasOtherChanges = true;
+                                        }
+                                    }
+                                    // Prüfe andere Eigenschaften (but be less strict to avoid false positives)
+                                    else if (JSON.stringify(newVariable) !== JSON.stringify(oldVariable)) {
+
+                                        
+                                        // Only mark as hasOtherChanges if it's a significant change (not just object reference)
+                                        const significantChange = (
+                                            newVariable.displayValue !== oldVariable.displayValue ||
+                                            newVariable.unit !== oldVariable.unit ||
+                                            newVariable.minValue !== oldVariable.minValue ||
+                                            newVariable.maxValue !== oldVariable.maxValue
+                                        );
+                                        
+                                        if (significantChange) {
+                                            hasOtherChanges = true;
+                                        }
+                                    }
+                                } else {
+                                    hasOtherChanges = true; // Neue oder gelöschte Variable oder missing ID
+                                }
+                            }
+                            
+                            // Wenn nur Variable-Werte geändert haben (alle Typen), skip Full-Re-Render
+                            if (hasMinimalUpdates && !hasOtherChanges) {
+                                
+                                // Führe Mini-Updates für alle geänderten Variablen durch
+                                minimalUpdates.forEach((updateData, variableId) => {
+                                    const { type, variable } = updateData;
+                                    
+                                    switch (type) {
+                                        case 'progress':
+                                            updateProgressBarValue(variableId, variable.rawValue);
+                                            break;
+                                        case 'button':
+                                            updateButtonValue(variableId, variable);
+                                            break;
+                                        case 'text':
+                                            updateTextValue(variableId, variable);
+                                            break;
+                                    }
+                                });
+                                
+                                // Update cache mit korrekter Datenstruktur
+                                updateVariableCache(value);
+                                window.lastVariablesData = value;
+                                needsRerender = false; // 🚀 SKIP FULL RE-RENDER!
+                                break;
+                            }
                         } else {
-                            // Warte auf groupNames - wird später von groupNames case gerendert
                         }
                         
+                        window.lastVariablesData = value;
+                        window.variableDataCache = value;
+                        needsRerender = true;
                         break;
                     case 'progressbarconfig':
                         updateProgressBarStyles(value);
-                        // Nach Progress-Config-Update, re-render Variables wenn nötig
+                        // 🚀 BATCH: Markiere für Re-Render statt sofort zu rendern
                         if (window.lastVariablesData) {
-                            renderVariables(window.lastVariablesData);
+                            needsRerender = true;
                         }
                         break;
                     case 'buttonconfig':
                         updateButtonStyles(value);
-                        // Nach Button-Config-Update, re-render Variables wenn nötig
+                        // 🚀 BATCH: Markiere für Re-Render statt sofort zu rendern
                         if (window.lastVariablesData) {
-                            renderVariables(window.lastVariablesData);
+                            needsRerender = true;
                         }
                         break;
                     case 'assets':
@@ -686,13 +1041,13 @@
                     case 'groupnames':
                         // Speichere Gruppennamen für Frontend-Verwendung
                         window.groupNames = value;
-                        // Re-render variables wenn bereits geladen, damit neue Gruppennamen angezeigt werden
+                        // 🚀 BATCH: Markiere für Re-Render statt sofort zu rendern
                         if (window.lastVariablesData) {
-                            renderVariables(window.lastVariablesData);
+                            needsRerender = true;
                         }
                         break;
                     case 'bildbreite':
-                        root.style.setProperty('--bildbreite', value + '%');
+                        root.style.setProperty('--bildbreite', value + 'px');
                         window.currentBildbreite = value;
                         updateImageVisibility();
                         break;
@@ -721,6 +1076,13 @@
                                 const targetVariableId = window.varKeyToIdMapping?.[varKey];
                                 if (targetVariableId && window.variableDataCache[targetVariableId]) {
                                     window.variableDataCache[targetVariableId].rawValue = value;
+                                    
+                                    // MINIMAL UPDATE: Nur Progress Bar updaten, nicht komplettes Re-Render
+                                    const variable = window.variableDataCache[targetVariableId];
+                                    if (variable.displayType === 'progress') {
+                                        updateProgressBarValue(targetVariableId, value);
+                                        return; // Skip full re-render für Progress Bar Updates
+                                    }
                                 }
                             }
                             
@@ -745,6 +1107,11 @@
                         }
                         break;
                 }
+            }
+
+            // BATCH-RENDERING: Nur einmal rendern am Ende der Message-Verarbeitung
+            if (needsRerender && window.lastVariablesData) {
+                renderVariables(window.lastVariablesData);
             }
         }
 
@@ -807,7 +1174,7 @@
                     // Find the corresponding association for color
                     const association = associations.find(assoc => assoc.value === associationValue);
                     const buttonColor = association?.color || 'var(--accent-color)';
-                    const opacity = isActive ? '1' : '0.7';
+                    const opacity = isActive ? '1' : '0.5';
                     
                     // Update button state
                     button.style.backgroundColor = buttonColor;
@@ -899,20 +1266,7 @@
             }
         }
         
-        // Hilfsfunktion für Text- und Progress-Display-Update
-        function updateTextDisplay(targetVariableId, variable) {
-            
-            const container = document.getElementById('variables-container');
-            if (!container) return;
-            
-            if (variable.displayType === 'progress') {
-                // Progress-Bar-Update
-                updateProgressDisplay(targetVariableId, variable);
-            } else {
-                // Text-Variable-Update
-                updateTextVariableDisplay(targetVariableId, variable);
-            }
-        }
+
         
         // Hilfsfunktion für Progress-Bar-Update
         function updateProgressDisplay(targetVariableId, variable) {
@@ -933,15 +1287,34 @@
                 const minValue = parseFloat(variable.progressMin) || 0;
                 const maxValue = parseFloat(variable.progressMax) || 100;
                 
-                // Stelle sicher, dass maxValue > minValue
-                const range = maxValue - minValue;
                 let progressPercent = 0;
-                
+                const range = maxValue - minValue;
                 if (range > 0) {
-                    progressPercent = Math.max(0, Math.min(100, ((rawValue - minValue) / range) * 100));
+                    progressPercent = ((rawValue - minValue) / range) * 100;
                 }
                 
-                progressBar.style.width = progressPercent + '%';
+                // Animation Logic: Lese aktuelle Breite und animiere zur neuen Breite
+                const currentWidth = progressBar.style.width || '0%';
+                const newWidth = progressPercent + '%';
+                
+                if (currentWidth !== newWidth) {
+                    // Entferne temporär die CSS transition
+                    progressBar.style.transition = 'none';
+                    
+                    // Setze die aktuelle Breite falls noch nicht gesetzt
+                    if (!progressBar.style.width) {
+                        progressBar.style.width = currentWidth;
+                    }
+                    
+                    // Force Reflow um sicherzustellen dass die aktuelle Breite angewendet ist
+                    progressBar.offsetWidth;
+                    
+                    // Aktiviere die CSS transition wieder
+                    progressBar.style.transition = 'width 3s ease-in-out';
+                    
+                    // Setze die neue Breite - das triggert die Animation
+                    progressBar.style.width = newWidth;
+                }
             }
             
             // Aktualisiere Progress-Text
@@ -959,7 +1332,7 @@
             if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
                 const iconClass = prepareIconForDisplay(variable.icon);
                 if (iconClass) {
-                    progressIconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                    progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`;
                 }
             }
             
@@ -970,16 +1343,16 @@
             }
             
             if (variable.showLabel && variable.label) {
-                progressTextParts.push(variable.label + ':');
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.label}:&nbsp;</span>`);
             }
             
             if (variable.showValue) {
-                progressTextParts.push(variable.formattedValue);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
             }
             
             // Falls nichts konfiguriert ist, zeige Wert als Fallback
             if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                progressTextParts.push(variable.formattedValue);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
             }
             
             const progressText = progressTextParts.join(' ');
@@ -1000,23 +1373,33 @@
                     if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
                         const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
                         if (secondIconClass) {
-                            secondVariableParts.push(`<i class="${secondIconClass}" style="margin-right: 4px;"></i>`);
+                            secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
                         }
                     }
                     
                     // Label für zweite Variable
                     if (variable.secondVariable.showLabel && variable.secondVariable.label) {
-                        secondVariableParts.push(variable.secondVariable.label + ':');
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.secondVariable.label}:&nbsp;</span>`);
                     }
                     
                     // Wert für zweite Variable
                     if (variable.secondVariable.showValue) {
-                        secondVariableParts.push(variable.secondVariable.formattedValue);
+                        let secondVariableDisplayValue;
+                        if (variable.progressbarActive === false) {
+                            // Extrahiere Suffix aus zweiter Variable
+                            const secondOriginalFormatted = variable.secondVariable.formattedValue || '';
+                            const secondSuffixMatch = secondOriginalFormatted.match(/[^0-9.,\-\s]+/);
+                            const secondSuffix = secondSuffixMatch ? secondSuffixMatch[0] : '';
+                            secondVariableDisplayValue = '0 ' + secondSuffix;
+                        } else {
+                            secondVariableDisplayValue = variable.secondVariable.formattedValue;
+                        }
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${secondVariableDisplayValue}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
                     if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
-                        secondVariableParts.push(variable.secondVariable.formattedValue);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
                     }
                     
                     if (secondVariableParts.length > 0) {
@@ -1026,38 +1409,7 @@
             }
         }
         
-        // Hilfsfunktion für Text-Variable-Update
-        function updateTextVariableDisplay(targetVariableId, variable) {
-            
-            const container = document.getElementById('variables-container');
-            if (!container) return;
-            
-            // Suche nach variable-label und variable-value Elementen
-            const variableItems = container.querySelectorAll('.variable-item');
-            
-            variableItems.forEach(item => {
-                // Prüfe ob dieses Item die gesuchte Variable enthält
-                const labelSpans = item.querySelectorAll('.variable-label');
-                const valueSpans = item.querySelectorAll('.variable-value');
-                
-                // Suche nach dem Label-Text der Variable
-                let found = false;
-                labelSpans.forEach(labelSpan => {
-                    if (labelSpan.textContent.includes(variable.label)) {
-                        found = true;
-                    }
-                });
-                
-                if (found) {
-                    // Aktualisiere die Value-Spans in diesem Item
-                    valueSpans.forEach(valueSpan => {
-                        if (valueSpan.classList.contains('variable-text')) {
-                            valueSpan.textContent = variable.formattedValue;
-                        }
-                    });
-                }
-            });
-        }
+
 
         function renderStatus(data) {
             const statusContainer = document.getElementById('status-container');
@@ -1069,7 +1421,13 @@
                 // Bestimme Status-Farbe: verwende --content-color wenn transparent, ansonsten konfigurierte Farbe
                 const statusColor = data.isStatusColorTransparent ? 'var(--content-color)' : (data.statusColor || 'var(--content-color)');
                 statusContainer.style.setProperty('--status-color', statusColor);
-                statusContainer.style.fontSize = (data.statusFontSize || 12) + 'px';
+                // Nur font-size setzen wenn nicht -1 - unterscheide zwischen -1 und undefined
+                const statusFontSize = data.statusFontSize !== undefined ? data.statusFontSize : 12;
+                if (statusFontSize !== -1) {
+                    statusContainer.style.fontSize = statusFontSize + 'px';
+                } else {
+                    statusContainer.style.fontSize = ''; // Reset to default
+                }
                 
                 let statusContent = '';
                 
@@ -1155,6 +1513,8 @@
             const container = document.getElementById('variables-container');
             if (!container) return;
             
+
+            
             // Cache die Variablen-Daten für spätere Re-Rendering
             window.cachedVariables = variables;
             
@@ -1209,8 +1569,12 @@
                         }
                         
                         // Verwende die gleiche Schriftgröße wie die erste Variable
-                        const firstVariableFontSize = groupVariables[0]?.fontSize || 14;
-                        tempDiv.style.fontSize = firstVariableFontSize + 'px';
+                        // Nur Fallback wenn fontSize undefined/null ist, nicht bei 0
+                        const firstVariableFontSize = groupVariables[0]?.fontSize !== undefined ? groupVariables[0].fontSize : 14;
+                        // Nur font-size setzen wenn nicht -1
+                        if (firstVariableFontSize !== -1) {
+                            tempDiv.style.fontSize = firstVariableFontSize + 'px';
+                        }
                         tempDiv.textContent = displayGroupName + ':';
                         
                         const width = tempDiv.offsetWidth;
@@ -1270,16 +1634,13 @@
                             if (groupMatch) {
                                 const groupNumber = parseInt(groupMatch[1]);
                                 const groupConfig = window.groupNames[groupNumber];
-                                if (groupConfig) {
-                                    displayGroupName = groupConfig.name || variable.group;
-                                    showAbove = groupConfig.showAbove || false;
-                                    showLine = groupConfig.showLine || false;
-                                    stretch = groupConfig.stretch || false;
-                                }
-
-                            } else {
-
+                                displayGroupName = (groupConfig && groupConfig.name) ? groupConfig.name : variable.group;
+                                showAbove = groupConfig.showAbove || false;
+                                showLine = groupConfig.showLine || false;
+                                stretch = groupConfig.stretch || false;
                             }
+
+                        } else {
                         }
                         
                         // Bestimme CSS-Klassen für die Gruppe
@@ -1290,26 +1651,22 @@
                             return v.displayType === 'button' && (v.variableType === 0 || v.variableType === 1 || v.variableType === 3);
                         });
                         
-                        console.log('GROUP STRETCH DEBUG:', {
-                            group: variable.group,
-                            stretch: stretch,
-                            hasButtons: hasButtons,
-                            groupCssClasses: groupCssClasses
-                        });
-                        
                         if (stretch && hasButtons) {
                             groupCssClasses += ' stretch-buttons';
-                            console.log('STRETCH CSS CLASS ADDED:', groupCssClasses);
                         }
                         
                         // Alternative Darstellung: Gruppenname über der Gruppe
                         if (shouldShowGroupName && showAbove) {
                             // Verwende konfigurierte Schriftgröße aus groupnamesize oder Fallback
                             const groupConfig = window.groupNames?.[parseInt(variable.group.match(/Gruppe (\d+)/)?.[1])];
-                            const groupNameFontSize = groupConfig?.fontSize || 16; // Fallback zu 16px
+                            // Nur Fallback wenn fontSize undefined/null ist, nicht bei 0
+                            const groupNameFontSize = groupConfig?.fontSize !== undefined ? groupConfig.fontSize : 16;
+                            
+                            // Nur font-size setzen wenn nicht -1
+                            const fontSizeStyle = groupNameFontSize !== -1 ? `font-size: ${groupNameFontSize}px;` : '';
                             
                             content += `
-                                <div class="group-name-above" style="font-weight: bold; color: var(--content-color); font-size: ${groupNameFontSize}px; margin-bottom: 0px; margin-top: 10px; text-align: left; opacity: 0.5;">
+                                <div class="group-name-above" style="font-weight: bold; color: var(--content-color); ${fontSizeStyle} margin-bottom: 0px; margin-top: 10px; text-align: left; opacity: 0.5;">
                                     ${displayGroupName}:
                                 </div>
                             `;
@@ -1328,13 +1685,17 @@
                         // Füge Gruppennamen links hinzu wenn gewünscht (nur wenn NICHT showAbove)
                         if (shouldShowGroupName && !showAbove) {
                             // Verwende die gleiche Schriftgröße wie die erste Variable der Gruppe
-                            const firstVariableFontSize = groupVariables[0]?.fontSize || 14;
+                            // Nur Fallback wenn fontSize undefined/null ist, nicht bei 0
+                            const firstVariableFontSize = groupVariables[0]?.fontSize !== undefined ? groupVariables[0].fontSize : 14;
+                            
+                            // Nur font-size setzen wenn nicht -1
+                            const labelFontSizeStyle = firstVariableFontSize !== -1 ? `font-size: ${firstVariableFontSize}px;` : '';
                             
                             // Verwende feste Breite für einheitliches Alignment aller Gruppen
                             const groupNameWidth = maxGroupNameWidth > 0 ? maxGroupNameWidth + 'px' : 'auto';
                             
                             content += `
-                                <div class="group-name-label" style="font-weight: bold; color: var(--content-color); font-size: ${firstVariableFontSize}px; white-space: nowrap; align-self: center; margin-right: 8px; width: ${groupNameWidth}; display: inline-block; text-align: left;">
+                                <div class="group-name-label" style="font-weight: bold; color: var(--content-color); ${labelFontSizeStyle} white-space: nowrap; align-self: center; margin-right: 8px; width: ${groupNameWidth}; display: inline-block; text-align: left;">
                                     ${displayGroupName}:
                                 </div>
                             `;
@@ -1376,6 +1737,11 @@
             updateImageVisibility();
             
             container.innerHTML = content;
+            
+            // Trigger Progress-Bar-Animation nach DOM-Update
+            setTimeout(() => {
+                animateProgressBars();
+            }, 10); // Kurzer Delay um sicherzustellen dass DOM aktualisiert ist
         }
         
         // Hilfsfunktion zum Rendern einer einzelnen Variable
@@ -1387,17 +1753,21 @@
             
             // Wrapper-Stil je nach Kontext - Progress-Balken unterstützen jetzt auch Gruppen
             let wrapperStyle;
+            
+            // Nur font-size setzen wenn nicht -1
+            const fontSizeStyle = variable.fontSize !== -1 ? `font-size: ${variable.fontSize}px;` : '';
+            
             if (isGrouped) {
                 if (isProgressBar) {
                     // Progress-Balken in Gruppen: Inline-flex damit sie nebeneinander passen, aber mit voller verfügbarer Breite
-                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0 2px 0 0; font-size: ${variable.fontSize}px; color: ${getTextColor(variable)}; flex: none;`;
+                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0 2px 0 0; ${fontSizeStyle} color: ${getTextColor(variable)}; flex: none;`;
                 } else {
                     // Text/Button-Variablen in Gruppen: Wie bisher
-                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0; white-space: nowrap; font-size: ${variable.fontSize}px; color: ${getTextColor(variable)};`;
+                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0; white-space: nowrap; ${fontSizeStyle} color: ${getTextColor(variable)};`;
                 }
             } else {
                 // Ungrouped: Standard-Layout
-                wrapperStyle = `font-size: ${variable.fontSize}px; color: ${getTextColor(variable)};`;
+                wrapperStyle = `${fontSizeStyle} color: ${getTextColor(variable)};`;
             }
                 
             // CSS-Klassen für Variable zusammenstellen
@@ -1438,13 +1808,17 @@
                         const minValue = parseFloat(variable.progressMin) || 0;
                         const maxValue = parseFloat(variable.progressMax) || 100;
                         
-                        // Stelle sicher, dass maxValue > minValue
                         const range = maxValue - minValue;
                         progressValue = 0;
-                        
                         if (range > 0) {
                             progressValue = Math.max(0, Math.min(100, ((rawValue - minValue) / range) * 100));
                         }
+                        
+                        // Verhindere NaN-Werte
+                        if (isNaN(progressValue)) {
+                            progressValue = 0;
+                        }
+                        
                         displayValue = variable.formattedValue;
                     }
                     
@@ -1480,7 +1854,7 @@
                         progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${displayValue}</span>`);
                     }
                     
-                    const progressText = progressTextParts.join('');
+                    const progressText = progressTextParts.join(' ');
                     
                     // Zweite Variable für rechte Seite vorbereiten
                     let secondVariableText = '';
@@ -1529,10 +1903,50 @@
                     // Berechne individuelles Padding basierend auf Variable-Textgröße
                     const individualPadding = Math.max(4, Math.round(variable.fontSize / 2)); // Minimum 4px
                     
+                    // ANIMATION FIX: Verwende ALTE Breite für DOM, nicht neue!
+                    let widthForDOM = progressValue; // Default: neuer Wert
+                    
+                    // Prüfe ob bereits eine alte Breite gespeichert ist
+                    if (window.previousProgressWidths && window.previousProgressWidths[variable.id] !== undefined) {
+                        const oldWidth = window.previousProgressWidths[variable.id];
+                        
+                        // ANIMATION VOR UPDATE: Prüfe ob Animation nötig ist
+                        if (Math.abs(progressValue - oldWidth) > 0.1) {
+                            // Mark for animation - no DOM update yet!
+                            needsAnimation = true;
+                            animationTargetWidth = progressValue;
+                            widthForDOM = oldWidth; // Keep old width in DOM to enable animation
+                            
+                            // Store animation info for later triggering
+                            if (!window.pendingProgressAnimations) {
+                                window.pendingProgressAnimations = new Map();
+                            }
+                            window.pendingProgressAnimations.set(variable.id, {
+                                from: oldWidth,
+                                to: progressValue
+                            });
+                        } else {
+                            // Keine Animation nötig - DOM kann direkt aktualisiert werden
+                            widthForDOM = progressValue;
+                        }
+                        
+                        // Erste Render: Speichere den Wert direkt
+                        if (!window.previousProgressWidths) {
+                            window.previousProgressWidths = {};
+                        }
+                        window.previousProgressWidths[variable.id] = progressValue;
+                    } else {
+                        // Erste Render: Speichere den Wert direkt
+                        if (!window.previousProgressWidths) {
+                            window.previousProgressWidths = {};
+                        }
+                        window.previousProgressWidths[variable.id] = progressValue;
+                    }
+                    
                     content += `
                         <div class="variable-progress">
-                            <div class="progress-container" data-variable-id="${variable.id}" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; --progress-bar-text-padding: ${individualPadding}px;">
-                                <div class="progress-bar" style="width: ${progressValue}%;"></div>
+                            <div class="progress-container" data-variable-id="${variable.id}" data-new-width="${progressValue}" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; --progress-bar-text-padding: ${individualPadding}px;">
+                                <div class="progress-bar" style="width: ${widthForDOM}%;"></div>
                                 <div class="progress-text">
                                     <span class="progress-main-text">${progressText}</span>
                                     ${secondVariableText}
@@ -1574,9 +1988,8 @@
                                 associationName = currentAssociation.name;
 
                             }
-                        }
-                        
-                        const opacity = isActive ? '1' : '0.7';
+                        }                
+                        const opacity = isActive ? '1' : '0.5';
                         const buttonWidth = variable.buttonWidth || 120;
                         
                         // Prüfe ob die aktuelle Gruppe im stretch-Modus ist
@@ -1641,12 +2054,6 @@
                         
                         // Button-Styles: Bool-Button soll IMMER seine buttonWidth verwenden
                         let buttonStyleExtras = `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`;
-                        console.log('BOOL BUTTON STYLES:', {
-                            variableId: variable.id,
-                            isGroupStretched: isGroupStretched,
-                            buttonWidth: buttonWidth,
-                            buttonStyleExtras: buttonStyleExtras
-                        });
                         
                         content += `
                             <div class="variable-button-container">
@@ -1673,7 +2080,7 @@
                         associations.forEach((association, index) => {
                             const isActive = currentValue === association.value;
                             const buttonColor = association.color || 'var(--accent-color)';
-                            const opacity = isActive ? '1' : '0.7';
+                            const opacity = isActive ? '1' : '0.5';
                             
                             // Button-Gruppierung: Bestimme CSS-Klasse basierend auf Position
                             let positionClass = '';
@@ -1735,7 +2142,7 @@
                         variable.stringAssociations.forEach((association, index) => {
                             const isActive = currentValue === String(association.value);
                             const buttonColor = association.color || 'var(--accent-color)';
-                            const opacity = isActive ? '1' : '0.7';
+                            const opacity = isActive ? '1' : '0.5';
                             
                             // Button-Gruppierung: Bestimme CSS-Klasse basierend auf Position
                             let positionClass = '';
@@ -1845,6 +2252,147 @@
                 content += `</div>`; // Schließe variable-item div
                 
             return content;
+        }
+        
+        // Mini-Update-Funktion für Button-Variablen
+        function updateButtonValue(variableId, variable) {
+            const buttonElement = document.querySelector(`[data-variable-id="${variableId}"]`);
+            if (!buttonElement) {
+                return;
+            }
+            
+            // Aktualisiere Button mit neuen Variablen-Daten
+            updateButtonDisplay(buttonElement, variable);
+        }
+        
+        // Mini-Update-Funktion für Text-Variablen
+        function updateTextValue(variableId, variable) {
+            // Text-Variablen haben keinen speziellen Update-Prozess, da sie nur Text anzeigen
+            // Der Wert wird automatisch aus dem Cache gelesen beim nächsten Render
+        }
+        
+        // Cache-Update-Funktion mit korrekter Datenstruktur
+        function updateVariableCache(newVariables) {
+            if (!window.variableDataCache) {
+                window.variableDataCache = {};
+            }
+            
+            // Konvertiere Array-basierte Daten zu ID-basiertem Cache
+            for (const arrayIndex in newVariables) {
+                const variable = newVariables[arrayIndex];
+                const variableId = variable?.variableId || variable?.id;
+                
+                if (variableId) {
+                    window.variableDataCache[variableId] = variable;
+                }
+            }
+        }
+
+        // Funktion zum Animieren aller Progress Bars nach Re-Renders
+        function updateProgressBarValue(variableId, newValue) {
+            const progressBar = document.querySelector(`[data-variable-id="${variableId}"] .progress-bar`);
+            const valueSpan = document.querySelector(`[data-variable-id="${variableId}"] .progress-text .variable-value`);
+            
+            if (!progressBar || !valueSpan) {
+                return;
+            }
+            
+            // Hole Variable-Konfiguration aus Cache
+            const variableConfig = window.variableDataCache?.[variableId];
+            if (!variableConfig) {
+                return;
+            }
+            
+            // Berechne alte und neue Breite
+            const minValue = parseFloat(variableConfig.minValue) || 0;
+            const maxValue = parseFloat(variableConfig.maxValue) || 100;
+            const oldValue = parseFloat(progressBar.dataset.oldValue || variableConfig.rawValue || 0);
+            const oldWidth = Math.max(0, Math.min(100, ((oldValue - minValue) / (maxValue - minValue)) * 100));
+            const newWidth = Math.max(0, Math.min(100, ((newValue - minValue) / (maxValue - minValue)) * 100));
+            
+
+            
+            // 1. UPDATE VALUE SPAN (sofort)
+            valueSpan.textContent = newValue;
+            
+            // 2. ANIMATE PROGRESS BAR WIDTH (nur wenn sich Wert geändert hat)
+            if (Math.abs(oldWidth - newWidth) > 0.1) {
+                // Setze Bar auf alte Breite
+                progressBar.style.width = oldWidth + '%';
+                progressBar.style.transition = 'none';
+                
+                // Force Reflow
+                progressBar.offsetHeight;
+                
+                // Starte Animation (nur width, keine visuellen Effekte)
+                progressBar.style.transition = 'width 0.5s ease';
+                progressBar.style.width = newWidth + '%';
+                
+                setTimeout(() => {
+                    progressBar.style.width = `${newWidth}%`;
+                    progressBar.dataset.oldValue = newValue;
+                }, 500);
+            }
+            
+            // Speichere neuen Wert für nächste Animation
+            progressBar.dataset.oldValue = newValue;
+        }
+
+        function animateProgressBars() {
+            const progressBars = document.querySelectorAll('.progress-bar');
+            
+            // Initialisiere Storage für vorherige Breiten falls nicht vorhanden
+            if (!window.previousProgressWidths) {
+                window.previousProgressWidths = {};
+            }
+            
+            progressBars.forEach((progressBar, index) => {
+                // Finde die Variable ID über das Parent-Element
+                const progressContainer = progressBar.closest('.progress-container');
+                if (!progressContainer) {
+                    return;
+                }
+                
+                const variableId = progressContainer.getAttribute('data-variable-id');
+                if (!variableId) {
+                    return;
+                }
+                
+                // NEUE Breite aus data-new-width Attribut lesen (nicht aus DOM Style!)
+                const newWidthFromData = parseFloat(progressContainer.getAttribute('data-new-width')) || 0;
+                
+                // ALTE Breite ist die aktuelle DOM-Breite (wurde von Render-Fix gesetzt)
+                const oldWidthStyle = progressBar.style.width;
+                const oldWidth = parseFloat(oldWidthStyle) || 0;
+                
+
+                
+                // Nur animieren wenn sich die Breite geändert hat
+                if (Math.abs(oldWidth - newWidthFromData) > 0.1) {
+                    
+                    // DOM ist bereits auf alte Breite gesetzt - KEINE Änderung nötig!
+                    // (Der Render-Fix hat das bereits gemacht)
+                    
+                    // Force Reflow
+                    progressBar.offsetWidth;
+                    
+                    // Minimaler Browser-Delay (1ms) für Timing
+                    setTimeout(() => {
+                        // Kurze Animation zur neuen Breite (keine visuellen Effekte)
+                        progressBar.style.transition = 'width 0.5s ease';
+                        progressBar.style.width = newWidthFromData + '%';
+                        
+                        setTimeout(() => {
+                            progressBar.style.transition = '';
+                        }, 500);
+                    }, 1); // Nur 1ms - Browser-Timing ohne sichtbare Verzögerung
+                }
+                
+                // Speichere NEUE Breite für nächstes Mal
+                window.previousProgressWidths[variableId] = newWidthFromData;
+            });
+            
+
         }
 
     </script>

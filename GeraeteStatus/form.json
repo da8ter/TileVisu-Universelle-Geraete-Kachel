@@ -53,17 +53,61 @@
             {
               "type": "NumberSpinner",
               "name": "BildBreite",
-              "caption": "Image width:",
+              "caption": "Image width",
               "digits": 0,
-              "minimum": 0.0,
-              "maximum": 50.0,
-              "suffix": "%",
+              "minimum": 0,
+              "maximum": 2000,
+              "suffix": "px",
               "width": "150px"
             },
             {
+              "type": "Select",
+              "name": "BildPosition",
+              "caption": "Image position",
+              "width": "150px",
+              "options": [
+                {
+                  "caption": "Links",
+                  "value": "left"
+                },
+                {
+                  "caption": "Oben",
+                  "value": "top"
+                },
+                {
+                  "caption": "Unten",
+                  "value": "bottom"
+                },
+                {
+                  "caption": "Rechts",
+                  "value": "right"
+                }
+              ]
+            },
+            {
+              "type": "Select",
+              "name": "ImageAlignment",
+              "caption": "Alignment",
+              "width": "150px",
+              "options": [
+                {
+                  "caption": "Links",
+                  "value": "left"
+                },
+                {
+                  "caption": "Mitte",
+                  "value": "center"
+                },
+                {
+                  "caption": "Rechts",
+                  "value": "right"
+                }
+              ]
+            },
+            {
               "type": "CheckBox",
-              "name": "DebugEnabled",
-              "caption": "Enable debug logging"
+              "name": "ShowBorderLine",
+              "caption": "Show border line"
             }
           ]
         }
@@ -92,8 +136,8 @@
               "type": "NumberSpinner",
               "name": "StatusFontSize",
               "caption": "Font size",
-              "minimum": 8,
-              "maximum": 24,
+              "minimum": -1,
+              "maximum": 100,
               "suffix": "px"
             }
           ]
@@ -489,12 +533,12 @@
               "name": "FontSize",
               "width": "80px",
               "save": true,
-              "add": 14,
+              "add": -1,
               "visible": false,
               "edit": {
                 "type": "NumberSpinner",
-                "minimum": 8,
-                "maximum": 50,
+                "minimum": -1,
+                "maximum": 100,
                 "suffix": "px"
               }
             },
@@ -760,11 +804,11 @@
                   "caption": "Font Size",
                   "name": "FontSize",
                   "type": "NumberSpinner",
-                  "minimum": 8,
+                  "minimum": -1,
                   "maximum": 50,
                   "suffix": "px",
                   "save": true,
-                  "add": 14,
+                  "add": -1,
                   "visible": true
                 },
                 {
@@ -918,7 +962,7 @@
           "name": "GroupNameSize",
           "caption": "Group Name Size",
           "width": "300px",
-          "minimum": 5,
+          "minimum": -1,
           "maximum": 100,
           "suffix": "px"
         },
