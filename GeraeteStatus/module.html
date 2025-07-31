@@ -810,38 +810,34 @@
                         if (window.currentImageAlignment) {
                             console.log('🔄 RE-APPLYING persistent alignment after renderStatus:', window.currentImageAlignment);
                             const div1Restore = document.querySelector('.main_container .div1');
+                            const imgRestore = document.querySelector('.main_container .div1 img');
                             const mainContainerRestore = document.querySelector('.main_container');
-                            if (div1Restore && mainContainerRestore) {
+                            
+                            if (div1Restore && imgRestore && mainContainerRestore) {
                                 // Prüfe ob Bildposition oben oder unten ist
                                 const isVerticalPositionRestore = mainContainerRestore.classList.contains('image-top') || mainContainerRestore.classList.contains('image-bottom');
                                 
                                 if (isVerticalPositionRestore) {
-                                    // Verwende direktes JavaScript-Styling für Persistenz
-                                    let justifyContentValue;
-                                    let debugBorder;
+                                    // Entferne Debug-Borders und verwende margin-basierte Ausrichtung
+                                    div1Restore.style.border = '';
+                                    imgRestore.style.border = '';
                                     
+                                    // Margin-basierte Ausrichtung (wie im Haupt-Code)
                                     switch (window.currentImageAlignment) {
                                         case 'left':
-                                            justifyContentValue = 'flex-start';
-                                            debugBorder = '10px solid red';
+                                            imgRestore.style.margin = '0 auto 0 0';
                                             break;
                                         case 'center':
-                                            justifyContentValue = 'center';
-                                            debugBorder = '10px solid blue';
+                                            imgRestore.style.margin = '0 auto';
                                             break;
                                         case 'right':
-                                            justifyContentValue = 'flex-end';
-                                            debugBorder = '10px solid green';
+                                            imgRestore.style.margin = '0 0 0 auto';
                                             break;
                                         default:
-                                            justifyContentValue = 'center';
-                                            debugBorder = '10px solid gray';
+                                            imgRestore.style.margin = '0 auto';
                                     }
                                     
-                                    div1Restore.style.justifyContent = justifyContentValue;
-                                    div1Restore.style.border = debugBorder;
-                                    
-                                    console.log('✨ PERSISTENT DIRECT STYLING restored:', window.currentImageAlignment, justifyContentValue);
+                                    console.log('✨ PERSISTENT ALIGNMENT restored:', window.currentImageAlignment);
                                 }
                             }
                         }
