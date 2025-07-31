@@ -57,12 +57,11 @@
         }
 
         .div1 {
-            width: var(--bildbreite);
             min-width: var(--bildbreite);
             max-width: var(--bildbreite);
             box-sizing: border-box;
             border-right: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
-            padding-right: 10px;
+            padding-right: 20px;
         }
 
         .div1 img {
@@ -153,36 +152,7 @@
             border: none !important;
         }
         
-        /* Horizontale Bildausrichtung mit Flexbox für vertikale Positionen - MAXIMALE SPEZIFITÄT */
-        body .main_container.main_container.image-top.image-top .div1.div1.align-left.align-left {
-            justify-content: flex-start !important; /* Links */
-            border: 10px solid red !important; /* DEBUG: Links = Rot */
-        }
-        
-        body .main_container.main_container.image-top.image-top .div1.div1.align-center.align-center {
-            justify-content: center !important; /* Mitte */
-            border: 10px solid blue !important; /* DEBUG: Mitte = Blau */
-        }
-        
-        body .main_container.main_container.image-top.image-top .div1.div1.align-right.align-right {
-            justify-content: flex-end !important; /* Rechts */
-            border: 10px solid green !important; /* DEBUG: Rechts = Grün */
-        }
-        
-        body .main_container.main_container.image-bottom.image-bottom .div1.div1.align-left.align-left {
-            justify-content: flex-start !important; /* Links */
-            border: 10px solid red !important; /* DEBUG: Links = Rot */
-        }
-        
-        body .main_container.main_container.image-bottom.image-bottom .div1.div1.align-center.align-center {
-            justify-content: center !important; /* Mitte */
-            border: 10px solid blue !important; /* DEBUG: Mitte = Blau */
-        }
-        
-        body .main_container.main_container.image-bottom.image-bottom .div1.div1.align-right.align-right {
-            justify-content: flex-end !important; /* Rechts */
-            border: 10px solid green !important; /* DEBUG: Rechts = Grün */
-        }
+        /* Bildausrichtung wird jetzt via JavaScript gesteuert - CSS-Debug-Borders entfernt */
         
 
 
@@ -799,34 +769,11 @@
                             const isVerticalPosition = alignmentContainer.classList.contains('image-top') || alignmentContainer.classList.contains('image-bottom');
                             
                             if (isVerticalPosition) {
-                                // STRATEGIE 1: Container mit Flexbox ausrichten
-                                let justifyContentValue;
-                                let debugBorderContainer;
-                                let debugBorderImg;
+                                // DIREKTES BILD-ALIGNMENT mit Margins - OHNE DEBUG BORDERS
                                 
-                                switch (value) {
-                                    case 'left':
-                                        justifyContentValue = 'flex-start';
-                                        debugBorderContainer = '5px solid red';
-                                        debugBorderImg = '5px solid darkred';
-                                        break;
-                                    case 'center':
-                                        justifyContentValue = 'center';
-                                        debugBorderContainer = '5px solid blue';
-                                        debugBorderImg = '5px solid darkblue';
-                                        break;
-                                    case 'right':
-                                        justifyContentValue = 'flex-end';
-                                        debugBorderContainer = '5px solid green';
-                                        debugBorderImg = '5px solid darkgreen';
-                                        break;
-                                    default:
-                                        justifyContentValue = 'center';
-                                        debugBorderContainer = '5px solid gray';
-                                        debugBorderImg = '5px solid darkgray';
-                                }
-                                
-                                // DIREKTES BILD-ALIGNMENT mit Margins
+                                // Entferne alle Debug-Borders von vorherigen Sessions
+                                div1.style.border = '';
+                                imgElement.style.border = '';
                                 imgElement.style.display = 'block';
                                 
                                 // Margin-basierte Ausrichtung
