@@ -68,18 +68,18 @@ class UniversalDeviceTile extends IPSModule
         $this->RegisterPropertyInteger('ElementSpacing', 5); // Standardwert für Element-Abstand
         
          
-        // Benutzerdefinierte Gruppennamen (Groups 1-10)
+        // Benutzerdefinierte Gruppennamen (Groups 1-10) mit expliziten Checkbox-Defaults
         $defaultGroupNames = json_encode([
-            ['Group' => 1, 'GroupName' => 'Group 1'],
-            ['Group' => 2, 'GroupName' => 'Group 2'],
-            ['Group' => 3, 'GroupName' => 'Group 3'],
-            ['Group' => 4, 'GroupName' => 'Group 4'],
-            ['Group' => 5, 'GroupName' => 'Group 5'],
-            ['Group' => 6, 'GroupName' => 'Group 6'],
-            ['Group' => 7, 'GroupName' => 'Group 7'],
-            ['Group' => 8, 'GroupName' => 'Group 8'],
-            ['Group' => 9, 'GroupName' => 'Group 9'],
-            ['Group' => 10, 'GroupName' => 'Group 10']
+            ['Group' => 1, 'GroupName' => 'Group 1', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false],
+            ['Group' => 2, 'GroupName' => 'Group 2', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false],
+            ['Group' => 3, 'GroupName' => 'Group 3', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false],
+            ['Group' => 4, 'GroupName' => 'Group 4', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false],
+            ['Group' => 5, 'GroupName' => 'Group 5', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false],
+            ['Group' => 6, 'GroupName' => 'Group 6', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false],
+            ['Group' => 7, 'GroupName' => 'Group 7', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false],
+            ['Group' => 8, 'GroupName' => 'Group 8', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false],
+            ['Group' => 9, 'GroupName' => 'Group 9', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false],
+            ['Group' => 10, 'GroupName' => 'Group 10', 'ShowGroupName' => false, 'ShowAbove' => false, 'line' => false, 'stretch' => false]
         ]);
         $this->RegisterPropertyString('GroupNamesList', $defaultGroupNames);
 
