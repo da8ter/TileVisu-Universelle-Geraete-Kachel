@@ -150,7 +150,6 @@
             border: none !important;
         }
         
-        /* Bildausrichtung wird jetzt via JavaScript gesteuert - CSS-Debug-Borders entfernt */
         
 
 
@@ -551,9 +550,6 @@
     </style>
 
     <script>
-        // Globale Debug-Steuerung für Frontend
-        let debugEnabled = false; // Wird über handleMessage gesetzt
-        
 
         
         // Icons werden direkt vom Server gemappt, wir müssen nur noch die richtigen CSS-Klassen hinzufügen
@@ -631,10 +627,11 @@
             const hideImageColumn = window.hideImageColumn || false;
             const currentImageIsNone = (bildauswahl === 'none');
             
+            
             // Hide ENTIRE COLUMN only when: ALL associations "none" OR bildbreite = 0
             const shouldHideColumn = (
                 hideImageColumn ||           // All associations are "none"
-                bildbreite === 0 || bildbreite === '0'  // Image width is 0
+                bildbreite === 0 || bildbreite === '0'   // Image width is 0
             );
             
             // Hide just IMAGE (keep column) when: current status is "none"
@@ -754,7 +751,6 @@
                         break;
                     case 'imagealignment':
                         // Speichere Alignment global und wende sofort an
-                        console.log('💾 STORING alignment globally:', value);
                         window.currentImageAlignment = value;
                         
                         // Wende Alignment sofort an - DIREKTES IMG-ELEMENT STYLING
@@ -767,9 +763,7 @@
                             const isVerticalPosition = alignmentContainer.classList.contains('image-top') || alignmentContainer.classList.contains('image-bottom');
                             
                             if (isVerticalPosition) {
-                                // DIREKTES BILD-ALIGNMENT mit Margins - OHNE DEBUG BORDERS
-                                
-                                // Entferne alle Debug-Borders von vorherigen Sessions
+
                                 div1.style.border = '';
                                 imgElement.style.border = '';
                                 imgElement.style.display = 'block';
@@ -789,9 +783,9 @@
                                         imgElement.style.margin = '0 auto';      // Standard: Mitte
                                 }
                                 
-                                console.log('✨ Image alignment applied:', value);
+                                // Image alignment applied
                             } else {
-                                console.log('⚠️ Alignment ignored - only works with image-top/image-bottom positions');
+                                // Alignment only works with image-top/image-bottom positions
                             }
                         }
                         break;
@@ -818,7 +812,6 @@
                                 const isVerticalPositionRestore = mainContainerRestore.classList.contains('image-top') || mainContainerRestore.classList.contains('image-bottom');
                                 
                                 if (isVerticalPositionRestore) {
-                                    // Entferne Debug-Borders und verwende margin-basierte Ausrichtung
                                     div1Restore.style.border = '';
                                     imgRestore.style.border = '';
                                     
@@ -1207,7 +1200,20 @@
             }
         }
         
-
+        // CRITICAL: Berechnet Progress-Balken Prozentwert basierend auf Min/Max-Werten
+        function calculateProgressValue(rawValue, progressMin, progressMax) {
+            const minValue = parseFloat(progressMin) || 0;
+            const maxValue = parseFloat(progressMax) || 100;
+            const currentValue = parseFloat(rawValue) || 0;
+            
+            const range = maxValue - minValue;
+            if (range <= 0) {
+                return 0;
+            }
+            
+            const progressValue = Math.max(0, Math.min(100, ((currentValue - minValue) / range) * 100));
+            return isNaN(progressValue) ? 0 : progressValue;
+        }
         
         // Hilfsfunktion für Progress-Bar-Update
         function updateProgressDisplay(targetVariableId, variable) {
@@ -1323,19 +1329,9 @@
                         secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.secondVariable.label}:&nbsp;</span>`);
                     }
                     
-                    // Wert für zweite Variable
+                    // Wert für zweite Variable (Backend-Wert direkt verwenden)
                     if (variable.secondVariable.showValue) {
-                        let secondVariableDisplayValue;
-                        if (variable.progressbarActive === false) {
-                            // Extrahiere Suffix aus zweiter Variable
-                            const secondOriginalFormatted = variable.secondVariable.formattedValue || '';
-                            const secondSuffixMatch = secondOriginalFormatted.match(/[^0-9.,\-\s]+/);
-                            const secondSuffix = secondSuffixMatch ? secondSuffixMatch[0] : '';
-                            secondVariableDisplayValue = '0 ' + secondSuffix;
-                        } else {
-                            secondVariableDisplayValue = variable.secondVariable.formattedValue;
-                        }
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${secondVariableDisplayValue}</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
@@ -1488,16 +1484,20 @@
                 Object.keys(groupedVariables).forEach(groupKey => {
                     const groupVariables = groupedVariables[groupKey];
                     
-                    // Prüfe ShowGroupName aus Gruppenkonfiguration statt aus Variablen
+                    // Prüfe ShowGroupName und ShowAbove aus Gruppenkonfiguration
                     let shouldShowGroupName = false;
+                    let showAbove = false;
                     const groupMatch = groupKey.match(/Gruppe (\d+)/);
                     if (groupMatch && window.groupNames) {
                         const groupNumber = parseInt(groupMatch[1]);
                         const groupConfig = window.groupNames[groupNumber];
                         shouldShowGroupName = groupConfig && groupConfig.showGroupName === true;
+                        showAbove = groupConfig && groupConfig.showAbove === true;
                     }
                     
-                    if (shouldShowGroupName) {
+                    // Nur Gruppennamen berechnen, die LINKS angezeigt werden (nicht showAbove)
+                    // Gruppennamen mit showAbove=true brauchen keinen horizontalen Platz
+                    if (shouldShowGroupName && !showAbove) {
                         // Bestimme Anzeigenamen
                         let displayGroupName = groupKey;
                         const groupMatch = groupKey.match(/Gruppe (\d+)/);
@@ -1728,39 +1728,14 @@
 
                 // Wert je nach Darstellungstyp hinzufügen
                 if (variable.displayType === 'progress') {
-                    // Fortschrittsbalken - nutze zentrale Konfiguration
-                    // Prüfe Progressbar Active Status - wenn inaktiv, überschreibe mit 0-Werten
-                    let rawValue, progressValue, displayValue;
+                    // Fortschrittsbalken - nutze Backend-Werte (Backend behandelt bereits Deaktivierung)
+                    let rawValue = variable.rawValue;
+                    let progressValue = calculateProgressValue(rawValue, variable.progressMin, variable.progressMax);
+                    let displayValue = variable.formattedValue;
                     
-                    if (variable.progressbarActive === false) {
-                        // Progressbar inaktiv - zeige 0-Werte und verhindere Updates
-                        rawValue = 0;
+                    // Verhindere NaN-Werte
+                    if (isNaN(progressValue)) {
                         progressValue = 0;
-                        
-                        // Extrahiere Suffix aus ursprünglichem formatiertem Wert
-                        const originalFormatted = variable.formattedValue || '';
-                        const suffixMatch = originalFormatted.match(/[^0-9.,\-\s]+/);
-                        const suffix = suffixMatch ? suffixMatch[0] : '';
-                        
-                        displayValue = '0 ' + suffix;
-                    } else {
-                        // Progressbar aktiv - normale Berechnung
-                        rawValue = parseFloat(variable.rawValue) || 0;
-                        const minValue = parseFloat(variable.progressMin) || 0;
-                        const maxValue = parseFloat(variable.progressMax) || 100;
-                        
-                        const range = maxValue - minValue;
-                        progressValue = 0;
-                        if (range > 0) {
-                            progressValue = Math.max(0, Math.min(100, ((rawValue - minValue) / range) * 100));
-                        }
-                        
-                        // Verhindere NaN-Werte
-                        if (isNaN(progressValue)) {
-                            progressValue = 0;
-                        }
-                        
-                        displayValue = variable.formattedValue;
                     }
                     
                     // Berechne Prozentsatz basierend auf Min/Max-Werten
@@ -1815,19 +1790,9 @@
                             secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.secondVariable.label}:&nbsp;</span>`);
                         }
                         
-                        // Wert für zweite Variable
+                        // Wert für zweite Variable (Backend-Wert direkt verwenden)
                         if (variable.secondVariable.showValue) {
-                            let secondVariableDisplayValue;
-                            if (variable.progressbarActive === false) {
-                                // Extrahiere Suffix aus zweiter Variable
-                                const secondOriginalFormatted = variable.secondVariable.formattedValue || '';
-                                const secondSuffixMatch = secondOriginalFormatted.match(/[^0-9.,\-\s]+/);
-                                const secondSuffix = secondSuffixMatch ? secondSuffixMatch[0] : '';
-                                secondVariableDisplayValue = '0 ' + secondSuffix;
-                            } else {
-                                secondVariableDisplayValue = variable.secondVariable.formattedValue;
-                            }
-                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${secondVariableDisplayValue}</span>`);
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
                         }
                         
                         // Falls nichts konfiguriert ist, zeige Wert als Fallback

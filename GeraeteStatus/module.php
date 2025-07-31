@@ -507,33 +507,10 @@ class UniversalDeviceTile extends IPSModule
         if ($statusId > 0 && $SenderID === $statusId) {
             switch ($Message) {
             case VM_UPDATE:
-            $updateData = [
-                'status' => GetValueFormatted($statusId),
-                'statusValue' => GetValue($statusId),
-                'statusFontSize' => $this->ReadPropertyInteger('StatusFontSize'),
-                'statusShowIcon' => $this->ReadPropertyBoolean('StatusShowIcon'),
-                'statusShowLabel' => $this->ReadPropertyBoolean('StatusShowLabel'),
-                'statusShowValue' => $this->ReadPropertyBoolean('StatusShowValue'),
-                'statusLabel' => $this->ReadPropertyString('StatusLabel'),
-                'statusIcon' => $this->GetIcon($statusId)
-            ];
-            
-            // Verwende Profilassoziationen für Status-Update
-            $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-            if (is_array($profilAssoziationen)) {
-                $currentValue = GetValue($statusId);
-                foreach ($profilAssoziationen as $assoziation) {
-                    if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentValue) {
-                        $updateData['statusBildauswahl'] = $assoziation['Bildauswahl'] ?? 'wm_aus';
-                        $statusColor = $assoziation['StatusColor'] ?? -1;
-                        $updateData['statusColor'] = isset($assoziation['StatusColor']) ? '#' . sprintf('%06X', $assoziation['StatusColor']) : '#000000';
-                        $updateData['isStatusColorTransparent'] = isset($assoziation['StatusColor']) && ($assoziation['StatusColor'] == -1 || $assoziation['StatusColor'] == 16777215);
-                        break;
-                    }
-                }
-            }
-            
-            $this->UpdateVisualizationValue(json_encode($updateData));
+                // Status-Änderung: Vollständige Nachricht mit abgefangenen Progress-Werten senden  
+                $fullMessage = $this->GetFullUpdateMessage();
+                $interceptedMessage = $this->InterceptProgressValuesIfNeeded($fullMessage);
+                $this->UpdateVisualizationValue($interceptedMessage);
                     break;
             }
         }
@@ -547,10 +524,10 @@ class UniversalDeviceTile extends IPSModule
             if (isset($variable['Variable']) && $SenderID === $variable['Variable']) {
                 switch ($Message) {
                     case VM_UPDATE:
-                        
-                        
-                        // Sende vollständige Update-Nachricht für diese Variable
-                        $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
+                        // Variable-Änderung: Vollständige Nachricht mit abgefangenen Progress-Werten senden
+                        $fullMessage = $this->GetFullUpdateMessage();
+                        $interceptedMessage = $this->InterceptProgressValuesIfNeeded($fullMessage);
+                        $this->UpdateVisualizationValue($interceptedMessage);
                         break;
                 }
             }
@@ -558,10 +535,10 @@ class UniversalDeviceTile extends IPSModule
             elseif (isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable']) {
                 switch ($Message) {
                     case VM_UPDATE:
-                        
-                        
-                        // Sende vollständige Update-Nachricht für diese Variable (enthält auch SecondVariable-Daten)
-                        $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
+                        // SecondVariable-Änderung: Vollständige Nachricht mit abgefangenen Progress-Werten senden
+                        $fullMessage = $this->GetFullUpdateMessage();
+                        $interceptedMessage = $this->InterceptProgressValuesIfNeeded($fullMessage);
+                        $this->UpdateVisualizationValue($interceptedMessage);
                         break;
                 }
             }
@@ -804,19 +781,7 @@ class UniversalDeviceTile extends IPSModule
     private function GetFullUpdateMessage() {
         $result = [];
         
-        // DIREKTER TEST: Ist Variable 11998 konfiguriert?
-        $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
-        $found11998 = false;
-        if (is_array($variablesList)) {
-            foreach ($variablesList as $index => $variable) {
-                if (isset($variable['Variable']) && $variable['Variable'] == 11998) {
-                    $found11998 = true;
-                    break;
-                }
-            }
-        }
-
-        
+       
         
 
         // Status-Daten (werden immer oben angezeigt)
@@ -840,7 +805,7 @@ class UniversalDeviceTile extends IPSModule
             $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
             $statusBildauswahlSet = false; // Flag to track if statusBildauswahl was set
             
-            // NEW: Check if ALL associations have Bildauswahl = "none" to hide image column completely
+            // Check if ALL associations have Bildauswahl = "none" to hide image column completely
             $hideImageColumn = true; // Assume we should hide until we find an image
             if (is_array($profilAssoziationen)) {
                 foreach ($profilAssoziationen as $assoz) {
@@ -1029,6 +994,23 @@ class UniversalDeviceTile extends IPSModule
                     }
                     
                   
+                    // Backend-basierte Progressbar-Deaktivierung: Überschreibe Werte wenn deaktiviert
+                    $finalFormattedValue = GetValueFormatted($variable['Variable']);
+                    $finalRawValue = GetValue($variable['Variable']);
+                    
+                    if (!$progressbarActive) {
+                        // Progressbar deaktiviert: Setze Werte auf 0, aber behalte Suffix bei
+                        $finalRawValue = 0;
+                        // Extrahiere Suffix aus ursprünglichem formatiertem Wert
+                        $originalFormatted = $finalFormattedValue;
+                        if (preg_match('/[^0-9.,\-\s]+/', $originalFormatted, $matches)) {
+                            $suffix = $matches[0];
+                            $finalFormattedValue = '0 ' . $suffix;
+                        } else {
+                            $finalFormattedValue = '0';
+                        }
+                    }
+                    
                     $variableData = [
                         'id' => $variable['Variable'],
                         'label' => $label,
@@ -1050,8 +1032,8 @@ class UniversalDeviceTile extends IPSModule
                         'showBorderLine' => $variable['ShowBorderLine'] ?? false,
                         'progressMin' => $progressMinMax['min'],
                         'progressMax' => $progressMinMax['max'],
-                        'formattedValue' => GetValueFormatted($variable['Variable']),
-                        'rawValue' => GetValue($variable['Variable']),
+                        'formattedValue' => $finalFormattedValue, // Backend-überschriebener Wert
+                        'rawValue' => $finalRawValue, // Backend-überschriebener Wert
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
@@ -1076,11 +1058,28 @@ class UniversalDeviceTile extends IPSModule
                         // Label für zweite Variable ermitteln
                         $secondLabel = !empty($variable['SecondVariableLabel']) ? $variable['SecondVariableLabel'] : IPS_GetName($variable['SecondVariable']);
                         
+                        // Backend-basierte Deaktivierung auch für zweite Variable
+                        $secondFinalFormattedValue = GetValueFormatted($variable['SecondVariable']);
+                        $secondFinalRawValue = GetValue($variable['SecondVariable']);
+                        
+                        if (!$progressbarActive) {
+                            // Progressbar deaktiviert: Setze auch zweite Variable auf 0, aber behalte Suffix bei
+                            $secondFinalRawValue = 0;
+                            // Extrahiere Suffix aus ursprünglichem formatiertem Wert der zweiten Variable
+                            $secondOriginalFormatted = $secondFinalFormattedValue;
+                            if (preg_match('/[^0-9.,\-\s]+/', $secondOriginalFormatted, $matches)) {
+                                $suffix = $matches[0];
+                                $secondFinalFormattedValue = '0 ' . $suffix;
+                            } else {
+                                $secondFinalFormattedValue = '0';
+                            }
+                        }
+                        
                         $variableData['secondVariable'] = [
                             'id' => $variable['SecondVariable'],
                             'label' => $secondLabel,
-                            'formattedValue' => GetValueFormatted($variable['SecondVariable']),
-                            'rawValue' => GetValue($variable['SecondVariable']),
+                            'formattedValue' => $secondFinalFormattedValue, // Backend-überschriebener Wert
+                            'rawValue' => $secondFinalRawValue, // Backend-überschriebener Wert
                             'icon' => $secondIcon,
                             'showIcon' => ($variable['SecondVariableShowIcon'] ?? true) && !empty($secondIcon) && $secondIcon !== 'Transparent',
                             'showLabel' => $variable['SecondVariableShowLabel'] ?? true,
@@ -1113,7 +1112,6 @@ class UniversalDeviceTile extends IPSModule
             }
             
             $result['variables'] = $variables;
-        // Debug: Log the first variable object to verify icon mapping
         }
         
         // Zentrale Fortschrittsbalken-Konfiguration
@@ -1209,36 +1207,132 @@ class UniversalDeviceTile extends IPSModule
         return json_encode($result);
     }
 
+    /**
+     * Einfache Abfang-Funktion: Interceptiert Progress-Werte und setzt sie auf 0 wenn Progressbar deaktiviert
+     * @param string $fullMessageJson JSON-String der vollständigen Update-Nachricht
+     * @return string Modifizierte JSON-Nachricht mit abgefangenen Progress-Werten
+     */
+    private function InterceptProgressValuesIfNeeded($fullMessageJson) {
+        // Decode die vollständige Nachricht
+        $messageData = json_decode($fullMessageJson, true);
+        if (!is_array($messageData)) {
+            return $fullMessageJson; // Rückgabe original wenn decode fehlschlägt
+        }
+        
+        // Prüfe ob Progress-Balken deaktiviert werden sollen (gleiche Logik wie GetFullUpdateMessage)
+        $progressbarActive = true; // Standard
+        $statusId = $this->ReadPropertyInteger('Status');
+        if ($statusId > 0 && IPS_VariableExists($statusId)) {
+            $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+            if (is_array($profilAssoziationen)) {
+                $currentStatusValue = GetValue($statusId);
+                foreach ($profilAssoziationen as $assoziation) {
+                    if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentStatusValue) {
+                        $progressbarActive = $assoziation['ProgressbarActive'] ?? true;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Wenn Progressbar aktiv ist, keine Änderungen nötig
+        if ($progressbarActive) {
+            return $fullMessageJson;
+        }
+        
+        // Progressbar deaktiviert: Abfangen und Zeroing der Progress-Werte  
+        if (isset($messageData['variables']) && is_array($messageData['variables'])) {
+            foreach ($messageData['variables'] as &$variable) {
+                // Nur Progress-Variablen manipulieren
+                if (($variable['displayType'] ?? 'text') === 'progress') {
+                    // Haupt-Variable auf 0 setzen, Suffix beibehalten
+                    $originalFormatted = $variable['formattedValue'] ?? '';
+                    if (preg_match('/[^0-9.,\-\s]+/', $originalFormatted, $matches)) {
+                        $suffix = $matches[0];
+                        $variable['formattedValue'] = '0 ' . $suffix;
+                    } else {
+                        $variable['formattedValue'] = '0';
+                    }
+                    $variable['rawValue'] = 0;
+                    
+                    // Second-Variable auch auf 0 setzen wenn vorhanden
+                    if (isset($variable['secondVariable'])) {
+                        $originalSecondFormatted = $variable['secondVariable']['formattedValue'] ?? '';
+                        if (preg_match('/[^0-9.,\-\s]+/', $originalSecondFormatted, $matches)) {
+                            $suffix = $matches[0];
+                            $variable['secondVariable']['formattedValue'] = '0 ' . $suffix;
+                        } else {
+                            $variable['secondVariable']['formattedValue'] = '0';
+                        }
+                        $variable['secondVariable']['rawValue'] = 0;
+                    }
+                }
+            }
+        }
+        
+        return json_encode($messageData);
+    }
+
     public function UpdateList(int $StatusID)
     {
         $listData = []; // Hier sammeln Sie die Daten für Ihre Liste
     
-        $id = $StatusID;
+    $id = $StatusID;
 
-        // Prüfen, ob die übergebene ID einer existierenden Variable entspricht
-        if (IPS_VariableExists($id)) {
-            // Auslesen des Variablenprofils
-            $variable = IPS_GetVariable($id);
+    // Prüfen, ob die übergebene ID einer existierenden Variable entspricht
+    if (IPS_VariableExists($id)) {
+        $variable = IPS_GetVariable($id);
+        $variableType = $variable['VariableType'];
+        
+        $associations = null;
+        
+        // Verwende die existierenden Association-Funktionen basierend auf Variablentyp
+        if ($variableType === VARIABLETYPE_BOOLEAN) {
+            $associations = $this->GetBooleanAssociations($id);
+        } elseif ($variableType === VARIABLETYPE_INTEGER) {
+            $associations = $this->GetIntegerAssociations($id);
+        }
+        
+        // Fallback auf klassische Profile wenn keine Associations gefunden
+        if (empty($associations)) {
             $profileName = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
             
             if ($profileName != '') {
-                $profile = IPS_GetVariableProfile($profileName);
-    
-                // Durchlaufen der Profilassoziationen
-                foreach ($profile['Associations'] as $association) {
-                    $listData[] = [
-                        'AssoziationName' => $association['Name'],
-                        'AssoziationValue' => $association['Value'],
-                        'Bildauswahl' => 'wm_aus',
-                        'StatusColor' => '-1'
-                    ];
+                try {
+                    $profile = IPS_GetVariableProfile($profileName);
+                    if (isset($profile['Associations'])) {
+                        $associations = [];
+                        foreach ($profile['Associations'] as $association) {
+                            $associations[] = [
+                                'name' => $association['Name'],
+                                'value' => $association['Value'],
+                                'icon' => isset($association['Icon']) ? $association['Icon'] : '',
+                                'color' => isset($association['Color']) ? $association['Color'] : null
+                            ];
+                        }
+                    }
+                } catch (Exception $e) {
+                    // Profil existiert nicht oder ist nicht lesbar
                 }
             }
         }
+        
+        // Konvertiere Associations zu ListData Format
+        if (!empty($associations)) {
+            foreach ($associations as $association) {
+                $listData[] = [
+                    'AssoziationName' => $association['name'],
+                    'AssoziationValue' => $association['value'],
+                    'Bildauswahl' => 'none',
+                    'StatusColor' => '-1'
+                ];
+            }
+        }
+    }
     
-        // Konvertieren Sie Ihre Liste in JSON und aktualisieren Sie das Konfigurationsformular
-        $jsonListData = json_encode($listData);
-        $this->UpdateFormField('ProfilAssoziazionen', 'values', $jsonListData);
+    // Konvertieren Sie Ihre Liste in JSON und aktualisieren Sie das Konfigurationsformular
+    $jsonListData = json_encode($listData);
+    $this->UpdateFormField('ProfilAssoziazionen', 'values', $jsonListData);
     }
     
     
@@ -1594,8 +1688,7 @@ class UniversalDeviceTile extends IPSModule
         // DEBUG: Log variable info  
         $profileName = $variable['VariableProfile'] ?? 'NONE';
         $customPresentation = is_array($variable['VariableCustomPresentation'] ?? null) ? json_encode($variable['VariableCustomPresentation']) : ($variable['VariableCustomPresentation'] ?? 'NONE');
-        error_log("TILEVISU DEBUG: Variable $variableId has VariableProfile: $profileName");
-        error_log("TILEVISU DEBUG: Variable $variableId has VariableCustomPresentation: $customPresentation");
+
         
         // Nur für Bool-Variablen
         if ($variable['VariableType'] !== VARIABLETYPE_BOOLEAN) {
@@ -1662,36 +1755,21 @@ class UniversalDeviceTile extends IPSModule
      * @return array Array mit 'min' und 'max' Werten
      */
     private function GetProgressMinMax($variableId) {
-        // CRITICAL DEBUG: Always log this function call
-        error_log("TILEVISU CRITICAL DEBUG: GetProgressMinMax called for Variable ID: $variableId");
-        IPS_LogMessage('TileVisu CRITICAL', "GetProgressMinMax called for Variable ID: $variableId");
-        
         $defaultMinMax = [
             'min' => 0,
             'max' => 100
         ];
         
         if (!IPS_VariableExists($variableId)) {
-            IPS_LogMessage('TileVisu CRITICAL', "Variable $variableId does NOT exist - returning default");
             return $defaultMinMax;
         }
-        
-        IPS_LogMessage('TileVisu CRITICAL', "Variable $variableId exists - continuing");
         
         $variable = IPS_GetVariable($variableId);
         
-        // DEBUG: Log variable info
-        IPS_LogMessage('TileVisu DEBUG', "Variable $variableId has VariableProfile: " . ($variable['VariableProfile'] ?? 'NONE'));
-        IPS_LogMessage('TileVisu DEBUG', "Variable $variableId has VariableCustomProfile: " . ($variable['VariableCustomProfile'] ?? 'NONE'));
-        IPS_LogMessage('TileVisu DEBUG', "Variable $variableId has VariableType: " . $variable['VariableType']);
-        
         // Unterstütze INTEGER und FLOAT Variablen für Progress Bars
         if ($variable['VariableType'] !== VARIABLETYPE_INTEGER && $variable['VariableType'] !== VARIABLETYPE_FLOAT) {
-            IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Wrong type (${variable['VariableType']}), returning default");
             return $defaultMinMax;
         }
-        
-        IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Correct type (${variable['VariableType']}), proceeding with extraction");
         
         // **PRESENTATION-HIERARCHIE wie bei Icons: Gleiche Taktik für konsistente Behandlung**
         
@@ -1706,7 +1784,6 @@ class UniversalDeviceTile extends IPSModule
                     'max' => floatval($profileData['MaxValue'])
                 ];
                 
-                IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, PROFILE MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                 return $minMax;
             }
         }
@@ -1723,7 +1800,6 @@ class UniversalDeviceTile extends IPSModule
                         'max' => floatval($customPresentation['MAX'])
                     ];
                     
-                    IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, CustomPresentation MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                     return $minMax;
                 }
             }
@@ -1731,7 +1807,6 @@ class UniversalDeviceTile extends IPSModule
             // **FALL 3: GUID-basierte Presentations (PRESENTATION)**
             if (isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
                 $presentationGuid = $customPresentation['PRESENTATION'];
-                IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Checking PRESENTATION GUID: $presentationGuid");
                 
                 try {
                     // GUID VALIDATION: Prüfe ob GUID im System existiert
@@ -1750,19 +1825,16 @@ class UniversalDeviceTile extends IPSModule
                                 'max' => floatval($presentationArray['MaxValue'])
                             ];
                             
-                            IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, PRESENTATION GUID MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                             return $minMax;
                         }
                     }
                 } catch (Exception $e) {
-                    IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - PRESENTATION GUID failed: " . $e->getMessage());
                 }
             }
             
             // **FALL 4: OPTIONS-basierte Presentations**
             if (isset($customPresentation['OPTIONS']) && !empty($customPresentation['OPTIONS'])) {
                 $optionsGuid = $customPresentation['OPTIONS'];
-                IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Checking OPTIONS GUID: $optionsGuid");
                 
                 try {
                     if (@IPS_PresentationExists($optionsGuid)) {
@@ -1777,20 +1849,18 @@ class UniversalDeviceTile extends IPSModule
                                     'max' => floatval($presentationArray['MaxValue'])
                                 ];
                                 
-                                IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, OPTIONS GUID MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                                 return $minMax;
                             }
                         }
                     }
                 } catch (Exception $e) {
-                    IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - OPTIONS GUID failed: " . $e->getMessage());
+                    
                 }
             }
             
             // **FALL 5: TEMPLATE-basierte Presentations**
             if (isset($customPresentation['TEMPLATE']) && !empty($customPresentation['TEMPLATE'])) {
                 $templateGuid = $customPresentation['TEMPLATE'];
-                IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - Checking TEMPLATE GUID: $templateGuid");
                 
                 try {
                     if (@IPS_PresentationExists($templateGuid)) {
@@ -1805,13 +1875,12 @@ class UniversalDeviceTile extends IPSModule
                                     'max' => floatval($presentationArray['MaxValue'])
                                 ];
                                 
-                                IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, TEMPLATE GUID MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                                 return $minMax;
                             }
                         }
                     }
                 } catch (Exception $e) {
-                    IPS_LogMessage('TileVisu DEBUG', "Variable $variableId - TEMPLATE GUID failed: " . $e->getMessage());
+                    
                 }
             }
         }
@@ -1854,7 +1923,6 @@ class UniversalDeviceTile extends IPSModule
                             'max' => $foundMax
                         ];
                         
-                        IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, Visualization MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                         return $minMax;
                     }
                     
@@ -1873,7 +1941,6 @@ class UniversalDeviceTile extends IPSModule
                                 'max' => max($values)
                             ];
                             
-                            IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, ValueMappings MIN: {$minMax['min']}, MAX: {$minMax['max']}");
                             return $minMax;
                         }
                     }
@@ -1882,7 +1949,6 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // **LETZTER FALLBACK: Standard Min/Max verwenden**
-        IPS_LogMessage('TileVisu DEBUG', "GetProgressMinMax - Variable ID: $variableId, Using DEFAULT MIN: {$defaultMinMax['min']}, MAX: {$defaultMinMax['max']}");
         return $defaultMinMax;
     }
     
