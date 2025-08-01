@@ -234,6 +234,9 @@
         }
 
         .variable-icon {
+            margin-right: 5px;
+            margin-top: calc(var(--element-spacing, 8px));
+            margin-bottom: calc(var(--element-spacing, 8px));
             display: inline-block;
             vertical-align: baseline;
             flex-shrink: 0;
@@ -245,6 +248,7 @@
             flex-shrink: 0;
             display: flex;
             align-items: center; /* Vertikale Zentrierung für Labels */
+            margin: calc(var(--element-spacing, 8px)) 0; /* Einheitlicher Abstand wie bei variable-text */
         }
 
         .variable-value {
@@ -309,6 +313,14 @@
             display: inline-flex;
             align-items: center;
             transform: translateY(-1px); /* Icon 1px höher */
+            margin-top: 0 !important; /* Überschreibe allgemeine Icon-Margins */
+            margin-bottom: 0 !important; /* Überschreibe allgemeine Icon-Margins */
+        }
+        
+        /* Labels in Progress-Bars: Keine störenden Margins */
+        .progress-text .variable-label {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
         }
 
         .no-wrap {
@@ -320,6 +332,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            margin: calc(var(--element-spacing, 8px) ) 0;
         }
         
         /* Text-Variablen: 5px mehr Top- und Bottom-Margin als andere Darstellungen */
@@ -1178,39 +1191,38 @@
                     textParts.push(iconHtml);
                 }
                 if (variable.showLabel) {
-                    // Verwende Variablenname als Priorität, Association-Name als Fallback
+                    // Verwende Variablenname als Label (höchste Priorität), dann Association-Name als Fallback
                     const displayLabel = variable.label || associationName || (isActive ? 'ON' : 'OFF');
-                    textParts.push(displayLabel);
+                    if (variable.showValue) {
+                        // Doppelpunkt nur wenn auch Value angezeigt wird - Label fett
+                        textParts.push(`<span style="font-weight: 700;">${displayLabel}:&nbsp;</span>`);
+                    } else {
+                        // Kein Doppelpunkt wenn nur Label - Label fett
+                        textParts.push(`<span style="font-weight: 700;">${displayLabel}</span>`);
+                    }
                 }
+                
                 if (variable.showValue) {
-                    textParts.push(variable.formattedValue);
+                    textParts.push(`<span style="font-weight: normal;">${variable.formattedValue}</span>`);
                 }
+                
+                // Falls keine Checkbox aktiviert ist, zeige Label als Fallback (ohne Doppelpunkt) - fett
                 if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                    textParts.push(variable.label || (isActive ? 'ON' : 'OFF'));
+                    textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}</span>`);
                 }
                 
                 buttonText = textParts.join(' ');
+                
+                // Spezielle Behandlung für nur Icon (ohne Abstand)
                 if (variable.showIcon && !variable.showLabel && !variable.showValue && iconHtml) {
                     buttonText = iconHtml.replace('margin-right: 6px;', '');
                 }
                 
+                // Button-Styles: Bool-Button soll IMMER seine buttonWidth verwenden
+                let buttonStyleExtras = `width: ${variable.buttonWidth}px; min-width: ${variable.buttonWidth}px;`;
+                
                 buttonElement.innerHTML = buttonText;
             }
-        }
-        
-        // CRITICAL: Berechnet Progress-Balken Prozentwert basierend auf Min/Max-Werten
-        function calculateProgressValue(rawValue, progressMin, progressMax) {
-            const minValue = parseFloat(progressMin) || 0;
-            const maxValue = parseFloat(progressMax) || 100;
-            const currentValue = parseFloat(rawValue) || 0;
-            
-            const range = maxValue - minValue;
-            if (range <= 0) {
-                return 0;
-            }
-            
-            const progressValue = Math.max(0, Math.min(100, ((currentValue - minValue) / range) * 100));
-            return isNaN(progressValue) ? 0 : progressValue;
         }
         
         // Hilfsfunktion für Progress-Bar-Update
@@ -2298,6 +2310,22 @@
 
         }
 
+        // CRITICAL: Berechnet Progress-Balken Prozentwert basierend auf Min/Max-Werten
+        function calculateProgressValue(rawValue, progressMin, progressMax) {
+            const minValue = parseFloat(progressMin) || 0;
+            const maxValue = parseFloat(progressMax) || 100;
+            const currentValue = parseFloat(rawValue) || 0;
+            
+            const range = maxValue - minValue;
+            if (range <= 0) {
+                return 0;
+            }
+            
+            const progressValue = Math.max(0, Math.min(100, ((currentValue - minValue) / range) * 100));
+            return isNaN(progressValue) ? 0 : progressValue;
+        }
+        
+        // Hilfsfunktion für Progress-Bar-Update
     </script>
 
 
