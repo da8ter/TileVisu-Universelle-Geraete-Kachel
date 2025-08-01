@@ -172,7 +172,7 @@
         /* Für gruppierte Variablen: Kein width: 100% damit sie nebeneinander passen */
         /* NUR Progress-Balken-Gruppen sollen wachsen, nicht Button/Text-Gruppen */
         .variable-group-item:has(.progress-variable) {
-            flex: 1 1 200px; /* Nur Container mit Progress-Balken wachsen lassen */
+            flex: 1 1 100px; /* Nur Container mit Progress-Balken wachsen lassen */
         }
         
         /* SPEZIAL: Für group-name-above Layout (flex-direction: column) */
@@ -211,7 +211,6 @@
         .variable-group-item .progress-variable {
             display: flex !important;
             width: 100% !important;
-            min-width: 200px !important; /* Mindestbreite für sichtbare Progress-Balken */
             flex-direction: row;
             flex: 1 1 200px; /* Wachsen mit verfügbarem Platz, aber min 200px */
         }
@@ -235,7 +234,6 @@
         }
 
         .variable-icon {
-            margin-right: 5px;
             display: inline-block;
             vertical-align: baseline;
             flex-shrink: 0;
@@ -247,7 +245,6 @@
             flex-shrink: 0;
             display: flex;
             align-items: center; /* Vertikale Zentrierung für Labels */
-            margin: calc(var(--element-spacing, 8px)) 0; /* Einheitlicher Abstand wie bei variable-text */
         }
 
         .variable-value {
@@ -1919,12 +1916,12 @@
                         let finalIcon = associationIcon || variable.icon; // Association-Icon hat Priorität
                         if (variable.showIcon && finalIcon && finalIcon !== 'Transparent') {
                             const iconClass = prepareIconForDisplay(finalIcon);
+                
+                            
                             if (iconClass) {
                                 iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
                             }
                         }
-                        
-                        // Button-Inhalt basierend auf allgemeiner Konfiguration zusammenstellen
                         let textParts = [];
                         
                         if (variable.showIcon && iconHtml) {

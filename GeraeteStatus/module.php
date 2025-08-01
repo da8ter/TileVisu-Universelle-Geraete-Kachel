@@ -1324,7 +1324,7 @@ class UniversalDeviceTile extends IPSModule
                     'AssoziationName' => $association['name'],
                     'AssoziationValue' => $association['value'],
                     'Bildauswahl' => 'none',
-                    'StatusColor' => '-1'
+                    'StatusColor' => -1
                 ];
             }
         }
