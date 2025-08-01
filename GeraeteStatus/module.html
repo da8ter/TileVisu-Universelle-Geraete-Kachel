@@ -161,7 +161,7 @@
         }
 
         .variable-item {
-            margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            margin: calc(var(--element-spacing, 8px)) 0;
             display: flex;
             align-items: center; /* Vertikale Zentrierung aller Inhalte */
             justify-content: flex-start; /* Horizontale Ausrichtung */
@@ -247,6 +247,7 @@
             flex-shrink: 0;
             display: flex;
             align-items: center; /* Vertikale Zentrierung für Labels */
+            margin: calc(var(--element-spacing, 8px)) 0; /* Einheitlicher Abstand wie bei variable-text */
         }
 
         .variable-value {
@@ -1807,7 +1808,7 @@
                     
                   
                     // Berechne individuelles Padding basierend auf Variable-Textgröße
-                    const individualPadding = Math.max(4, Math.round(variable.fontSize / 2)); // Minimum 4px
+                    const individualPadding = Math.max(4, Math.round(variable.fontSize / 1)); // Minimum 4px
                     
                     // ANIMATION FIX: Verwende ALTE Breite für DOM, nicht neue!
                     let widthForDOM = progressValue; // Default: neuer Wert
@@ -2111,7 +2112,9 @@
                         let textParts = [];
                         
                         if (variable.showLabel && variable.label) {
-                            textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${variable.label}:&nbsp;</span>`);
+                            // Doppelpunkt nur hinzufügen wenn auch Value angezeigt wird
+                            const labelText = variable.showValue ? `${variable.label}:&nbsp;` : variable.label;
+                            textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${labelText}</span>`);
                         }
                         
                         if (variable.showValue) {
@@ -2140,7 +2143,9 @@
                     }
                     
                     if (variable.showLabel && variable.label) {
-                        textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${variable.label}:&nbsp;</span>`);
+                        // Doppelpunkt nur hinzufügen wenn auch Value angezeigt wird
+                        const labelText = variable.showValue ? `${variable.label}:&nbsp;` : variable.label;
+                        textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${labelText}</span>`);
                     }
                     
                     if (variable.showValue) {
@@ -2282,16 +2287,11 @@
                     // Force Reflow
                     progressBar.offsetWidth;
                     
-                    // Minimaler Browser-Delay (1ms) für Timing
-                    setTimeout(() => {
-                        // Kurze Animation zur neuen Breite (keine visuellen Effekte)
-                        progressBar.style.transition = 'width 0.5s ease';
-                        progressBar.style.width = newWidthFromData + '%';
-                        
-                        setTimeout(() => {
-                            progressBar.style.transition = '';
-                        }, 500);
-                    }, 1); // Nur 1ms - Browser-Timing ohne sichtbare Verzögerung
+                    // Aktiviere die CSS transition wieder
+                    progressBar.style.transition = 'width 0.5s ease';
+                    
+                    // Setze die neue Breite - das triggert die Animation
+                    progressBar.style.width = newWidthFromData + '%';
                 }
                 
                 // Speichere NEUE Breite für nächstes Mal
