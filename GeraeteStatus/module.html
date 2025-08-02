@@ -812,7 +812,6 @@
                         
                         // Re-apply gespeicherte Bildausrichtung nach dem Rendering (Persistenz)
                         if (window.currentImageAlignment) {
-                            console.log('🔄 RE-APPLYING persistent alignment after renderStatus:', window.currentImageAlignment);
                             const div1Restore = document.querySelector('.main_container .div1');
                             const imgRestore = document.querySelector('.main_container .div1 img');
                             const mainContainerRestore = document.querySelector('.main_container');
@@ -840,7 +839,6 @@
                                             imgRestore.style.margin = '0 auto';
                                     }
                                     
-                                    console.log('✨ PERSISTENT ALIGNMENT restored:', window.currentImageAlignment);
                                 }
                             }
                         }
