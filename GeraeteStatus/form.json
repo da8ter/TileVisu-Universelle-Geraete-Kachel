@@ -667,291 +667,115 @@
           "loadValuesFromConfiguration": true,
           "values": [],
           "form": [
-          
-            {
-              "caption": "Variable",
-              "name": "Variable",
-              "width": "100%",
-              "type": "SelectVariable",
-              "validVariableTypes": [],
-              "save": true,
-              "add": 0
-            },
-            {
-              "caption": "Display Type",
-              "name": "DisplayType",
-              "type": "Select",
-              "width": "100%",
-              "options": [
-                {
-                  "caption": "Text",
-                  "value": "text"
-                },
-                {
-                  "caption": "Progress Bar",
-                  "value": "progress"
-                },
-                {
-                  "caption": "Button",
-                  "value": "button"
-                }
-              ],
-              "save": true,
-              "add": "text"
-            },
-            {
-              "type": "RowLayout",
-              "items": [
-                {
-                  "caption": "Show Icon",
-                  "name": "ShowIcon",
-                  "type": "CheckBox",
-                  "save": true,
-                  "visible": true,
-                  "add": true
-                },
-                {
-                  "caption": "Show Label",
-                  "name": "ShowLabel",
-                  "type": "CheckBox",
-                  "save": true,
-                  "visible": true,
-                  "add": true
-                },
-                {
-                  "caption": "Show Value",
-                  "name": "ShowValue",
-                  "type": "CheckBox",
-                  "save": true,
-                  "visible": true,
-                  "add": true
-                }
-              ]
-            },
-            {
-              "caption": "Label (Overrides the variable name)",
-              "name": "Label",
-              "width": "100%",
-              "type": "ValidationTextBox",
-              "save": true,
-              "add": "",
-              "visible": true
-            },
-            {
-              "type": "RowLayout",
-              "items": [
-                {
-                  "caption": "Group (All elements in a group are displayed in a single row.)",
-                  "name": "Group",
-                  "type": "Select",
-                  "width": "600px",
-                  "options": [
-                    {
-                      "caption": "keine Gruppe",
-                      "value": "keine Gruppe"
-                    },
-                    {
-                      "caption": "Gruppe 1",
-                      "value": "Gruppe 1"
-                    },
-                    {
-                      "caption": "Gruppe 2",
-                      "value": "Gruppe 2"
-                    },
-                    {
-                      "caption": "Gruppe 3",
-                      "value": "Gruppe 3"
-                    },
-                    {
-                      "caption": "Gruppe 4",
-                      "value": "Gruppe 4"
-                    },
-                    {
-                      "caption": "Gruppe 5",
-                      "value": "Gruppe 5"
-                    },
-                    {
-                      "caption": "Gruppe 6",
-                      "value": "Gruppe 6"
-                    },
-                    {
-                      "caption": "Gruppe 7",
-                      "value": "Gruppe 7"
-                    },
-                    {
-                      "caption": "Gruppe 8",
-                      "value": "Gruppe 8"
-                    },
-                    {
-                      "caption": "Gruppe 9",
-                      "value": "Gruppe 9"
-                    },
-                    {
-                      "caption": "Gruppe 10",
-                      "value": "Gruppe 10"
-                    }
-                  ],
-                  "save": true,
-                  "add": "keine Gruppe",
-                  "visible": true
-                }
-              ]
-            },
-            {
-              "type": "RowLayout",
-              "items": [
-                {
-                  "caption": "Font Size",
-                  "name": "FontSize",
-                  "type": "NumberSpinner",
-                  "minimum": -1,
-                  "maximum": 50,
-                  "suffix": "px",
-                  "save": true,
-                  "add": -1,
-                  "visible": true
-                },
-                {
-                  "caption": "Text Color",
-                  "name": "TextColor",
-                  "type": "SelectColor",
-                  "allowTransparent": true,
-                  "save": true,
-                  "add": -1,
-                  "visible": true
-                }
-              ]
-            },
-            {
-              "type": "ExpansionPanel",
-              "caption": "Progressbar",
-              "items": [
-                {
-                  "type": "RowLayout",
-                  "items": [
-                    {
-                      "caption": "Progress bar color 1",
-                      "name": "ProgressColor1",
-                      "type": "SelectColor",
-                      "allowTransparent": true,
-                      "save": true,
-                      "add": 52650,
-                      "value": 52650,
-                      "visible": true
-                    },
-                    {
-                      "caption": "Progress bar color 2",
-                      "name": "ProgressColor2",
-                      "type": "SelectColor",
-                      "allowTransparent": true,
-                      "save": true,
-                      "add": 30050,
-                      "value": 30050,
-                      "visible": true
-                    }
-                  ]
-                },
-                {
-                  "type": "Label",
-                  "caption": "Additional information in the progress bar",
-                  "underline": false,
-                  "width": "100%"
-                },
-                {
-                  "caption": "Second Variable",
-                  "name": "SecondVariable",
-                  "type": "SelectVariable",
-                  "width": "100%",
-                  "validVariableTypes": [],
-                  "save": true,
-                  "add": 0,
-                  "visible": true
-                },
-                {
-                  "type": "RowLayout",
-                  "items": [
-                    {
-                      "caption": "Show Icon",
-                      "name": "SecondVariableShowIcon",
-                      "type": "CheckBox",
-                      "save": true,
-                      "add": true,
-                      "visible": true
-                    },
-                    {
-                      "caption": "Show Label",
-                      "name": "SecondVariableShowLabel",
-                      "type": "CheckBox",
-                      "save": true,
-                      "add": true,
-                      "visible": true
-                    },
-                    {
-                      "caption": "Show Value",
-                      "name": "SecondVariableShowValue",
-                      "type": "CheckBox",
-                      "save": true,
-                      "add": true,
-                      "visible": true
-                    }
-                  ]
-                },
-                {
-                  "caption": "Label (Overrides the variable name)",
-                  "name": "SecondVariableLabel",
-                  "type": "ValidationTextBox",
-                  "width": "100%",
-                  "save": true,
-                  "add": "",
-                  "visible": true
-                }
-              ]
-            },
-            {
-              "type": "ExpansionPanel",
-              "caption": "Button",
-              "items": [
-                {
-                  "caption": "Bool Button Color",
-                  "name": "boolButtonColor",
-                  "type": "SelectColor",
-                  "allowTransparent": true,
-                  "save": true,
-                  "add": -1,
-                  "value": -1,
-                  "visible": true
-                },
-                {
-                  "caption": "Button Width",
-                  "name": "ButtonWidth",
-                  "type": "NumberSpinner",
-                  "minimum": 20,
-                  "maximum": 500,
-                  "suffix": "px",
-                  "save": true,
-                  "add": 120,
-                  "visible": true
-                }
-              ]
-            },
-            {
-              "type": "ExpansionPanel",
-              "caption": "Text-Variable",
-              "items": [
-                {
-                  "caption": "Separator line",
-                  "name": "ShowBorderLine",
-                  "type": "CheckBox",
-                  "save": true,
-                  "add": false,
-                  "visible": true
-                }
-              ]
-            }
-          ]
-        }
-        
-    ,
+    "$form = [];",
+    "",
+    "// ---------- Grund-Felder ----------",
+    "$form[] = [ 'caption' => 'Variable', 'name' => 'Variable', 'width' => '100%', 'type' => 'SelectVariable', 'validVariableTypes' => [], 'save' => true, 'add' => 0 ];",
+    "$form[] = [ 'caption' => 'Display Type', 'name' => 'DisplayType', 'type' => 'Select', 'width' => '100%', 'options' => [",
+    "    [ 'caption' => 'Text',         'value' => 'text'     ],",
+    "    [ 'caption' => 'Progress Bar', 'value' => 'progress' ],",
+    "    [ 'caption' => 'Button',       'value' => 'button'   ]",
+    "  ], 'save' => true, 'add' => 'text', 'onChange' => 'IPS_RequestAction($id, \"UpdateDisplayTypeFields\", $DisplayType);' ];",
+    "$form[] = [ 'type' => 'RowLayout', 'items' => [",
+    "    [ 'caption' => 'Show Icon',  'name' => 'ShowIcon',  'type' => 'CheckBox', 'save' => true, 'visible' => true, 'add' => true ],",
+    "    [ 'caption' => 'Show Label', 'name' => 'ShowLabel', 'type' => 'CheckBox', 'save' => true, 'visible' => true, 'add' => true ],",
+    "    [ 'caption' => 'Show Value', 'name' => 'ShowValue', 'type' => 'CheckBox', 'save' => true, 'visible' => true, 'add' => true ]",
+    "  ] ];",
+    "$form[] = [ 'caption' => 'Label (Overrides the variable name)', 'name' => 'Label', 'width' => '100%', 'type' => 'ValidationTextBox', 'save' => true, 'add' => '', 'visible' => true ];",
+    "$form[] = [ 'type' => 'RowLayout', 'items' => [",
+    "    [ 'caption' => 'Group (All elements in a group are displayed in a single row.)', 'name' => 'Group', 'type' => 'Select', 'width' => '600px',",
+    "      'options' => [",
+    "        [ 'caption' => 'keine Gruppe', 'value' => 'keine Gruppe' ],",
+    "        [ 'caption' => 'Gruppe 1', 'value' => 'Gruppe 1' ],",
+    "        [ 'caption' => 'Gruppe 2', 'value' => 'Gruppe 2' ],",
+    "        [ 'caption' => 'Gruppe 3', 'value' => 'Gruppe 3' ],",
+    "        [ 'caption' => 'Gruppe 4', 'value' => 'Gruppe 4' ],",
+    "        [ 'caption' => 'Gruppe 5', 'value' => 'Gruppe 5' ],",
+    "        [ 'caption' => 'Gruppe 6', 'value' => 'Gruppe 6' ],",
+    "        [ 'caption' => 'Gruppe 7', 'value' => 'Gruppe 7' ],",
+    "        [ 'caption' => 'Gruppe 8', 'value' => 'Gruppe 8' ],",
+    "        [ 'caption' => 'Gruppe 9', 'value' => 'Gruppe 9' ],",
+    "        [ 'caption' => 'Gruppe 10', 'value' => 'Gruppe 10' ]",
+    "      ],",
+    "      'save' => true, 'add' => 'keine Gruppe', 'visible' => true ]",
+    "  ] ];",
+    "$form[] = [ 'type' => 'RowLayout', 'items' => [",
+    "    [ 'caption' => 'Font Size', 'name' => 'FontSize', 'type' => 'NumberSpinner', 'minimum' => -1, 'maximum' => 50, 'suffix' => 'px', 'save' => true, 'add' => -1, 'visible' => true ],",
+    "    [ 'caption' => 'Text Color', 'name' => 'TextColor', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => -1, 'visible' => true ]",
+    "  ] ];",
+    "",
+    "// ---------- DisplayType-abhängige Panels ----------",
+    "// DEBUG: DisplayType Wert ausgeben",
+    "IPS_LogMessage('TileVisu DEBUG', 'DisplayType Wert: ' . json_encode($VariablesList['DisplayType'] ?? 'NICHT_GESETZT'));",
+    "$displayType = $VariablesList['DisplayType'] ?? 'text';",
+    "",
+    "// DisplayType 'text' - alle Felder mit entsprechender Sichtbarkeit",
+    "if ($displayType === 'text') {",
+    "    // Progress-Felder (ausgeblendet bei text)",
+    "    $form[] = [ 'type' => 'RowLayout', 'items' => [",
+    "        [ 'caption' => 'Progress bar color 1', 'name' => 'ProgressColor1', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 52650, 'value' => 52650, 'visible' => false ],",
+    "        [ 'caption' => 'Progress bar color 2', 'name' => 'ProgressColor2', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 30050, 'value' => 30050, 'visible' => false ]",
+    "    ] ];",
+    "    $form[] = [ 'caption' => 'Second Variable', 'name' => 'SecondVariable', 'type' => 'SelectVariable', 'width' => '100%', 'validVariableTypes' => [], 'save' => true, 'add' => 0, 'visible' => false ];",
+    "    $form[] = [ 'type' => 'RowLayout', 'items' => [",
+    "        [ 'caption' => 'Show Icon',  'name' => 'SecondVariableShowIcon',  'type' => 'CheckBox', 'save' => true, 'add' => true, 'visible' => false ],",
+    "        [ 'caption' => 'Show Label', 'name' => 'SecondVariableShowLabel', 'type' => 'CheckBox', 'save' => true, 'add' => true, 'visible' => false ],",
+    "        [ 'caption' => 'Show Value', 'name' => 'SecondVariableShowValue', 'type' => 'CheckBox', 'save' => true, 'add' => true, 'visible' => false ]",
+    "    ] ];",
+    "    $form[] = [ 'caption' => 'Label (Overrides the variable name)', 'name' => 'SecondVariableLabel', 'type' => 'ValidationTextBox', 'width' => '100%', 'save' => true, 'add' => '', 'visible' => false ];",
+    "    // Button-Felder (ausgeblendet bei text)",
+    "    $form[] = [ 'caption' => 'Bool Button Color', 'name' => 'boolButtonColor', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => -1, 'value' => -1, 'visible' => false ];",
+    "    $form[] = [ 'caption' => 'Button Width', 'name' => 'ButtonWidth', 'type' => 'NumberSpinner', 'minimum' => 20, 'maximum' => 500, 'suffix' => 'px', 'save' => true, 'add' => 120, 'visible' => false ];",
+    "    // Text-Felder (sichtbar bei text)",
+    "    $form[] = [ 'caption' => 'Separator line', 'name' => 'ShowBorderLine', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => true ];",
+    "}",
+    "",
+    "// DisplayType 'progress' - alle Felder mit entsprechender Sichtbarkeit",
+    "if ($displayType === 'progress') {",
+    "    // Progress-Felder (sichtbar bei progress)",
+    "    $form[] = [ 'type' => 'RowLayout', 'items' => [",
+    "        [ 'caption' => 'Progress bar color 1', 'name' => 'ProgressColor1', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 52650, 'value' => 52650, 'visible' => true ],",
+    "        [ 'caption' => 'Progress bar color 2', 'name' => 'ProgressColor2', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 30050, 'value' => 30050, 'visible' => true ]",
+    "    ] ];",
+    "    $form[] = [ 'type' => 'Label', 'caption' => 'Additional information in the progress bar', 'underline' => false, 'width' => '100%' ];",
+    "    $form[] = [ 'caption' => 'Second Variable', 'name' => 'SecondVariable', 'type' => 'SelectVariable', 'width' => '100%', 'validVariableTypes' => [], 'save' => true, 'add' => 0, 'visible' => true ];",
+    "    $form[] = [ 'type' => 'RowLayout', 'items' => [",
+    "        [ 'caption' => 'Show Icon',  'name' => 'SecondVariableShowIcon',  'type' => 'CheckBox', 'save' => true, 'add' => true, 'visible' => true ],",
+    "        [ 'caption' => 'Show Label', 'name' => 'SecondVariableShowLabel', 'type' => 'CheckBox', 'save' => true, 'add' => true, 'visible' => true ],",
+    "        [ 'caption' => 'Show Value', 'name' => 'SecondVariableShowValue', 'type' => 'CheckBox', 'save' => true, 'add' => true, 'visible' => true ]",
+    "    ] ];",
+    "    $form[] = [ 'caption' => 'Label (Overrides the variable name)', 'name' => 'SecondVariableLabel', 'type' => 'ValidationTextBox', 'width' => '100%', 'save' => true, 'add' => '', 'visible' => true ];",
+    "    // Button-Felder (ausgeblendet bei progress)",
+    "    $form[] = [ 'caption' => 'Bool Button Color', 'name' => 'boolButtonColor', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => -1, 'value' => -1, 'visible' => false ];",
+    "    $form[] = [ 'caption' => 'Button Width', 'name' => 'ButtonWidth', 'type' => 'NumberSpinner', 'minimum' => 20, 'maximum' => 500, 'suffix' => 'px', 'save' => true, 'add' => 120, 'visible' => false ];",
+    "    // Text-Felder (ausgeblendet bei progress)",
+    "    $form[] = [ 'caption' => 'Separator line', 'name' => 'ShowBorderLine', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => false ];",
+    "}",
+    "",
+    "// DisplayType 'button' - alle Felder mit entsprechender Sichtbarkeit",
+    "if ($displayType === 'button') {",
+    "    // Progress-Felder (ausgeblendet bei button)",
+    "    $form[] = [ 'type' => 'RowLayout', 'items' => [",
+    "        [ 'caption' => 'Progress bar color 1', 'name' => 'ProgressColor1', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 52650, 'value' => 52650, 'visible' => false ],",
+    "        [ 'caption' => 'Progress bar color 2', 'name' => 'ProgressColor2', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 30050, 'value' => 30050, 'visible' => false ]",
+    "    ] ];",
+    "    $form[] = [ 'caption' => 'Second Variable', 'name' => 'SecondVariable', 'type' => 'SelectVariable', 'width' => '100%', 'validVariableTypes' => [], 'save' => true, 'add' => 0, 'visible' => false ];",
+    "    $form[] = [ 'type' => 'RowLayout', 'items' => [",
+    "        [ 'caption' => 'Show Icon',  'name' => 'SecondVariableShowIcon',  'type' => 'CheckBox', 'save' => true, 'add' => true, 'visible' => false ],",
+    "        [ 'caption' => 'Show Label', 'name' => 'SecondVariableShowLabel', 'type' => 'CheckBox', 'save' => true, 'add' => true, 'visible' => false ],",
+    "        [ 'caption' => 'Show Value', 'name' => 'SecondVariableShowValue', 'type' => 'CheckBox', 'save' => true, 'add' => true, 'visible' => false ]",
+    "    ] ];",
+    "    $form[] = [ 'caption' => 'Label (Overrides the variable name)', 'name' => 'SecondVariableLabel', 'type' => 'ValidationTextBox', 'width' => '100%', 'save' => true, 'add' => '', 'visible' => false ];",
+    "    // Button-Felder (sichtbar bei button)",
+    "    $form[] = [ 'caption' => 'Bool Button Color', 'name' => 'boolButtonColor', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => -1, 'value' => -1, 'visible' => true ];",
+    "    $form[] = [ 'caption' => 'Button Width', 'name' => 'ButtonWidth', 'type' => 'NumberSpinner', 'minimum' => 20, 'maximum' => 500, 'suffix' => 'px', 'save' => true, 'add' => 120, 'visible' => true ];",
+    "    // Text-Felder (ausgeblendet bei button)",
+    "    $form[] = [ 'caption' => 'Separator line', 'name' => 'ShowBorderLine', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => false ];",
+    "}",
+    "",
+    "return $form;"
+]
+        },
 
     {
       "type": "ExpansionPanel",

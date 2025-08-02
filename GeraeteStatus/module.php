@@ -97,14 +97,15 @@ class UniversalDeviceTile extends IPSModule
      */
     public function GetConfigurationForm()
     {
-        // Lade die statische Form
-        $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
-        
         // Hole die konfigurierten Gruppennamen
         $groupNames = $this->GetAllGroupNames();
         
-        // Finde das Group Select-Element und aktualisiere die Optionen
-        $this->updateGroupSelectOptions($form, $groupNames);
+        // Lade die statische Form als Text und ersetze Gruppennamen direkt
+        $formJson = file_get_contents(__DIR__ . '/form.json');
+        $formJson = $this->replaceGroupNamesInFormJson($formJson, $groupNames);
+        
+        // Parse die modifizierte Form
+        $form = json_decode($formJson, true);
         
         // Befülle die neue GroupName Anzeige-Spalte mit konfigurierten Gruppennamen
         $this->populateGroupNameColumn($form, $groupNames);
@@ -113,61 +114,69 @@ class UniversalDeviceTile extends IPSModule
     }
     
     /**
-     * Aktualisiert die Group Select-Optionen mit konfigurierten Gruppennamen
-     * @param array &$form Das Form-Array (per Referenz)
+     * Ersetzt Gruppennamen direkt im JSON-Text
+     * @param string $formJson Der JSON-Text der Form
      * @param array $groupNames Die konfigurierten Gruppennamen
+     * @return string Der modifizierte JSON-Text
      */
-    private function updateGroupSelectOptions(&$form, $groupNames)
+    private function replaceGroupNamesInFormJson($formJson, $groupNames)
     {
-        // Finde das Group Select-Element rekursiv
-        $this->findAndUpdateGroupSelect($form, $groupNames);
-    }
-    
-    /**
-     * Rekursive Suche nach dem Group Select-Element
-     * @param array &$formElement Das aktuelle Form-Element (per Referenz)
-     * @param array $groupNames Die konfigurierten Gruppennamen
-     */
-    private function findAndUpdateGroupSelect(&$formElement, $groupNames)
-    {
-        if (is_array($formElement)) {
-            // Prüfe, ob dies das Group Select-Element ist
-            if (isset($formElement['name']) && $formElement['name'] === 'Group' && 
-                isset($formElement['type']) && $formElement['type'] === 'Select') {
-                
-                // Erstelle neue Optionen mit konfigurierten Gruppennamen
-                $newOptions = [
-                    [
-                        'caption' => 'keine Gruppe',
-                        'value' => 'keine Gruppe'
-                    ]
-                ];
-                
-                // Füge konfigurierte Gruppennamen hinzu
-                for ($i = 1; $i <= 10; $i++) {
-                    $groupName = 'Gruppe ' . $i; // Fallback
-                    
-                    // Verwende konfigurierten Namen falls vorhanden
-                    if (isset($groupNames[$i]) && !empty($groupNames[$i]['name'])) {
-                        $groupName = $groupNames[$i]['name'];
-                    }
-                    
-                    $newOptions[] = [
-                        'caption' => $groupName,
-                        'value' => 'Gruppe ' . $i  // Value bleibt als Gruppe X für Backward-Kompatibilität
-                    ];
-                }
-                
-                $formElement['options'] = $newOptions;
-                // Weiter suchen, da es mehrere Group Select-Elemente gibt
+        
+        // Baue die neuen Group-Optionen als Text
+        $newOptionsText = "";
+        
+        // Erste Option: keine Gruppe
+        $newOptionsText .= "        [ 'caption' => 'keine Gruppe', 'value' => 'keine Gruppe' ],\n";
+        
+        // Füge konfigurierte Gruppennamen hinzu
+        for ($i = 1; $i <= 10; $i++) {
+            $groupName = 'Gruppe ' . $i; // Fallback
+            
+            // Verwende konfigurierten Namen falls vorhanden
+            if (isset($groupNames[$i]) && !empty($groupNames[$i]['name'])) {
+                $groupName = $groupNames[$i]['name'];
             }
             
-            // Rekursive Suche in allen Array-Elementen
-            foreach ($formElement as &$subElement) {
-                $this->findAndUpdateGroupSelect($subElement, $groupNames);
-            }
+            $comma = ($i < 10) ? ',' : ''; // Letztes Element ohne Komma
+            $newOptionsText .= "        [ 'caption' => '" . addslashes($groupName) . "', 'value' => 'Gruppe " . $i . "' ]" . $comma . "\n";
         }
+        
+        // Definiere das Pattern für die alte Options-Sektion
+        $pattern = '/(
+        .*?"options" => \[\n).*?(        \],?\n)/s';
+        
+        // Alternative: Präziserer Pattern für Group Select Optionen
+        $pattern = '/("        \[ \'caption\' => \'keine Gruppe\'.*?)\n(.*?)(        \[ \'caption\' => \'Gruppe 10\'.*?)\n/s';
+        
+        // Noch einfacher: Ersetze direkt die bekannten statischen Zeilen
+        $patterns = [
+            "        [ 'caption' => 'Gruppe 1', 'value' => 'Gruppe 1' ]," => "        [ 'caption' => '" . addslashes($groupNames[1]['name'] ?? 'Gruppe 1') . "', 'value' => 'Gruppe 1' ],",
+            "        [ 'caption' => 'Gruppe 2', 'value' => 'Gruppe 2' ]," => "        [ 'caption' => '" . addslashes($groupNames[2]['name'] ?? 'Gruppe 2') . "', 'value' => 'Gruppe 2' ],",
+            "        [ 'caption' => 'Gruppe 3', 'value' => 'Gruppe 3' ]," => "        [ 'caption' => '" . addslashes($groupNames[3]['name'] ?? 'Gruppe 3') . "', 'value' => 'Gruppe 3' ],",
+            "        [ 'caption' => 'Gruppe 4', 'value' => 'Gruppe 4' ]," => "        [ 'caption' => '" . addslashes($groupNames[4]['name'] ?? 'Gruppe 4') . "', 'value' => 'Gruppe 4' ],",
+            "        [ 'caption' => 'Gruppe 5', 'value' => 'Gruppe 5' ]," => "        [ 'caption' => '" . addslashes($groupNames[5]['name'] ?? 'Gruppe 5') . "', 'value' => 'Gruppe 5' ],",
+            "        [ 'caption' => 'Gruppe 6', 'value' => 'Gruppe 6' ]," => "        [ 'caption' => '" . addslashes($groupNames[6]['name'] ?? 'Gruppe 6') . "', 'value' => 'Gruppe 6' ],",
+            "        [ 'caption' => 'Gruppe 7', 'value' => 'Gruppe 7' ]," => "        [ 'caption' => '" . addslashes($groupNames[7]['name'] ?? 'Gruppe 7') . "', 'value' => 'Gruppe 7' ],",
+            "        [ 'caption' => 'Gruppe 8', 'value' => 'Gruppe 8' ]," => "        [ 'caption' => '" . addslashes($groupNames[8]['name'] ?? 'Gruppe 8') . "', 'value' => 'Gruppe 8' ],",
+            "        [ 'caption' => 'Gruppe 9', 'value' => 'Gruppe 9' ]," => "        [ 'caption' => '" . addslashes($groupNames[9]['name'] ?? 'Gruppe 9') . "', 'value' => 'Gruppe 9' ],",
+            "        [ 'caption' => 'Gruppe 10', 'value' => 'Gruppe 10' ]" => "        [ 'caption' => '" . addslashes($groupNames[10]['name'] ?? 'Gruppe 10') . "', 'value' => 'Gruppe 10' ]"
+        ];
+        
+        // Ersetze jede Gruppe einzeln
+        foreach ($patterns as $search => $replace) {
+            $formJson = str_replace($search, $replace, $formJson);
+        }
+        
+        return $formJson;
     }
+    
+
+    
+
+    
+
+    
+
     
     /**
      * Befüllt die neue GroupName Anzeige-Spalte mit konfigurierten Gruppennamen
@@ -555,7 +564,7 @@ class UniversalDeviceTile extends IPSModule
     public function RequestAction($Ident, $value) {
         // Prüfe zuerst auf spezielle Aktionen
         if ($Ident === 'UpdateDisplayTypeFields') {
-            $this->UDST_UpdateDisplayTypeFields($value);
+            $this->UpdateDisplayTypeVisibility($value, $this->InstanceID);
             return;
         }
         
@@ -816,7 +825,7 @@ class UniversalDeviceTile extends IPSModule
                     }
                 }
             } else {
-                $hideImageColumn = false; // No associations = show image column with default
+                $hideImageColumn = true; // No associations = hide image column
             }
             $result['hideImageColumn'] = $hideImageColumn;
             
@@ -858,8 +867,12 @@ class UniversalDeviceTile extends IPSModule
                 $result['statusBildauswahl'] = 'none'; // Default fallback
             }
         } else {
-            // Fallback: Wenn keine Statusvariable konfiguriert ist, verwende img_wm_an als Standard
+            // Fallback: Wenn keine Statusvariable konfiguriert ist, kein Bild anzeigen
             $result['statusBildauswahl'] = 'none';
+            
+            // Wenn keine Statusvariable konfiguriert ist, gibt es auch keine Assoziationen
+            // → Bildspalte ausblenden
+            $result['hideImageColumn'] = true;
         }
         
         // UNIVERSAL GUARANTEE: statusBildauswahl MUST ALWAYS be set
@@ -1018,7 +1031,7 @@ class UniversalDeviceTile extends IPSModule
                         'variableType' => $variableInfo['VariableType'], // Für Button-Validierung
                         'group' => $variable['Group'] ?? 'keine Gruppe', // Group-Information für Frontend-Gruppierung
                         'showGroupName' => $variable['ShowGroupName'] ?? false, // Show Group Name Flag für Frontend
-                        'showIcon' => ($variable['ShowIcon'] ?? true) && !empty($icon) && $icon !== 'Transparent',
+                        'showIcon' => $variable['ShowIcon'],
                         'showLabel' => $variable['ShowLabel'] ?? true,
                         'showValue' => $variable['ShowValue'] ?? true,
                         'fontSize' => $variable['FontSize'] ?? 12,
@@ -1333,6 +1346,87 @@ class UniversalDeviceTile extends IPSModule
     // Konvertieren Sie Ihre Liste in JSON und aktualisieren Sie das Konfigurationsformular
     $jsonListData = json_encode($listData);
     $this->UpdateFormField('ProfilAssoziazionen', 'values', $jsonListData);
+    }
+    
+    // Temporary alias for cached form calls - can be removed after Symcon restart
+    public function UDST_UpdateDisplayTypeVisibility($id, $displayType, $rowIndex = null)
+    {
+        // Forward to the new RequestAction system
+        $this->UpdateDisplayTypeVisibility($id, $displayType);
+    }
+    
+    public function UpdateDisplayTypeVisibility(string $displayType, int $rowId = null)
+    {
+        IPS_LogMessage('UpdateDisplayTypeVisibility', 'DisplayType: ' . $displayType . ', RowID: ' . ($rowId ?? 'null'));
+        
+        // Basierend auf Display Type verschiedene Felder ein-/ausblenden
+        switch ($displayType) {
+            case 'text':
+                IPS_LogMessage('UpdateDisplayTypeVisibility', 'CASE TEXT: Konfiguriere Felder für Text-Darstellung');
+                // Bei Text: Show Icon ausblenden, da Text-Variablen normalerweise kein Icon haben
+                $this->UpdateFormField('ShowIcon', 'visible', true);
+                $this->UpdateFormField('ShowLabel', 'visible', true);
+                $this->UpdateFormField('ShowValue', 'visible', true);
+                // Progress-spezifische Felder ausblenden
+                $this->UpdateFormField('ProgressColor1', 'visible', false);
+                $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SecondVariable', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
+                $this->UpdateFormField('SecondVariableLabel', 'visible', false);    
+                // Button-spezifische Felder ausblenden
+                $this->UpdateFormField('ButtonWidth', 'visible', false);
+                $this->UpdateFormField('boolButtonColor', 'visible', false);
+                // Text-spezifische Felder einblenden
+                $this->UpdateFormField('ShowBorderLine', 'visible', true);
+                break;
+                
+            case 'progress':
+                IPS_LogMessage('UpdateDisplayTypeVisibility', 'CASE PROGRESS: Konfiguriere Felder für Progress-Darstellung');
+                // Bei Progress: Alle relevanten Felder einblenden
+                $this->UpdateFormField('ShowIcon', 'visible', true);
+                $this->UpdateFormField('ShowLabel', 'visible', true);
+                $this->UpdateFormField('ShowValue', 'visible', true);
+                // Progress-spezifische Felder einblenden
+                $this->UpdateFormField('ProgressColor1', 'visible', true);
+                $this->UpdateFormField('ProgressColor2', 'visible', true);
+                $this->UpdateFormField('SecondVariable', 'visible', true);
+                $this->UpdateFormField('SecondVariableShowIcon', 'visible', true);
+                $this->UpdateFormField('SecondVariableShowLabel', 'visible', true);
+                $this->UpdateFormField('SecondVariableShowValue', 'visible', true);
+                $this->UpdateFormField('SecondVariableLabel', 'visible', true);
+                // Button-spezifische Felder ausblenden
+                $this->UpdateFormField('ButtonWidth', 'visible', false);
+                $this->UpdateFormField('boolButtonColor', 'visible', false);
+                // Text-spezifische Felder ausblenden
+                $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                break;
+                
+            case 'button':
+                IPS_LogMessage('UpdateDisplayTypeVisibility', 'CASE BUTTON: Konfiguriere Felder für Button-Darstellung');
+                // Bei Button: Relevante Felder einblenden
+                $this->UpdateFormField('ShowIcon', 'visible', true);
+                $this->UpdateFormField('ShowLabel', 'visible', true);
+                $this->UpdateFormField('ShowValue', 'visible', true);
+                // Progress-spezifische Felder ausblenden
+                $this->UpdateFormField('ProgressColor1', 'visible', false);
+                $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SecondVariable', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
+                $this->UpdateFormField('SecondVariableLabel', 'visible', false);    
+                // Button-spezifische Felder einblenden
+                $this->UpdateFormField('ButtonWidth', 'visible', true);
+                $this->UpdateFormField('boolButtonColor', 'visible', true);
+
+                // Text-spezifische Felder ausblenden
+                $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                break;
+        }
+        
+        IPS_LogMessage('UpdateDisplayTypeVisibility', 'Felder erfolgreich aktualisiert für DisplayType: ' . $displayType);
     }
     
     

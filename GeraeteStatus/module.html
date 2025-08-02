@@ -517,7 +517,6 @@
 
         .variable-multi-button.active {
             font-weight: 600;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         /* Button-Gruppierung: Spezielle Border-Radius für zusammenhängende Button-Gruppe */
@@ -1116,7 +1115,7 @@
                         button.getAttribute('data-association-value');
                     const isActive = currentValue === associationValue;
                     
-                    // Find the corresponding association for color
+                    // Find the corresponding association for color and content
                     const association = associations.find(assoc => assoc.value === associationValue);
                     const buttonColor = association?.color || 'var(--accent-color)';
                     const opacity = isActive ? '1' : '0.5';
@@ -1130,6 +1129,42 @@
                     } else {
                         button.classList.remove('active');
                     }
+                    
+                    // Update button content based on display configuration
+                    let buttonContentParts = [];
+                    
+                    // Icon
+                    if (variable.showIcon && association?.icon && association.icon !== 'Transparent') {
+                        const iconClass = prepareIconForDisplay(association.icon);
+                        if (iconClass) {
+                            buttonContentParts.push(`<i class="${iconClass}" style="margin-right: 6px;"></i>`);
+                        }
+                    }
+                    
+                    // Label and Value
+                    if (variable.showLabel && association?.name) {
+                        if (variable.showValue) {
+                            // Label mit Doppelpunkt wenn auch Value gezeigt wird
+                            buttonContentParts.push(`<span style="font-weight: 700;">${association.name}:&nbsp;</span>`);
+                        } else {
+                            // Nur Label ohne Doppelpunkt
+                            buttonContentParts.push(`<span style="font-weight: 700;">${association.name}</span>`);
+                        }
+                    }
+                    
+                    if (variable.showValue) {
+                        // Bei aktiven Buttons: aktueller Wert, bei inaktiven: Association-Name als Value
+                        const displayValue = isActive ? variable.formattedValue : association?.name;
+                        buttonContentParts.push(`<span style="font-weight: normal;">${displayValue}</span>`);
+                    }
+                    
+                    // Falls keine Checkbox aktiviert ist, zeige Association-Name als Fallback
+                    if (!variable.showIcon && !variable.showLabel && !variable.showValue && association?.name) {
+                        buttonContentParts.push(`<span>${association.name}</span>`);
+                    }
+                    
+                    // Update button content
+                    button.innerHTML = buttonContentParts.join(' ');
                 });
                 
 
@@ -2012,21 +2047,48 @@
                                 positionClass = 'middle-button'; // Mittlere Buttons: keine runden Ecken
                             }
                             
-                            // Button-Text basierend auf Association-Name
-                            let buttonText = association.name || `Wert ${association.value}`;
+                            // Button-Text basierend auf Display-Konfiguration generieren
+                            let buttonContentParts = [];
                             
-                            // Icon hinzufügen falls vorhanden, mit Fallback auf Standard-Icon
-                            let iconToUse = association.icon;
-                            if (!iconToUse || iconToUse === 'Transparent' || iconToUse === null) {
-                                iconToUse = variable.icon; // Fallback auf Standard-Icon der Variable
-                            }
-                            
-                            if (iconToUse && iconToUse !== 'Transparent') {
-                                const iconClass = prepareIconForDisplay(iconToUse);
-                                if (iconClass) {
-                                    buttonText = `<i class="${iconClass}" style="margin-right: 4px;"></i>${buttonText}`;
+                            // Icon hinzufügen falls konfiguriert und vorhanden
+                            if (variable.showIcon) {
+                                let iconToUse = association.icon;
+                                if (!iconToUse || iconToUse === 'Transparent' || iconToUse === null) {
+                                    iconToUse = variable.icon; // Fallback auf Standard-Icon der Variable
+                                }
+                                
+                                if (iconToUse && iconToUse !== 'Transparent') {
+                                    const iconClass = prepareIconForDisplay(iconToUse);
+                                    if (iconClass) {
+                                        buttonContentParts.push(`<i class="${iconClass}" style="margin-right: 4px;"></i>`);
+                                    }
                                 }
                             }
+                            
+                            // Label hinzufügen falls konfiguriert
+                            if (variable.showLabel && association.name) {
+                                if (variable.showValue) {
+                                    // Label mit Doppelpunkt wenn auch Value gezeigt wird
+                                    buttonContentParts.push(`<span style="font-weight: 700;">${association.name}:&nbsp;</span>`);
+                                } else {
+                                    // Nur Label ohne Doppelpunkt
+                                    buttonContentParts.push(`<span style="font-weight: 700;">${association.name}</span>`);
+                                }
+                            }
+                            
+                            // Value hinzufügen falls konfiguriert
+                            if (variable.showValue) {
+                                // Bei aktiven Buttons: aktueller Wert, bei inaktiven: Association-Name als Value
+                                const displayValue = isActive ? variable.formattedValue : association.name;
+                                buttonContentParts.push(`<span style="font-weight: normal;">${displayValue}</span>`);
+                            }
+                            
+                            // Falls keine Checkbox aktiviert ist, zeige Association-Name als Fallback
+                            if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
+                                buttonContentParts.push(`<span>${association.name || 'Wert ' + association.value}</span>`);
+                            }
+                            
+                            const buttonText = buttonContentParts.join(' ');
                             
                             buttonsHtml += `
                                 <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
