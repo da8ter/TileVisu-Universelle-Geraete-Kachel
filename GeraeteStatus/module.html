@@ -64,7 +64,30 @@
 
         .div1 img {
             width: var(--bildbreite);
-
+        }
+        
+        /* CRITICAL FIX: Verhindere div1 Kollaps durch robuste CSS-Lösung */
+        .main_container .div1 {
+            /* Mindestbreite für div1 auch ohne Bild */
+            min-width: 50px !important;
+        }
+        
+        /* Transparenter Platzhalter für leere Bilder */
+        .main_container .div1 img:not([src]), 
+        .main_container .div1 img[src=""], 
+        .main_container .div1 img {
+            /* 1x1 transparentes PNG als Hintergrundbild */
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI/hPbEEQAAAABJRU5ErkJggg==') !important;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            /* Mindestgröße mit höherer Priorität */
+            min-width: 40px !important;
+            min-height: 40px !important;
+            width: var(--bildbreite) !important;
+            display: block !important;
+            /* Fallback für leere src */
+            content: '' !important;
         }
 
         .div2 {
@@ -638,11 +661,8 @@
             const currentImageIsNone = (bildauswahl === 'none');
             
             
-            // Hide ENTIRE COLUMN only when: ALL associations "none" OR bildbreite = 0
-            const shouldHideColumn = (
-                hideImageColumn ||           // All associations are "none"
-                bildbreite === 0 || bildbreite === '0'   // Image width is 0
-            );
+            // Hide ENTIRE COLUMN only when backend says so (considers all associations AND default image)
+            const shouldHideColumn = hideImageColumn; // Trust backend logic completely
             
             // Hide just IMAGE (keep column) when: current status is "none"
             const shouldHideImageOnly = currentImageIsNone && !shouldHideColumn;
@@ -1455,22 +1475,28 @@
                 const deviceImg = document.getElementById('image');
                 
                 if (data.statusBildauswahl === 'none') {
-                    // Kein Bild anzeigen
-
-                    if (deviceImgContainer) {
-                        deviceImgContainer.classList.add('hidden');
-                        deviceImgContainer.classList.remove('div1');
+                    // Wenn Bildspalte versteckt werden soll, verstecke Container
+                    if (window.hideImageColumn) {
+                        if (deviceImgContainer) {
+                            deviceImgContainer.classList.add('hidden');
+                            deviceImgContainer.classList.remove('div1');
+                        }
+                        return;
+                    } else {
+                        // Bildspalte soll sichtbar bleiben -> inline transparentes Platzhalter-Bild verwenden
+                        // 1x1 transparentes PNG als Data URI
+                        imageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI/hPbEEQAAAABJRU5ErkJggg==';
                     }
-                    // Früh return, da kein Bild gesetzt werden soll
-                    return;
                 } else if (data.statusBildauswahl.startsWith('img_custom_')) {
-                    // Custom Image über Asset-System verwenden
-                    imageUrl = window.assets[data.statusBildauswahl];
-
-                } else {
-                    // Vorkonfigurierte Bilder verwenden (wm_an, wm_aus, dryer_on, dryer_off, etc.)
-                    imageUrl = window.assets[`img_${data.statusBildauswahl}`];
-                }
+            // Custom Image über Asset-System verwenden
+            imageUrl = window.assets[data.statusBildauswahl];
+        } else if (data.statusBildauswahl.startsWith('img_default_')) {
+            // Standard-Bild (Fallback) über Asset-System verwenden
+            imageUrl = window.assets[data.statusBildauswahl];
+        } else {
+            // Vorkonfigurierte Bilder verwenden (wm_an, wm_aus, dryer_on, dryer_off, etc.)
+            imageUrl = window.assets[`img_${data.statusBildauswahl}`];
+        }
                 
                 if (imageUrl && deviceImg && deviceImgContainer) {
                     deviceImg.src = imageUrl;
@@ -2370,7 +2396,7 @@
 
         }
 
-        // CRITICAL: Berechnet Progress-Balken Prozentwert basierend auf Min/Max-Werten
+        // Calculate progress bar percentage based on min/max values
         function calculateProgressValue(rawValue, progressMin, progressMax) {
             const minValue = parseFloat(progressMin) || 0;
             const maxValue = parseFloat(progressMax) || 100;

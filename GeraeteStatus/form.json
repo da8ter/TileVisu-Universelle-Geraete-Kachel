@@ -173,6 +173,21 @@
           "caption": "Custom Label (optional)"
         },
         {
+          "type": "Label",
+          "caption": "Default Image",
+          "bold": true
+        },
+        {
+          "type": "Label",
+          "caption": "Is always displayed as long as no other image is set, e.g., via associations.",
+          "bold": false
+        },
+        {
+          "type": "SelectMedia",
+          "name": "DefaultImage",
+          "caption": "Default Image"
+        },
+        {
           "type": "List",
           "name": "ProfilAssoziazionen",
           "caption": "Profile associations",
@@ -703,12 +718,8 @@
     "    [ 'caption' => 'Font Size', 'name' => 'FontSize', 'type' => 'NumberSpinner', 'minimum' => -1, 'maximum' => 50, 'suffix' => 'px', 'save' => true, 'add' => -1, 'visible' => true ],",
     "    [ 'caption' => 'Text Color', 'name' => 'TextColor', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => -1, 'visible' => true ]",
     "  ] ];",
-    "",
-    "// ---------- DisplayType-abhängige Panels ----------",
-    "// DEBUG: DisplayType Wert ausgeben",
-    "IPS_LogMessage('TileVisu DEBUG', 'DisplayType Wert: ' . json_encode($VariablesList['DisplayType'] ?? 'NICHT_GESETZT'));",
+    "// ---------- DisplayType-abh\u00e4ngige Panels ----------",
     "$displayType = $VariablesList['DisplayType'] ?? 'text';",
-    "",
     "// DisplayType 'text' - alle Felder mit entsprechender Sichtbarkeit",
     "if ($displayType === 'text') {",
     "    // Progress-Felder (ausgeblendet bei text)",

@@ -35,6 +35,7 @@ class UniversalDeviceTile extends IPSModule
         $this->RegisterPropertyBoolean('StatusShowLabel', true);
         $this->RegisterPropertyBoolean('StatusShowValue', true);
         $this->RegisterPropertyString('StatusLabel', '');
+        $this->RegisterPropertyInteger('DefaultImage', 0);
 
         // Neue universelle Variablenliste für konfigurierbare Variablen
         $this->RegisterPropertyString('VariablesList', '[]');
@@ -483,6 +484,21 @@ class UniversalDeviceTile extends IPSModule
             }
         }
         
+        // Standard-Bild laden wenn konfiguriert (für Fallback-Zwecke)
+        $defaultImageId = $this->ReadPropertyInteger('DefaultImage');
+        if ($defaultImageId > 0 && IPS_MediaExists($defaultImageId)) {
+            $media = IPS_GetMedia($defaultImageId);
+            if ($media['MediaType'] === MEDIATYPE_IMAGE) {
+                $imageFile = explode('.', $media['MediaFile']);
+                $imageContent = $this->GetImageDataUri(end($imageFile));
+                if ($imageContent) {
+                    $assets['img_default_' . $defaultImageId] = $imageContent . IPS_GetMediaContent($defaultImageId);
+                }
+            }
+        }
+        
+        // Transparentes Platzhalter-Bild wird jetzt inline im Frontend als Data URI verwendet
+        
         // Fallback: Wenn keine Statusvariable konfiguriert ist und noch kein img_wm_an Asset vorhanden, 
         // lade Standard-Waschmaschinen-Asset als Fallback
         if ($needsFallbackAssets && !isset($assets['img_wm_an'])) {
@@ -814,19 +830,21 @@ class UniversalDeviceTile extends IPSModule
             $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
             $statusBildauswahlSet = false; // Flag to track if statusBildauswahl was set
             
-            // Check if ALL associations have Bildauswahl = "none" to hide image column completely
-            $hideImageColumn = true; // Assume we should hide until we find an image
+            // Check if ALL associations have Bildauswahl = "none" AND no default image is configured
+            $allAssociationsNone = true; // Assume all are none until we find one with an image
             if (is_array($profilAssoziationen)) {
                 foreach ($profilAssoziationen as $assoz) {
                     $bildauswahl = $assoz['Bildauswahl'] ?? 'wm_aus';
                     if ($bildauswahl !== 'none') {
-                        $hideImageColumn = false; // Found at least one association with an image
+                        $allAssociationsNone = false; // Found at least one association with an image
                         break;
                     }
                 }
-            } else {
-                $hideImageColumn = true; // No associations = hide image column
             }
+            
+            // Hide image column only if ALL associations are "none" AND no default image is configured
+            $hasDefaultImage = $this->ReadPropertyInteger('DefaultImage') > 0 && IPS_MediaExists($this->ReadPropertyInteger('DefaultImage'));
+            $hideImageColumn = $allAssociationsNone && !$hasDefaultImage;
             $result['hideImageColumn'] = $hideImageColumn;
             
             if (is_array($profilAssoziationen)) {
@@ -842,12 +860,12 @@ class UniversalDeviceTile extends IPSModule
                                 // Asset-Name für Custom Image (wird in GenerateAssets() als base64 geladen)
                                 $result['statusBildauswahl'] = 'img_custom_' . $assoziation['EigenesBild'];
                             } else {
-                                // Fallback wenn kein eigenes Bild konfiguriert
-                                $result['statusBildauswahl'] = 'none';
+                                // Fallback: Verwende Standard-Bild wenn konfiguriert, sonst 'none'
+                                $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
                             }
                         } elseif ($bildauswahl === 'none') {
-                            // Kein Bild anzeigen
-                            $result['statusBildauswahl'] = 'none';
+                            // Fallback: Verwende Standard-Bild wenn konfiguriert, sonst wirklich 'none'
+                            $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
                         } else {
                             // Verwende vorkonfigurierte Bilder (wm_an, wm_aus, dryer_on, dryer_off, etc.)
                             $result['statusBildauswahl'] = $bildauswahl;
@@ -862,17 +880,16 @@ class UniversalDeviceTile extends IPSModule
                 }
             }
             
-            // CRITICAL FIX: Ensure statusBildauswahl is ALWAYS set if we have a status variable
+            // Ensure statusBildauswahl is set if we have a status variable
             if (!$statusBildauswahlSet) {
-                $result['statusBildauswahl'] = 'none'; // Default fallback
+                $result['statusBildauswahl'] = $this->getDefaultImageOrNone(); // Fallback auf Standard-Bild oder 'none'
             }
         } else {
-            // Fallback: Wenn keine Statusvariable konfiguriert ist, kein Bild anzeigen
-            $result['statusBildauswahl'] = 'none';
+            // Fallback: Wenn keine Statusvariable konfiguriert ist, verwende Standard-Bild
+            $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
             
-            // Wenn keine Statusvariable konfiguriert ist, gibt es auch keine Assoziationen
-            // → Bildspalte ausblenden
-            $result['hideImageColumn'] = true;
+            // Image Column Logik wird bereits oben korrekt berechnet (Zeile 847-848)
+            // Keine Überschreibung hier - verwende die bereits berechnete Logik
         }
         
         // UNIVERSAL GUARANTEE: statusBildauswahl MUST ALWAYS be set
@@ -1357,12 +1374,9 @@ class UniversalDeviceTile extends IPSModule
     
     public function UpdateDisplayTypeVisibility(string $displayType, int $rowId = null)
     {
-        IPS_LogMessage('UpdateDisplayTypeVisibility', 'DisplayType: ' . $displayType . ', RowID: ' . ($rowId ?? 'null'));
-        
         // Basierend auf Display Type verschiedene Felder ein-/ausblenden
         switch ($displayType) {
             case 'text':
-                IPS_LogMessage('UpdateDisplayTypeVisibility', 'CASE TEXT: Konfiguriere Felder für Text-Darstellung');
                 // Bei Text: Show Icon ausblenden, da Text-Variablen normalerweise kein Icon haben
                 $this->UpdateFormField('ShowIcon', 'visible', true);
                 $this->UpdateFormField('ShowLabel', 'visible', true);
@@ -1383,7 +1397,6 @@ class UniversalDeviceTile extends IPSModule
                 break;
                 
             case 'progress':
-                IPS_LogMessage('UpdateDisplayTypeVisibility', 'CASE PROGRESS: Konfiguriere Felder für Progress-Darstellung');
                 // Bei Progress: Alle relevanten Felder einblenden
                 $this->UpdateFormField('ShowIcon', 'visible', true);
                 $this->UpdateFormField('ShowLabel', 'visible', true);
@@ -1404,7 +1417,6 @@ class UniversalDeviceTile extends IPSModule
                 break;
                 
             case 'button':
-                IPS_LogMessage('UpdateDisplayTypeVisibility', 'CASE BUTTON: Konfiguriere Felder für Button-Darstellung');
                 // Bei Button: Relevante Felder einblenden
                 $this->UpdateFormField('ShowIcon', 'visible', true);
                 $this->UpdateFormField('ShowLabel', 'visible', true);
@@ -1425,8 +1437,6 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 break;
         }
-        
-        IPS_LogMessage('UpdateDisplayTypeVisibility', 'Felder erfolgreich aktualisiert für DisplayType: ' . $displayType);
     }
     
     
@@ -1779,7 +1789,7 @@ class UniversalDeviceTile extends IPSModule
         // Extrahiere Variable-Info
         $variable = IPS_GetVariable($variableId);
         
-        // DEBUG: Log variable info  
+
         $profileName = $variable['VariableProfile'] ?? 'NONE';
         $customPresentation = is_array($variable['VariableCustomPresentation'] ?? null) ? json_encode($variable['VariableCustomPresentation']) : ($variable['VariableCustomPresentation'] ?? 'NONE');
 
@@ -2131,7 +2141,7 @@ class UniversalDeviceTile extends IPSModule
             $iconFalseSet = isset($customPresentation['ICON_FALSE']) && trim($customPresentation['ICON_FALSE']) !== '';
             if ($iconTrueSet || $iconFalseSet) {
                 
-                // CRITICAL FIX: Prüfe USE_ICON_FALSE Flag um Icon-Behavior zu bestimmen
+                // Check USE_ICON_FALSE flag to determine icon behavior
                 $useIconFalse = isset($customPresentation['USE_ICON_FALSE']) ? $customPresentation['USE_ICON_FALSE'] : true;
                 
                 $associations = [];
@@ -2298,6 +2308,18 @@ class UniversalDeviceTile extends IPSModule
         }
         
         return null;
+    }
+    
+    /**
+     * Hilfsfunktion: Gibt das konfigurierte Standard-Bild zurück oder 'none' wenn nicht konfiguriert
+     * @return string Asset-Name für das Standard-Bild oder 'none'
+     */
+    private function getDefaultImageOrNone() {
+        $defaultImageId = $this->ReadPropertyInteger('DefaultImage');
+        if ($defaultImageId > 0 && IPS_MediaExists($defaultImageId)) {
+            return 'img_default_' . $defaultImageId;
+        }
+        return 'none';
     }
     
 }

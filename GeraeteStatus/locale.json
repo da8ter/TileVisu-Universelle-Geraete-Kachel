@@ -123,7 +123,9 @@
         "Show Line Under Group": "Linie unter Gruppe",
         "Button height": "Schalter Höhe",
         "Buttonconfiguration": "Schalterkonfiguration",
-        "Group Name Size": "Gruppennamen-Größe"
+        "Group Name Size": "Gruppennamen-Größe",
+        "Default Image": "Standard-Bild",
+        "Is always displayed as long as no other image is set, e.g., via associations.": "Wird immer angezeigt so lange kein anderes Bild z.B. bei den Assoziationen eingestellt ist."
 
         }
     }
