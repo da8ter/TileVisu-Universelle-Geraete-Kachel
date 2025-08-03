@@ -1028,16 +1028,47 @@ class UniversalDeviceTile extends IPSModule
                     $finalFormattedValue = GetValueFormatted($variable['Variable']);
                     $finalRawValue = GetValue($variable['Variable']);
                     
-                    if (!$progressbarActive) {
-                        // Progressbar deaktiviert: Setze Werte auf 0, aber behalte Suffix bei
+                    if (!$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress') {
+                        // Progressbar deaktiviert: Nur für ECHTE Progress-Variablen Werte auf 0 setzen
                         $finalRawValue = 0;
-                        // Extrahiere Suffix aus ursprünglichem formatiertem Wert
-                        $originalFormatted = $finalFormattedValue;
-                        if (preg_match('/[^0-9.,\-\s]+/', $originalFormatted, $matches)) {
-                            $suffix = $matches[0];
-                            $finalFormattedValue = '0 ' . $suffix;
-                        } else {
+                        
+                        IPS_LogMessage('TileVisu-DEBUG', 'Processing progress variable: ' . $finalFormattedValue);
+                        
+                        // Spezielle Behandlung für Zeit-Formate
+                        if (preg_match('/^\s*(\d+):(\d+):(\d+)\s*$/', $finalFormattedValue)) {
+                            // Format: HH:MM:SS -> 00:00:00
+                            IPS_LogMessage('TileVisu-DEBUG', 'Matched HH:MM:SS format');
+                            $finalFormattedValue = '00:00:00';
+                        } elseif (preg_match('/^\s*(\d+):(\d+)\s*$/', $finalFormattedValue)) {
+                            // Format: H:MM oder HH:MM -> 0:00
+                            IPS_LogMessage('TileVisu-DEBUG', 'Matched H:MM format');
+                            $finalFormattedValue = '0:00';
+                        } elseif (preg_match('/^\s*[0-9.,\-]+\s*(%|V|A|W|kW|kWh|°C|°F|bar|Pa|Hz|m|cm|mm|kg|g|l|ml)\s*$/', $finalFormattedValue)) {
+                            // Numerische Werte mit Einheiten
+                            IPS_LogMessage('TileVisu-DEBUG', 'Matched numeric with units');
+                            $originalFormatted = $finalFormattedValue;
+                            if (preg_match('/[^0-9.,\-\s]+/', $originalFormatted, $matches)) {
+                                $suffix = $matches[0];
+                                $finalFormattedValue = '0 ' . $suffix;
+                            } else {
+                                $finalFormattedValue = '0';
+                            }
+                        } elseif (preg_match('/^\s*[0-9.,\-]+\s*$/', $finalFormattedValue)) {
+                            // Reine numerische Werte ohne Einheit
+                            IPS_LogMessage('TileVisu-DEBUG', 'Matched pure numeric');
                             $finalFormattedValue = '0';
+                        } else {
+                            // Unbekanntes Format - prüfen was es ist
+                            IPS_LogMessage('TileVisu-DEBUG', 'Unknown format, trying suffix extraction: ' . $finalFormattedValue);
+                            if (preg_match('/[^0-9.,\-\s]+/', $finalFormattedValue, $matches)) {
+                                $suffix = $matches[0];
+                                IPS_LogMessage('TileVisu-DEBUG', 'Found suffix: ' . $suffix);
+                                $finalFormattedValue = '0 ' . $suffix;
+                            } else {
+                                // Text-Werte aus Profil-Assoziationen werden NICHT verändert
+                                IPS_LogMessage('TileVisu-DEBUG', 'No suffix found, keeping original value');
+                                $finalRawValue = GetValue($variable['Variable']); // Restore original raw value
+                            }
                         }
                     }
                     
@@ -1093,15 +1124,38 @@ class UniversalDeviceTile extends IPSModule
                         $secondFinalRawValue = GetValue($variable['SecondVariable']);
                         
                         if (!$progressbarActive) {
-                            // Progressbar deaktiviert: Setze auch zweite Variable auf 0, aber behalte Suffix bei
+                            // Progressbar deaktiviert: Setze auch zweite Variable auf 0 mit korrekter Format-Behandlung
                             $secondFinalRawValue = 0;
-                            // Extrahiere Suffix aus ursprünglichem formatiertem Wert der zweiten Variable
-                            $secondOriginalFormatted = $secondFinalFormattedValue;
-                            if (preg_match('/[^0-9.,\-\s]+/', $secondOriginalFormatted, $matches)) {
-                                $suffix = $matches[0];
-                                $secondFinalFormattedValue = '0 ' . $suffix;
-                            } else {
+                            
+                            IPS_LogMessage('TileVisu-DEBUG', 'Processing second variable: ' . $secondFinalFormattedValue);
+                            
+                            // Spezielle Behandlung für Zeit-Formate (gleiche Logik wie Hauptvariable)
+                            if (preg_match('/^\s*(\d+):(\d+):(\d+)\s*$/', $secondFinalFormattedValue)) {
+                                // Format: HH:MM:SS -> 00:00:00
+                                IPS_LogMessage('TileVisu-DEBUG', 'Second var matched HH:MM:SS format');
+                                $secondFinalFormattedValue = '00:00:00';
+                            } elseif (preg_match('/^\s*(\d+):(\d+)\s*$/', $secondFinalFormattedValue)) {
+                                // Format: H:MM oder HH:MM -> 0:00
+                                IPS_LogMessage('TileVisu-DEBUG', 'Second var matched H:MM format');
+                                $secondFinalFormattedValue = '0:00';
+                            } elseif (preg_match('/^\s*[0-9.,\-]+\s*(%|V|A|W|kW|kWh|°C|°F|bar|Pa|Hz|m|cm|mm|kg|g|l|ml)\s*$/', $secondFinalFormattedValue)) {
+                                // Numerische Werte mit Einheiten
+                                IPS_LogMessage('TileVisu-DEBUG', 'Second var matched numeric with units');
+                                $secondOriginalFormatted = $secondFinalFormattedValue;
+                                if (preg_match('/[^0-9.,\-\s]+/', $secondOriginalFormatted, $matches)) {
+                                    $suffix = $matches[0];
+                                    $secondFinalFormattedValue = '0 ' . $suffix;
+                                } else {
+                                    $secondFinalFormattedValue = '0';
+                                }
+                            } elseif (preg_match('/^\s*[0-9.,\-]+\s*$/', $secondFinalFormattedValue)) {
+                                // Reine numerische Werte ohne Einheit
+                                IPS_LogMessage('TileVisu-DEBUG', 'Second var matched pure numeric');
                                 $secondFinalFormattedValue = '0';
+                            } else {
+                                // Text-Werte aus Profil-Assoziationen werden NICHT verändert
+                                IPS_LogMessage('TileVisu-DEBUG', 'Second var: keeping original text value');
+                                $secondFinalRawValue = GetValue($variable['SecondVariable']); // Restore original raw value
                             }
                         }
                         
@@ -1238,69 +1292,15 @@ class UniversalDeviceTile extends IPSModule
     }
 
     /**
-     * Einfache Abfang-Funktion: Interceptiert Progress-Werte und setzt sie auf 0 wenn Progressbar deaktiviert
+     * Legacy function: Progress value interception is now handled in GetFullUpdateMessage()
+     * This function is kept for compatibility but does minimal processing
      * @param string $fullMessageJson JSON-String der vollständigen Update-Nachricht
-     * @return string Modifizierte JSON-Nachricht mit abgefangenen Progress-Werten
+     * @return string Unveränderte JSON-Nachricht (Verarbeitung erfolgt bereits in GetFullUpdateMessage)
      */
     private function InterceptProgressValuesIfNeeded($fullMessageJson) {
-        // Decode die vollständige Nachricht
-        $messageData = json_decode($fullMessageJson, true);
-        if (!is_array($messageData)) {
-            return $fullMessageJson; // Rückgabe original wenn decode fehlschlägt
-        }
-        
-        // Prüfe ob Progress-Balken deaktiviert werden sollen (gleiche Logik wie GetFullUpdateMessage)
-        $progressbarActive = true; // Standard
-        $statusId = $this->ReadPropertyInteger('Status');
-        if ($statusId > 0 && IPS_VariableExists($statusId)) {
-            $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-            if (is_array($profilAssoziationen)) {
-                $currentStatusValue = GetValue($statusId);
-                foreach ($profilAssoziationen as $assoziation) {
-                    if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentStatusValue) {
-                        $progressbarActive = $assoziation['ProgressbarActive'] ?? true;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // Wenn Progressbar aktiv ist, keine Änderungen nötig
-        if ($progressbarActive) {
-            return $fullMessageJson;
-        }
-        
-        // Progressbar deaktiviert: Abfangen und Zeroing der Progress-Werte  
-        if (isset($messageData['variables']) && is_array($messageData['variables'])) {
-            foreach ($messageData['variables'] as &$variable) {
-                // Nur Progress-Variablen manipulieren
-                if (($variable['displayType'] ?? 'text') === 'progress') {
-                    // Haupt-Variable auf 0 setzen, Suffix beibehalten
-                    $originalFormatted = $variable['formattedValue'] ?? '';
-                    if (preg_match('/[^0-9.,\-\s]+/', $originalFormatted, $matches)) {
-                        $suffix = $matches[0];
-                        $variable['formattedValue'] = '0 ' . $suffix;
-                    } else {
-                        $variable['formattedValue'] = '0';
-                    }
-                    $variable['rawValue'] = 0;
-                    
-                    // Second-Variable auch auf 0 setzen wenn vorhanden
-                    if (isset($variable['secondVariable'])) {
-                        $originalSecondFormatted = $variable['secondVariable']['formattedValue'] ?? '';
-                        if (preg_match('/[^0-9.,\-\s]+/', $originalSecondFormatted, $matches)) {
-                            $suffix = $matches[0];
-                            $variable['secondVariable']['formattedValue'] = '0 ' . $suffix;
-                        } else {
-                            $variable['secondVariable']['formattedValue'] = '0';
-                        }
-                        $variable['secondVariable']['rawValue'] = 0;
-                    }
-                }
-            }
-        }
-        
-        return json_encode($messageData);
+        // Progress value processing is now handled directly in GetFullUpdateMessage()
+        // to avoid code duplication and ensure consistency
+        return $fullMessageJson;
     }
 
     public function UpdateList(int $StatusID)
