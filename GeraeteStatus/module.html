@@ -72,10 +72,9 @@
             min-width: 50px !important;
         }
         
-        /* Transparenter Platzhalter für leere Bilder */
+        /* Transparenter Platzhalter NUR für leere Bilder - iOS FIX */
         .main_container .div1 img:not([src]), 
-        .main_container .div1 img[src=""], 
-        .main_container .div1 img {
+        .main_container .div1 img[src=""] {
             /* 1x1 transparentes PNG als Hintergrundbild */
             background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI/hPbEEQAAAABJRU5ErkJggg==') !important;
             background-size: contain;
@@ -88,6 +87,15 @@
             display: block !important;
             /* Fallback für leere src */
             content: '' !important;
+        }
+        
+        /* Normale img-Elemente: Nur Basis-Styling ohne background-image Override */
+        .main_container .div1 img {
+            width: var(--bildbreite) !important;
+            min-width: var(--bildbreite) !important;
+            max-width: var(--bildbreite) !important;
+            display: block;
+            box-sizing: border-box;
         }
 
         .div2 {
@@ -656,18 +664,11 @@
             const bildauswahl = window.currentBildauswahl;
             const bildbreite = window.currentBildbreite;
             
-            // SEPARATED LOGIC: Column hiding vs Image hiding
+            // Only handle COLUMN hiding vs showing - let renderStatus() handle individual image content
             const hideImageColumn = window.hideImageColumn || false;
-            const currentImageIsNone = (bildauswahl === 'none');
             
-            
-            // Hide ENTIRE COLUMN only when backend says so (considers all associations AND default image)
-            const shouldHideColumn = hideImageColumn; // Trust backend logic completely
-            
-            // Hide just IMAGE (keep column) when: current status is "none"
-            const shouldHideImageOnly = currentImageIsNone && !shouldHideColumn;
-            
-            if (shouldHideColumn) {
+            if (hideImageColumn) {
+                // Hide ENTIRE COLUMN when backend determines no images should be shown
                 if (div1) {
                     div1.style.display = 'none';
                     div1.className = 'hidden';
@@ -676,24 +677,12 @@
                     div2.style.padding = '10px';
                     div2.style.width = '100%'; // div2 nimmt gesamte Breite ein
                 }
-            } else if (shouldHideImageOnly) {
-                if (div1) {
-                    div1.style.display = 'block';  // Keep column visible
-                    div1.className = 'div1';        // Keep normal column class
-                    // Hide the actual image element inside div1
-                    const imageElement = div1.querySelector('#image');
-                    if (imageElement) {
-                        imageElement.style.display = 'none';
-                    }
-                }
-                if (div2) {
-                    div2.style.width = '100%';
-                }
             } else {
+                // Show COLUMN - renderStatus() will handle individual image content (real images vs placeholders)
                 if (div1) {
                     div1.style.display = 'block';
                     div1.className = 'div1';
-                    // Show the image element inside div1
+                    // Always ensure image element is visible - renderStatus() sets appropriate content
                     const imageElement = div1.querySelector('#image');
                     if (imageElement) {
                         imageElement.style.display = 'block';
@@ -1468,35 +1457,34 @@
             if (data.statusBildauswahl) {
                 let imageUrl = null;
                 
-               
-                
                 // DOM-Elemente ZUERST definieren, bevor sie verwendet werden
                 const deviceImgContainer = document.getElementById('div1');
                 const deviceImg = document.getElementById('image');
                 
-                if (data.statusBildauswahl === 'none') {
-                    // Wenn Bildspalte versteckt werden soll, verstecke Container
-                    if (window.hideImageColumn) {
-                        if (deviceImgContainer) {
-                            deviceImgContainer.classList.add('hidden');
-                            deviceImgContainer.classList.remove('div1');
-                        }
-                        return;
-                    } else {
-                        // Bildspalte soll sichtbar bleiben -> inline transparentes Platzhalter-Bild verwenden
-                        // 1x1 transparentes PNG als Data URI
-                        imageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI/hPbEEQAAAABJRU5ErkJggg==';
+                // GLOBALE ENTSCHEIDUNG: Soll die gesamte Bildspalte versteckt werden?
+                if (window.hideImageColumn) {
+                    if (deviceImgContainer) {
+                        deviceImgContainer.classList.add('hidden');
+                        deviceImgContainer.classList.remove('div1');
                     }
+                    return;
+                }
+                
+                // PRO-ASSOZIATION-ENTSCHEIDUNG: Welches Bild soll für diese Assoziation angezeigt werden?
+                if (data.statusBildauswahl === 'none') {
+                    // Keine Bild für diese Assoziation -> transparentes Platzhalter-Bild verwenden
+                    // 1x1 transparentes PNG als Data URI
+                    imageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI/hPbEEQAAAABJRU5ErkJggg==';
                 } else if (data.statusBildauswahl.startsWith('img_custom_')) {
-            // Custom Image über Asset-System verwenden
-            imageUrl = window.assets[data.statusBildauswahl];
-        } else if (data.statusBildauswahl.startsWith('img_default_')) {
-            // Standard-Bild (Fallback) über Asset-System verwenden
-            imageUrl = window.assets[data.statusBildauswahl];
-        } else {
-            // Vorkonfigurierte Bilder verwenden (wm_an, wm_aus, dryer_on, dryer_off, etc.)
-            imageUrl = window.assets[`img_${data.statusBildauswahl}`];
-        }
+                    // Custom Image über Asset-System verwenden
+                    imageUrl = window.assets[data.statusBildauswahl];
+                } else if (data.statusBildauswahl.startsWith('img_default_')) {
+                    // Standard-Bild (Fallback) über Asset-System verwenden
+                    imageUrl = window.assets[data.statusBildauswahl];
+                } else {
+                    // Vorkonfigurierte Bilder verwenden (wm_an, wm_aus, dryer_on, dryer_off, etc.)
+                    imageUrl = window.assets[`img_${data.statusBildauswahl}`];
+                }
                 
                 if (imageUrl && deviceImg && deviceImgContainer) {
                     deviceImg.src = imageUrl;
