@@ -826,6 +826,14 @@
               }
             },
             {
+              "name": "Groupicon",
+              "caption": "Group Icon",
+              "width": "150px",
+              "edit": {
+                "type": "SelectIcon"
+              }
+            },
+            {
               "name": "ShowGroupName",
               "caption": "Show Group Name",
               "width": "200px",

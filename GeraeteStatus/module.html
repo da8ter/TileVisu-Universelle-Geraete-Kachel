@@ -1575,7 +1575,19 @@
                         }
                         tempDiv.textContent = displayGroupName + ':';
                         
-                        const width = tempDiv.offsetWidth;
+                        let width = tempDiv.offsetWidth;
+                        
+                        // Prüfe ob diese Gruppe ein Icon hat und füge Icon-Breite hinzu
+                        const iconGroupMatch = groupKey.match(/Gruppe (\d+)/);
+                        if (iconGroupMatch && window.groupNames) {
+                            const groupNumber = parseInt(iconGroupMatch[1]);
+                            const groupConfig = window.groupNames[groupNumber];
+                            if (groupConfig?.groupIcon && groupConfig.groupIcon !== '') {
+                                // Icon-Breite: 16px Icon + 8px margin-right = 24px
+                                width += 24;
+                            }
+                        }
+                        
                         maxGroupNameWidth = Math.max(maxGroupNameWidth, width);
                         
                     }
@@ -1663,9 +1675,18 @@
                             // Nur font-size setzen wenn nicht -1
                             const fontSizeStyle = groupNameFontSize !== -1 ? `font-size: ${groupNameFontSize}px;` : '';
                             
+                            // Group Icon vorbereiten
+                            let groupIconHtml = '';
+                            if (groupConfig?.groupIcon && groupConfig.groupIcon !== '') {
+                                const iconClass = prepareIconForDisplay(groupConfig.groupIcon);
+                                if (iconClass) {
+                                    groupIconHtml = `<i class="${iconClass}" style="margin-right: 8px; color: var(--accent-color);"></i>`;
+                                }
+                            }
+                            
                             content += `
-                                <div class="group-name-above" style="font-weight: bold; color: var(--content-color); ${fontSizeStyle} margin-bottom: 0px; margin-top: 10px; text-align: left; opacity: 0.5;">
-                                    ${displayGroupName}:
+                                <div class="group-name-above" style="font-weight: bold; color: var(--content-color); ${fontSizeStyle} margin-bottom: 0px; margin-top: 10px; text-align: left; opacity: 0.5; display: flex; align-items: center;">
+                                    ${groupIconHtml}${displayGroupName}:
                                 </div>
                             `;
                             
@@ -1692,9 +1713,19 @@
                             // Verwende feste Breite für einheitliches Alignment aller Gruppen
                             const groupNameWidth = maxGroupNameWidth > 0 ? maxGroupNameWidth + 'px' : 'auto';
                             
+                            // Group Icon vorbereiten
+                            const groupConfig = window.groupNames?.[parseInt(variable.group.match(/Gruppe (\d+)/)?.[1])];
+                            let groupIconHtml = '';
+                            if (groupConfig?.groupIcon && groupConfig.groupIcon !== '') {
+                                const iconClass = prepareIconForDisplay(groupConfig.groupIcon);
+                                if (iconClass) {
+                                    groupIconHtml = `<i class="${iconClass}" style="margin-right: 8px; color: var(--accent-color);"></i>`;
+                                }
+                            }
+                            
                             content += `
-                                <div class="group-name-label" style="font-weight: bold; color: var(--content-color); ${labelFontSizeStyle} white-space: nowrap; align-self: center; margin-right: 8px; width: ${groupNameWidth}; display: inline-block; text-align: left;">
-                                    ${displayGroupName}:
+                                <div class="group-name-label" style="font-weight: bold; color: var(--content-color); ${labelFontSizeStyle} white-space: nowrap; align-self: center; margin-right: 8px; width: ${groupNameWidth}; display: flex; align-items: center; text-align: left;">
+                                    ${groupIconHtml}${displayGroupName}:
                                 </div>
                             `;
                             

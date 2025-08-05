@@ -401,12 +401,21 @@ class UniversalDeviceTile extends IPSModule
                     $showLine = isset($group['line']) ? (bool)$group['line'] : false;
                     $stretch = isset($group['stretch']) ? (bool)$group['stretch'] : false;
                     $showGroupName = isset($group['ShowGroupName']) ? (bool)$group['ShowGroupName'] : false;
+                    $groupIcon = isset($group['Groupicon']) ? trim($group['Groupicon']) : '';
+                
+                    // Map Group Icon durch das bestehende Icon-Mapping-System
+                    $mappedIcon = '';
+                    if (!empty($groupIcon)) {
+                        $mappedIcon = $this->MapIconToFontAwesome($groupIcon);
+                    }
+                
                     $result[$groupNumber] = [
                         'name' => $group['GroupName'],
                         'showAbove' => $showAbove,
                         'showLine' => $showLine,
                         'stretch' => $stretch,
                         'showGroupName' => $showGroupName,
+                        'groupIcon' => $mappedIcon,
                         'fontSize' => $this->ReadPropertyInteger('GroupNameSize') // Globale Schriftgröße für alle Gruppen
                     ];
                 }
@@ -422,6 +431,7 @@ class UniversalDeviceTile extends IPSModule
                     'showLine' => false,
                     'stretch' => false,
                     'showGroupName' => false,
+                    'groupIcon' => '',
                     'fontSize' => $this->ReadPropertyInteger('GroupNameSize') // Globale Schriftgröße für alle Gruppen
                 ];
             }
