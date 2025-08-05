@@ -1042,20 +1042,20 @@ class UniversalDeviceTile extends IPSModule
                         // Progressbar deaktiviert: Nur für ECHTE Progress-Variablen Werte auf 0 setzen
                         $finalRawValue = 0;
                         
-                        IPS_LogMessage('TileVisu-DEBUG', 'Processing progress variable: ' . $finalFormattedValue);
+
                         
                         // Spezielle Behandlung für Zeit-Formate
                         if (preg_match('/^\s*(\d+):(\d+):(\d+)\s*$/', $finalFormattedValue)) {
                             // Format: HH:MM:SS -> 00:00:00
-                            IPS_LogMessage('TileVisu-DEBUG', 'Matched HH:MM:SS format');
+
                             $finalFormattedValue = '00:00:00';
                         } elseif (preg_match('/^\s*(\d+):(\d+)\s*$/', $finalFormattedValue)) {
                             // Format: H:MM oder HH:MM -> 0:00
-                            IPS_LogMessage('TileVisu-DEBUG', 'Matched H:MM format');
+
                             $finalFormattedValue = '0:00';
                         } elseif (preg_match('/^\s*[0-9.,\-]+\s*(%|V|A|W|kW|kWh|°C|°F|bar|Pa|Hz|m|cm|mm|kg|g|l|ml)\s*$/', $finalFormattedValue)) {
                             // Numerische Werte mit Einheiten
-                            IPS_LogMessage('TileVisu-DEBUG', 'Matched numeric with units');
+
                             $originalFormatted = $finalFormattedValue;
                             if (preg_match('/[^0-9.,\-\s]+/', $originalFormatted, $matches)) {
                                 $suffix = $matches[0];
@@ -1065,18 +1065,18 @@ class UniversalDeviceTile extends IPSModule
                             }
                         } elseif (preg_match('/^\s*[0-9.,\-]+\s*$/', $finalFormattedValue)) {
                             // Reine numerische Werte ohne Einheit
-                            IPS_LogMessage('TileVisu-DEBUG', 'Matched pure numeric');
+
                             $finalFormattedValue = '0';
                         } else {
                             // Unbekanntes Format - prüfen was es ist
-                            IPS_LogMessage('TileVisu-DEBUG', 'Unknown format, trying suffix extraction: ' . $finalFormattedValue);
+
                             if (preg_match('/[^0-9.,\-\s]+/', $finalFormattedValue, $matches)) {
                                 $suffix = $matches[0];
-                                IPS_LogMessage('TileVisu-DEBUG', 'Found suffix: ' . $suffix);
+
                                 $finalFormattedValue = '0 ' . $suffix;
                             } else {
                                 // Text-Werte aus Profil-Assoziationen werden NICHT verändert
-                                IPS_LogMessage('TileVisu-DEBUG', 'No suffix found, keeping original value');
+
                                 $finalRawValue = GetValue($variable['Variable']); // Restore original raw value
                             }
                         }
@@ -1137,20 +1137,20 @@ class UniversalDeviceTile extends IPSModule
                             // Progressbar deaktiviert: Setze auch zweite Variable auf 0 mit korrekter Format-Behandlung
                             $secondFinalRawValue = 0;
                             
-                            IPS_LogMessage('TileVisu-DEBUG', 'Processing second variable: ' . $secondFinalFormattedValue);
+
                             
                             // Spezielle Behandlung für Zeit-Formate (gleiche Logik wie Hauptvariable)
                             if (preg_match('/^\s*(\d+):(\d+):(\d+)\s*$/', $secondFinalFormattedValue)) {
                                 // Format: HH:MM:SS -> 00:00:00
-                                IPS_LogMessage('TileVisu-DEBUG', 'Second var matched HH:MM:SS format');
+
                                 $secondFinalFormattedValue = '00:00:00';
                             } elseif (preg_match('/^\s*(\d+):(\d+)\s*$/', $secondFinalFormattedValue)) {
                                 // Format: H:MM oder HH:MM -> 0:00
-                                IPS_LogMessage('TileVisu-DEBUG', 'Second var matched H:MM format');
+
                                 $secondFinalFormattedValue = '0:00';
                             } elseif (preg_match('/^\s*[0-9.,\-]+\s*(%|V|A|W|kW|kWh|°C|°F|bar|Pa|Hz|m|cm|mm|kg|g|l|ml)\s*$/', $secondFinalFormattedValue)) {
                                 // Numerische Werte mit Einheiten
-                                IPS_LogMessage('TileVisu-DEBUG', 'Second var matched numeric with units');
+
                                 $secondOriginalFormatted = $secondFinalFormattedValue;
                                 if (preg_match('/[^0-9.,\-\s]+/', $secondOriginalFormatted, $matches)) {
                                     $suffix = $matches[0];
@@ -1160,11 +1160,11 @@ class UniversalDeviceTile extends IPSModule
                                 }
                             } elseif (preg_match('/^\s*[0-9.,\-]+\s*$/', $secondFinalFormattedValue)) {
                                 // Reine numerische Werte ohne Einheit
-                                IPS_LogMessage('TileVisu-DEBUG', 'Second var matched pure numeric');
+
                                 $secondFinalFormattedValue = '0';
                             } else {
                                 // Text-Werte aus Profil-Assoziationen werden NICHT verändert
-                                IPS_LogMessage('TileVisu-DEBUG', 'Second var: keeping original text value');
+
                                 $secondFinalRawValue = GetValue($variable['SecondVariable']); // Restore original raw value
                             }
                         }
