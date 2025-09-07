@@ -34,7 +34,9 @@ class UniversalDeviceTile extends IPSModule
         $this->RegisterPropertyBoolean('StatusShowIcon', true);
         $this->RegisterPropertyBoolean('StatusShowLabel', true);
         $this->RegisterPropertyBoolean('StatusShowValue', true);
+        $this->RegisterPropertyBoolean('StatusHide', false);
         $this->RegisterPropertyString('StatusLabel', '');
+        $this->RegisterPropertyString('StatusAlignment', 'left');
         $this->RegisterPropertyInteger('DefaultImage', 0);
 
         // Neue universelle Variablenliste für konfigurierbare Variablen
@@ -821,10 +823,14 @@ class UniversalDeviceTile extends IPSModule
 
         // Status-Daten (werden immer oben angezeigt)
         $statusId = $this->ReadPropertyInteger('Status');
+        // Neue Option: Statusbereich komplett ausblenden (Funktionalität bleibt erhalten)
+        $result['statusHidden'] = $this->ReadPropertyBoolean('StatusHide');
         if ($statusId > 0 && IPS_VariableExists($statusId)) {
             $result['status'] = GetValueFormatted($statusId);
             $result['statusValue'] = GetValue($statusId);
             $result['statusFontSize'] = $this->ReadPropertyInteger('StatusFontSize');
+            // Alignment for Status
+            $result['statusAlignment'] = $this->ReadPropertyString('StatusAlignment');
             
             // Neue Status-Konfigurationsoptionen
             $result['statusShowIcon'] = $this->ReadPropertyBoolean('StatusShowIcon');
@@ -873,12 +879,37 @@ class UniversalDeviceTile extends IPSModule
                                 // Fallback: Verwende Standard-Bild wenn konfiguriert, sonst 'none'
                                 $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
                             }
+                        } elseif ($bildauswahl === 'symcon_icon') {
+                            // Verwende Symcon Icon aus SelectIcon-Feld
+                            if (isset($assoziation['SymconIcon']) && !empty($assoziation['SymconIcon'])) {
+                                $result['statusBildauswahl'] = 'symcon_icon_' . $assoziation['SymconIcon'];
+                                // Individuelle Icon-Farbe (transparent => Accent-Color im Frontend)
+                                if (array_key_exists('IconColor', $assoziation)) {
+                                    $iconColorVal = $assoziation['IconColor'];
+                                    $result['statusIconColor'] = ($iconColorVal === -1 || $iconColorVal === 16777215)
+                                        ? ''
+                                        : ('#' . sprintf('%06X', $iconColorVal));
+                                    $result['isStatusIconColorTransparent'] = ($iconColorVal === -1 || $iconColorVal === 16777215);
+                                } else {
+                                    $result['statusIconColor'] = '';
+                                    $result['isStatusIconColorTransparent'] = true;
+                                }
+                            } else {
+                                // Fallback: Verwende Standard-Bild wenn konfiguriert, sonst 'none'
+                                $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
+                                $result['statusIconColor'] = '';
+                                $result['isStatusIconColorTransparent'] = true;
+                            }
                         } elseif ($bildauswahl === 'none') {
                             // Fallback: Verwende Standard-Bild wenn konfiguriert, sonst wirklich 'none'
                             $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
+                            $result['statusIconColor'] = '';
+                            $result['isStatusIconColorTransparent'] = true;
                         } else {
                             // Verwende vorkonfigurierte Bilder (wm_an, wm_aus, dryer_on, dryer_off, etc.)
                             $result['statusBildauswahl'] = $bildauswahl;
+                            $result['statusIconColor'] = '';
+                            $result['isStatusIconColorTransparent'] = true;
                         }
                         
                         $statusBildauswahlSet = true;
@@ -895,16 +926,21 @@ class UniversalDeviceTile extends IPSModule
                 $result['statusBildauswahl'] = $this->getDefaultImageOrNone(); // Fallback auf Standard-Bild oder 'none'
             }
         } else {
-            // Fallback: Wenn keine Statusvariable konfiguriert ist, verwende Standard-Bild
+            // Fallback: Wenn keine Statusvariable konfiguriert ist
+            // 1) Bildauswahl: Standard-Bild wenn vorhanden, sonst 'none'
             $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
-            
-            // Image Column Logik wird bereits oben korrekt berechnet (Zeile 847-848)
-            // Keine Überschreibung hier - verwende die bereits berechnete Logik
+            // 2) Spaltenanzeige: Wenn KEIN DefaultImage vorhanden ist → gesamte Bildspalte ausblenden
+            $hasDefaultImage = $this->ReadPropertyInteger('DefaultImage') > 0 && IPS_MediaExists($this->ReadPropertyInteger('DefaultImage'));
+            $result['hideImageColumn'] = !$hasDefaultImage;
         }
         
         // UNIVERSAL GUARANTEE: statusBildauswahl MUST ALWAYS be set
         if (!isset($result['statusBildauswahl'])) {
             $result['statusBildauswahl'] = 'none';
+        }
+        // Ensure statusAlignment is always present
+        if (!isset($result['statusAlignment'])) {
+            $result['statusAlignment'] = $this->ReadPropertyString('StatusAlignment');
         }
         
 
@@ -1039,47 +1075,9 @@ class UniversalDeviceTile extends IPSModule
                     $finalRawValue = GetValue($variable['Variable']);
                     
                     if (!$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress') {
-                        // Progressbar deaktiviert: Nur für ECHTE Progress-Variablen Werte auf 0 setzen
+                        // Progressbar deaktiviert: Zeige "-" für alle Werte und mache Text/Icon 50% transparent
                         $finalRawValue = 0;
-                        
-
-                        
-                        // Spezielle Behandlung für Zeit-Formate
-                        if (preg_match('/^\s*(\d+):(\d+):(\d+)\s*$/', $finalFormattedValue)) {
-                            // Format: HH:MM:SS -> 00:00:00
-
-                            $finalFormattedValue = '00:00:00';
-                        } elseif (preg_match('/^\s*(\d+):(\d+)\s*$/', $finalFormattedValue)) {
-                            // Format: H:MM oder HH:MM -> 0:00
-
-                            $finalFormattedValue = '0:00';
-                        } elseif (preg_match('/^\s*[0-9.,\-]+\s*(%|V|A|W|kW|kWh|°C|°F|bar|Pa|Hz|m|cm|mm|kg|g|l|ml)\s*$/', $finalFormattedValue)) {
-                            // Numerische Werte mit Einheiten
-
-                            $originalFormatted = $finalFormattedValue;
-                            if (preg_match('/[^0-9.,\-\s]+/', $originalFormatted, $matches)) {
-                                $suffix = $matches[0];
-                                $finalFormattedValue = '0 ' . $suffix;
-                            } else {
-                                $finalFormattedValue = '0';
-                            }
-                        } elseif (preg_match('/^\s*[0-9.,\-]+\s*$/', $finalFormattedValue)) {
-                            // Reine numerische Werte ohne Einheit
-
-                            $finalFormattedValue = '0';
-                        } else {
-                            // Unbekanntes Format - prüfen was es ist
-
-                            if (preg_match('/[^0-9.,\-\s]+/', $finalFormattedValue, $matches)) {
-                                $suffix = $matches[0];
-
-                                $finalFormattedValue = '0 ' . $suffix;
-                            } else {
-                                // Text-Werte aus Profil-Assoziationen werden NICHT verändert
-
-                                $finalRawValue = GetValue($variable['Variable']); // Restore original raw value
-                            }
-                        }
+                        $finalFormattedValue = '-';
                     }
                     
                     $variableData = [
@@ -1101,14 +1099,41 @@ class UniversalDeviceTile extends IPSModule
                         'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
                         'buttonWidth' => $variable['ButtonWidth'] ?? 120,
                         'showBorderLine' => $variable['ShowBorderLine'] ?? false,
+                        'alignment' => $variable['VerticalAlignment'] ?? 'left',
                         'progressMin' => $progressMinMax['min'],
                         'progressMax' => $progressMinMax['max'],
                         'formattedValue' => $finalFormattedValue, // Backend-überschriebener Wert
                         'rawValue' => $finalRawValue, // Backend-überschriebener Wert
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
+                        'progressbarInactive' => !$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress', // 50% Transparenz Flag
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
                     ];
+
+                    // Bild (Symcon Medienobjekt) als eigene Darstellungsart
+                    if (($variable['DisplayType'] ?? 'text') === 'image') {
+                        $imageId = intval($variable['ImageMedia'] ?? 0);
+                        $dataUri = '';
+                        if ($imageId > 0 && IPS_MediaExists($imageId)) {
+                            $media = IPS_GetMedia($imageId);
+                            if ($media['MediaType'] === MEDIATYPE_IMAGE) {
+                                $ext = '';
+                                if (!empty($media['MediaFile'])) {
+                                    $parts = explode('.', $media['MediaFile']);
+                                    $ext = end($parts);
+                                }
+                                // Prefix anhand Extension bestimmen (Fallback PNG)
+                                $prefix = $this->GetImageDataUri($ext ?: 'png');
+                                if ($prefix) {
+                                    $dataUri = $prefix . IPS_GetMediaContent($imageId);
+                                }
+                            }
+                        }
+                        $variableData['imageDataUri'] = $dataUri;
+                        // Image width now in percent (1-100), default 40
+                        $variableData['imageWidth'] = max(1, min(100, intval($variable['ImageWidth'] ?? 40)));
+                        $variableData['imageBorderRadius'] = intval($variable['ImageBorderRadius'] ?? 6);
+                    }
                     
                     // Zweite Variable für Progress-Bars hinzufügen
                     if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0 && IPS_VariableExists($variable['SecondVariable'])) {
@@ -1134,39 +1159,9 @@ class UniversalDeviceTile extends IPSModule
                         $secondFinalRawValue = GetValue($variable['SecondVariable']);
                         
                         if (!$progressbarActive) {
-                            // Progressbar deaktiviert: Setze auch zweite Variable auf 0 mit korrekter Format-Behandlung
+                            // Progressbar deaktiviert: Zeige "-" für zweite Variable und mache Text/Icon 50% transparent
                             $secondFinalRawValue = 0;
-                            
-
-                            
-                            // Spezielle Behandlung für Zeit-Formate (gleiche Logik wie Hauptvariable)
-                            if (preg_match('/^\s*(\d+):(\d+):(\d+)\s*$/', $secondFinalFormattedValue)) {
-                                // Format: HH:MM:SS -> 00:00:00
-
-                                $secondFinalFormattedValue = '00:00:00';
-                            } elseif (preg_match('/^\s*(\d+):(\d+)\s*$/', $secondFinalFormattedValue)) {
-                                // Format: H:MM oder HH:MM -> 0:00
-
-                                $secondFinalFormattedValue = '0:00';
-                            } elseif (preg_match('/^\s*[0-9.,\-]+\s*(%|V|A|W|kW|kWh|°C|°F|bar|Pa|Hz|m|cm|mm|kg|g|l|ml)\s*$/', $secondFinalFormattedValue)) {
-                                // Numerische Werte mit Einheiten
-
-                                $secondOriginalFormatted = $secondFinalFormattedValue;
-                                if (preg_match('/[^0-9.,\-\s]+/', $secondOriginalFormatted, $matches)) {
-                                    $suffix = $matches[0];
-                                    $secondFinalFormattedValue = '0 ' . $suffix;
-                                } else {
-                                    $secondFinalFormattedValue = '0';
-                                }
-                            } elseif (preg_match('/^\s*[0-9.,\-]+\s*$/', $secondFinalFormattedValue)) {
-                                // Reine numerische Werte ohne Einheit
-
-                                $secondFinalFormattedValue = '0';
-                            } else {
-                                // Text-Werte aus Profil-Assoziationen werden NICHT verändert
-
-                                $secondFinalRawValue = GetValue($variable['SecondVariable']); // Restore original raw value
-                            }
+                            $secondFinalFormattedValue = '-';
                         }
                         
                         $variableData['secondVariable'] = [
@@ -1190,6 +1185,52 @@ class UniversalDeviceTile extends IPSModule
                     }
                     
                     $variables[] = $variableData;
+                } else if ((($variable['DisplayType'] ?? 'text') === 'image')) {
+                    // SUPPORT IMAGE ROWS WITHOUT A VARIABLE ID
+                    $imageId = intval($variable['ImageMedia'] ?? 0);
+                    $dataUri = '';
+                    if ($imageId > 0 && IPS_MediaExists($imageId)) {
+                        $media = IPS_GetMedia($imageId);
+                        if ($media['MediaType'] === MEDIATYPE_IMAGE) {
+                            $ext = '';
+                            if (!empty($media['MediaFile'])) {
+                                $parts = explode('.', $media['MediaFile']);
+                                $ext = end($parts);
+                            }
+                            $prefix = $this->GetImageDataUri($ext ?: 'png');
+                            if ($prefix) {
+                                $dataUri = $prefix . IPS_GetMediaContent($imageId);
+                            }
+                        }
+                    }
+                    // Label-Fallback
+                    $label = $variable['Label'] ?? '';
+                    // Alignment/Textfarbe
+                    $textColor = isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000';
+                    $isTextColorTransparent = isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215);
+                    $variables[] = [
+                        'id' => 'image_' . $index, // synthetische ID
+                        'label' => $label,
+                        'displayType' => 'image',
+                        'group' => $variable['Group'] ?? 'keine Gruppe',
+                        'showGroupName' => $variable['ShowGroupName'] ?? false,
+                        'showIcon' => false,
+                        'showLabel' => false,
+                        'showValue' => false,
+                        'fontSize' => $variable['FontSize'] ?? 12,
+                        'textColor' => $textColor,
+                        'isTextColorTransparent' => $isTextColorTransparent,
+                        'alignment' => $variable['VerticalAlignment'] ?? 'left',
+                        'imageDataUri' => $dataUri,
+                        // Image width now in percent (1-100), default 40
+                        'imageWidth' => max(1, min(100, intval($variable['ImageWidth'] ?? 40))),
+                        'imageBorderRadius' => intval($variable['ImageBorderRadius'] ?? 6),
+                        'showBorderLine' => false,
+                        // folgende Felder für API-Konsistenz, ohne Relevanz
+                        'variableType' => 3,
+                        'progressbarActive' => true,
+                        'progressbarInactive' => false,
+                    ];
                 }
                 
                 
@@ -1364,7 +1405,11 @@ class UniversalDeviceTile extends IPSModule
                     'AssoziationName' => $association['name'],
                     'AssoziationValue' => $association['value'],
                     'Bildauswahl' => 'none',
-                    'StatusColor' => -1
+                    'EigenesBild' => 0,
+                    'SymconIcon' => '',
+                    'IconColor' => -1,
+                    'StatusColor' => -1,
+                    'ProgressbarActive' => true
                 ];
             }
         }
@@ -1391,68 +1436,157 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowIcon', 'visible', true);
                 $this->UpdateFormField('ShowLabel', 'visible', true);
                 $this->UpdateFormField('ShowValue', 'visible', true);
-                // Progress-spezifische Felder ausblenden
+                // Variable wieder einblenden
+                $this->UpdateFormField('Variable', 'visible', true);
+                // Generelle Text-Einstellungen sichtbar
+                $this->UpdateFormField('Label', 'visible', true);
+                $this->UpdateFormField('FontSize', 'visible', true);
+                $this->UpdateFormField('TextColor', 'visible', true);
+                // Progress-Felder ausblenden
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
-                $this->UpdateFormField('SecondVariableLabel', 'visible', false);    
-                // Button-spezifische Felder ausblenden
+                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                // Button-Felder ausblenden
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
                 $this->UpdateFormField('boolButtonColor', 'visible', false);
-                // Text-spezifische Felder einblenden
+                // Text-spezifische Felder
                 $this->UpdateFormField('ShowBorderLine', 'visible', true);
+                $this->UpdateFormField('VerticalAlignment', 'visible', true);
+                // Image-Felder ausblenden
+                $this->UpdateFormField('ImageMedia', 'visible', false);
+                $this->UpdateFormField('ImageWidth', 'visible', false);
+                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
                 break;
-                
+            case 'image':
+                // Image-Display: relevante Felder steuern
+                // Grundfelder
+                $this->UpdateFormField('ShowIcon', 'visible', false);
+                $this->UpdateFormField('ShowLabel', 'visible', false);
+                $this->UpdateFormField('ShowValue', 'visible', false);
+                // Schriftgröße und Textfarbe ausblenden
+                $this->UpdateFormField('FontSize', 'visible', false);
+                $this->UpdateFormField('TextColor', 'visible', false);
+                // Label-Feld ausblenden
+                $this->UpdateFormField('Label', 'visible', false);
+                // SelectVariable ausblenden, Media zeigen
+                $this->UpdateFormField('Variable', 'visible', false);
+
+                // Progress-Felder ausblenden
+                $this->UpdateFormField('ProgressColor1', 'visible', false);
+                $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SecondVariable', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
+                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+
+                // Button-Felder ausblenden
+                $this->UpdateFormField('ButtonWidth', 'visible', false);
+                $this->UpdateFormField('boolButtonColor', 'visible', false);
+
+                // Image-spezifische Felder einblenden
+                $this->UpdateFormField('ImageMedia', 'visible', true);
+                $this->UpdateFormField('ImageWidth', 'visible', true);
+                $this->UpdateFormField('ImageBorderRadius', 'visible', true);
+
+                // Alignment sichtbar, Borderline ausblenden
+                $this->UpdateFormField('VerticalAlignment', 'visible', true);
+                $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                break;
             case 'progress':
-                // Bei Progress: Alle relevanten Felder einblenden
+                // Progress: relevante Felder ein-/ausblenden
                 $this->UpdateFormField('ShowIcon', 'visible', true);
                 $this->UpdateFormField('ShowLabel', 'visible', true);
                 $this->UpdateFormField('ShowValue', 'visible', true);
-                // Progress-spezifische Felder einblenden
+                // Variable benötigt
+                $this->UpdateFormField('Variable', 'visible', true);
+                // Generelle Text-Einstellungen sichtbar
+                $this->UpdateFormField('Label', 'visible', true);
+                $this->UpdateFormField('FontSize', 'visible', true);
+                $this->UpdateFormField('TextColor', 'visible', true);
+                // Progress-Farben sichtbar
                 $this->UpdateFormField('ProgressColor1', 'visible', true);
                 $this->UpdateFormField('ProgressColor2', 'visible', true);
+                // SecondVariable-Block sichtbar
                 $this->UpdateFormField('SecondVariable', 'visible', true);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', true);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', true);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', true);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', true);
-                // Button-spezifische Felder ausblenden
+                // Button-Felder ausblenden
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
                 $this->UpdateFormField('boolButtonColor', 'visible', false);
-                // Text-spezifische Felder ausblenden
+                // Image-Felder ausblenden
+                $this->UpdateFormField('ImageMedia', 'visible', false);
+                $this->UpdateFormField('ImageWidth', 'visible', false);
+                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
+                // Text-Felder ausblenden
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                // Ausrichtung bei Progress ausblenden
+                $this->UpdateFormField('VerticalAlignment', 'visible', false);
                 break;
-                
             case 'button':
-                // Bei Button: Relevante Felder einblenden
+                // Button-Display: relevante Felder steuern
+                // Grundfelder
                 $this->UpdateFormField('ShowIcon', 'visible', true);
                 $this->UpdateFormField('ShowLabel', 'visible', true);
-                $this->UpdateFormField('ShowValue', 'visible', true);
-                // Progress-spezifische Felder ausblenden
+                $this->UpdateFormField('ShowValue', 'visible', false);
+                // Variable sichtbar
+                $this->UpdateFormField('Variable', 'visible', true);
+                // Generelle Text-Einstellungen sichtbar
+                $this->UpdateFormField('Label', 'visible', true);
+                $this->UpdateFormField('FontSize', 'visible', true);
+                $this->UpdateFormField('TextColor', 'visible', true);
+
+                // Progress-Felder ausblenden
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
-                $this->UpdateFormField('SecondVariableLabel', 'visible', false);    
+                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+
+                // Image-Felder ausblenden
+                $this->UpdateFormField('ImageMedia', 'visible', false);
+                $this->UpdateFormField('ImageWidth', 'visible', false);
+                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
+
                 // Button-spezifische Felder einblenden
                 $this->UpdateFormField('ButtonWidth', 'visible', true);
                 $this->UpdateFormField('boolButtonColor', 'visible', true);
 
-                // Text-spezifische Felder ausblenden
+                // Alignment sichtbar, Borderline ausblenden
+                $this->UpdateFormField('VerticalAlignment', 'visible', true);
+                $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                break;
+            
+            default:
+                // Default-Fall: Alle Felder ausblenden
+                $this->UpdateFormField('ShowIcon', 'visible', false);
+                $this->UpdateFormField('ShowLabel', 'visible', false);
+                $this->UpdateFormField('ShowValue', 'visible', false);
+                $this->UpdateFormField('ProgressColor1', 'visible', false);
+                $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SecondVariable', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
+                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('ButtonWidth', 'visible', false);
+                $this->UpdateFormField('boolButtonColor', 'visible', false);
+                $this->UpdateFormField('ImageMedia', 'visible', false);
+                $this->UpdateFormField('ImageWidth', 'visible', false);
+                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
+                $this->UpdateFormField('VerticalAlignment', 'visible', false);
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 break;
         }
     }
-    
-    
-
-
-
 
 
     private function CheckAndGetValueFormatted($property) {

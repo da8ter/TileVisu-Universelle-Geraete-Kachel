@@ -76,7 +76,7 @@
         .main_container .div1 img:not([src]), 
         .main_container .div1 img[src=""] {
             /* 1x1 transparentes PNG als Hintergrundbild */
-            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI/hPbEEQAAAABJRU5ErkJggg==') !important;
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABBJREFUeNpi+P//PwNAgAEACPwC/tuiTRYAAAAASUVORK5CYII=') !important;
             background-size: contain;
             background-repeat: no-repeat;
             background-position: center;
@@ -87,6 +87,7 @@
             display: block !important;
             /* Fallback für leere src */
             content: '' !important;
+            color: transparent !important;
         }
         
         /* Normale img-Elemente: Nur Basis-Styling ohne background-image Override */
@@ -220,6 +221,32 @@
             width: auto;
             margin-bottom: 0;
             margin-top: 0;
+        }
+        
+        /* Bild-Variablen in Gruppen: nebeneinander und volle Breite nutzen */
+        .variable-group-item:has(.variable-inline-image) {
+            flex: 1 1 0;
+            display: flex;
+        }
+        .variable-group-item:has(.variable-inline-image) .variable-inline-image {
+            width: 100% !important;
+            height: auto !important;
+            flex: 1 1 auto !important;
+        }
+        /* Innerer Wrapper für Bild-Gruppenelemente: Inhalte (Label/Value) unter dem Bild stapeln */
+        .variable-group-item:has(.variable-inline-image) .variable-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+        .variable-group-item:has(.variable-inline-image) .variable-label,
+        .variable-group-item:has(.variable-inline-image) .variable-value {
+            width: 100%;
+            text-align: center;
+        }
+        .variable-group-item:has(.variable-inline-image) .variable-value {
+            flex-grow: 0;
         }
         
         /* Stretch-Gruppen: variable-item braucht volle Breite */
@@ -588,6 +615,36 @@
             width: 16px;
             height: 16px;
         }
+
+        .status-image {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* FontAwesome Icon Styles */
+        .fontawesome-icon-container {
+            display: flex;
+            align-items: center;
+            /* WICHTIG: Container darf nicht volle Breite einnehmen, damit .div1 justify-content wirkt */
+            flex: 0 0 auto;
+            width: auto;
+            color: var(--content-color, #000000);
+        }
+
+        .fontawesome-icon-container i[class*="fa-"],
+        .fontawesome-icon-container svg[class*="fa-"] {
+            color: inherit;
+            display: inline-block;
+            line-height: 1;
+        }
+
+        /* Icon size anpassbar basierend auf Container */
+        .div1 .fontawesome-icon-container i[class*="fa-"],
+        .div1 .fontawesome-icon-container svg[class*="fa-"] {
+            font-size: var(--bildbreite, 48px);
+            width: var(--bildbreite, 48px);
+            height: var(--bildbreite, 48px);
+        }
     </style>
 
     <script>
@@ -606,14 +663,56 @@
             // dass das richtige Präfix vorhanden ist
             let iconClass = iconName;
             
-            // Füge fa-light Präfix hinzu wenn nötig
-            if (!iconClass.startsWith('fa-')) {
-                iconClass = 'fa-fw fa-light fa-' + iconClass;
-            } else if (!iconClass.startsWith('fa-light ')) {
-                iconClass = 'fa-fw fa-light ' + iconClass;
+            // Respektiere vorhandene Prefixe (inkl. fa-kit/fak) und ergänze nur fa-fw
+            const hasPrefix =
+                iconClass.startsWith('fa-light ') ||
+                iconClass.startsWith('fa-solid ') ||
+                iconClass.startsWith('fa-regular ') ||
+                iconClass.startsWith('fa-brands ') ||
+                iconClass.startsWith('fas ') ||
+                iconClass.startsWith('far ') ||
+                iconClass.startsWith('fal ') ||
+                iconClass.startsWith('fab ') ||
+                iconClass.startsWith('fa-kit ') ||
+                iconClass.startsWith('fak ');
+
+            if (hasPrefix) {
+                if (!iconClass.includes('fa-fw')) {
+                    iconClass = 'fa-fw ' + iconClass;
+                }
+                return iconClass;
             }
-            
-            return iconClass;
+
+            // Kein Prefix angegeben: Versuche dynamisch das verfügbare Set zu finden (Kit → Solid → Regular → Light → Brands)
+            const styles = [
+                { classes: 'fa-kit fak', find: 'fak' },
+                { classes: 'fa-solid',  find: 'fas' },
+                { classes: 'fas',       find: 'fas' },
+                { classes: 'fa-regular',find: 'far' },
+                { classes: 'far',       find: 'far' },
+                { classes: 'fa-light',  find: 'fal' },
+                { classes: 'fal',       find: 'fal' },
+                { classes: 'fa-brands', find: 'fab' },
+                { classes: 'fab',       find: 'fab' },
+            ];
+
+            const baseName = iconClass.startsWith('fa-') ? iconClass.substring(3) : iconClass;
+
+            if (window.FontAwesome && typeof window.FontAwesome.findIconDefinition === 'function') {
+                for (const s of styles) {
+                    try {
+                        const def = window.FontAwesome.findIconDefinition({ prefix: s.find, iconName: baseName });
+                        if (def) {
+                            return `fa-fw ${s.classes} fa-${baseName}`;
+                        }
+                    } catch (e) {
+                        // continue
+                    }
+                }
+            }
+
+            // Fallback: bevorzuge Kit, ansonsten Solid
+            return `fa-fw fa-kit fak fa-${baseName}`;
         }
         
         // Hilfsfunktion zur Bestimmung der Textfarbe
@@ -674,19 +773,17 @@
                     div1.className = 'hidden';
                 }
                 if (div2) {
-                    div2.style.padding = '10px';
+                    div2.style.padding = '0px';
                     div2.style.width = '100%'; // div2 nimmt gesamte Breite ein
                 }
             } else {
-                // Show COLUMN - renderStatus() will handle individual image content (real images vs placeholders)
+                // Show COLUMN - renderStatus() will handle individual image/icon content exclusively
                 if (div1) {
                     div1.style.display = 'block';
                     div1.className = 'div1';
-                    // Always ensure image element is visible - renderStatus() sets appropriate content
-                    const imageElement = div1.querySelector('#image');
-                    if (imageElement) {
-                        imageElement.style.display = 'block';
-                    }
+                    // WICHTIG: Hier NICHT das #image sichtbar schalten.
+                    // Sonst kann kurzzeitig ein leeres Bild (blaues Quadrat) sichtbar werden,
+                    // bevor renderStatus() das tatsächliche Icon/Bild setzt.
                 }
                 if (div2) {
                     div2.style.width = '100%'; // div2 bleibt flexibel
@@ -772,45 +869,67 @@
                         // Speichere Alignment global und wende sofort an
                         window.currentImageAlignment = value;
                         
-                        // Wende Alignment sofort an - DIREKTES IMG-ELEMENT STYLING
+                        // Wende Alignment sofort an - gilt für Bild ODER Icon
                         const div1 = document.querySelector('.main_container .div1');
-                        const imgElement = document.querySelector('.main_container .div1 img');
                         const alignmentContainer = document.querySelector('.main_container');
+                        const imgElement = document.querySelector('.main_container .div1 img');
+                        const iconContainerLive = document.querySelector('.main_container .div1 .fontawesome-icon-container');
                         
-                        if (div1 && imgElement && alignmentContainer) {
-                            // Prüfe ob Bildposition oben oder unten ist (nur dann Alignment anwenden)
-                            const isVerticalPosition = alignmentContainer.classList.contains('image-top') || alignmentContainer.classList.contains('image-bottom');
+                        if (div1 && alignmentContainer) {
+                            // Stelle sicher, dass flex-Kontext vorhanden ist (für alle Positionen)
+                            div1.style.display = 'flex';
+                            switch (value) {
+                                case 'left':
+                                    div1.style.justifyContent = 'flex-start';
+                                    break;
+                                case 'center':
+                                    div1.style.justifyContent = 'center';
+                                    break;
+                                case 'right':
+                                    div1.style.justifyContent = 'flex-end';
+                                    break;
+                                default:
+                                    div1.style.justifyContent = 'center';
+                            }
                             
-                            if (isVerticalPosition) {
-
-                                div1.style.border = '';
-                                imgElement.style.border = '';
-                                imgElement.style.display = 'block';
-                                
-                                // Margin-basierte Ausrichtung
+                            // Für IMG zusätzlich Margin setzen (visuelle Sicherheit)
+                            if (imgElement) {
                                 switch (value) {
                                     case 'left':
-                                        imgElement.style.margin = '0 auto 0 0';  // Links
+                                        imgElement.style.margin = '0 auto 0 0';
                                         break;
                                     case 'center':
-                                        imgElement.style.margin = '0 auto';      // Mitte
+                                        imgElement.style.margin = '0 auto';
                                         break;
                                     case 'right':
-                                        imgElement.style.margin = '0 0 0 auto';  // Rechts
+                                        imgElement.style.margin = '0 0 0 auto';
                                         break;
                                     default:
-                                        imgElement.style.margin = '0 auto';      // Standard: Mitte
+                                        imgElement.style.margin = '0 auto';
                                 }
-                                
-                                // Image alignment applied
-                            } else {
-                                // Alignment only works with image-top/image-bottom positions
+                            }
+                            // Für Icon-Container: justify-content entsprechend setzen
+                            if (iconContainerLive) {
+                                switch (value) {
+                                    case 'left':
+                                        iconContainerLive.style.justifyContent = 'flex-start';
+                                        break;
+                                    case 'center':
+                                        iconContainerLive.style.justifyContent = 'center';
+                                        break;
+                                    case 'right':
+                                        iconContainerLive.style.justifyContent = 'flex-end';
+                                        break;
+                                    default:
+                                        iconContainerLive.style.justifyContent = 'center';
+                                }
                             }
                         }
                         break;
                     case 'status':
                     case 'statusvalue':
                     case 'statuscolor':
+                    case 'statusalignment':
                     case 'statusBildauswahl':  
                         // Set global currentBildauswahl for updateImageVisibility
                         if (decodedData.hasOwnProperty('statusBildauswahl')) {
@@ -819,21 +938,32 @@
                         renderStatus(decodedData);
                         updateImageVisibility();
                         
-                        // Re-apply gespeicherte Bildausrichtung nach dem Rendering (Persistenz)
+                        // Re-apply gespeicherte Bild-/Icon-Ausrichtung nach dem Rendering (Persistenz)
                         if (window.currentImageAlignment) {
                             const div1Restore = document.querySelector('.main_container .div1');
                             const imgRestore = document.querySelector('.main_container .div1 img');
+                            const iconRestore = document.querySelector('.main_container .div1 .fontawesome-icon-container');
                             const mainContainerRestore = document.querySelector('.main_container');
                             
-                            if (div1Restore && imgRestore && mainContainerRestore) {
-                                // Prüfe ob Bildposition oben oder unten ist
-                                const isVerticalPositionRestore = mainContainerRestore.classList.contains('image-top') || mainContainerRestore.classList.contains('image-bottom');
+                            if (div1Restore && mainContainerRestore) {
+                                // Justify-Content auf dem Container anwenden (wirkt für Icon und Bild) – für alle Positionen
+                                div1Restore.style.display = 'flex';
+                                switch (window.currentImageAlignment) {
+                                    case 'left':
+                                        div1Restore.style.justifyContent = 'flex-start';
+                                        break;
+                                    case 'center':
+                                        div1Restore.style.justifyContent = 'center';
+                                        break;
+                                    case 'right':
+                                        div1Restore.style.justifyContent = 'flex-end';
+                                        break;
+                                    default:
+                                        div1Restore.style.justifyContent = 'center';
+                                }
                                 
-                                if (isVerticalPositionRestore) {
-                                    div1Restore.style.border = '';
-                                    imgRestore.style.border = '';
-                                    
-                                    // Margin-basierte Ausrichtung (wie im Haupt-Code)
+                                // Für IMG zusätzlich Margin setzen
+                                if (imgRestore) {
                                     switch (window.currentImageAlignment) {
                                         case 'left':
                                             imgRestore.style.margin = '0 auto 0 0';
@@ -847,7 +977,36 @@
                                         default:
                                             imgRestore.style.margin = '0 auto';
                                     }
-                                    
+                                }
+                                // Für Icon-Container ebenfalls Margin setzen
+                                if (iconRestore) {
+                                    switch (window.currentImageAlignment) {
+                                        case 'left':
+                                            iconRestore.style.margin = '0 auto 0 0';
+                                            break;
+                                        case 'center':
+                                            iconRestore.style.margin = '0 auto';
+                                            break;
+                                        case 'right':
+                                            iconRestore.style.margin = '0 0 0 auto';
+                                            break;
+                                        default:
+                                            iconRestore.style.margin = '0 auto';
+                                    }
+                                    // Und justify-content für den Icon-Container setzen
+                                    switch (window.currentImageAlignment) {
+                                        case 'left':
+                                            iconRestore.style.justifyContent = 'flex-start';
+                                            break;
+                                        case 'center':
+                                            iconRestore.style.justifyContent = 'center';
+                                            break;
+                                        case 'right':
+                                            iconRestore.style.justifyContent = 'flex-end';
+                                            break;
+                                        default:
+                                            iconRestore.style.justifyContent = 'center';
+                                    }
                                 }
                             }
                         }
@@ -860,6 +1019,10 @@
                         }
                         break;
                     case 'statusschriftgroesse':
+                        renderStatus(decodedData);
+                        break;
+                    case 'statushidden':
+                        // Neue Option: Statusbereich ausblenden, Funktionalität bleibt
                         renderStatus(decodedData);
                         break;
                     case 'variables':
@@ -1404,9 +1567,18 @@
             const statusContainer = document.getElementById('status-container');
             const root = document.documentElement;
             
-            // Zeige Status-Container nur wenn Status vorhanden ist
-            if (data.status) {
-                statusContainer.style.display = 'block';
+            // Neue Option: Statusbereich komplett ausblenden, unabhängig vom Statuswert
+            const forceHideStatus = !!data.statusHidden;
+            // Zeige Status-Container nur wenn nicht versteckt und Status vorhanden ist
+            if (!forceHideStatus && data.status) {
+                // Alignment mapping for status
+                const alignment = (data.statusAlignment || 'left');
+                const justifyMap = alignment === 'center' ? 'center' : (alignment === 'right' ? 'flex-end' : 'flex-start');
+                // Use flex container for horizontal alignment
+                statusContainer.style.display = 'flex';
+                statusContainer.style.justifyContent = justifyMap;
+                statusContainer.style.alignItems = 'center';
+                statusContainer.style.width = '100%';
                 // Bestimme Status-Farbe: verwende --content-color wenn transparent, ansonsten konfigurierte Farbe
                 const statusColor = data.isStatusColorTransparent ? 'var(--content-color)' : (data.statusColor || 'var(--content-color)');
                 statusContainer.style.setProperty('--status-color', statusColor);
@@ -1434,7 +1606,9 @@
                 // Label für Status-Bereich (wenn konfiguriert)
                 if (data.statusShowLabel) {
                     const label = data.statusLabel || 'Status'; // Fallback zu "Status" wenn kein Custom Label
-                    statusParts.push(`<span class="status-label" style="color: var(--status-color);">${label}:</span>`);
+                    // Füge ein geschütztes Leerzeichen NUR hinzu, wenn auch ein Wert angezeigt wird
+                    const trailingSpace = data.statusShowValue ? '&nbsp;' : '';
+                    statusParts.push(`<span class="status-label" style="color: var(--status-color);">${label}:${trailingSpace}</span>`);
                 }
                 
                 // Wert für Status-Bereich (wenn konfiguriert)
@@ -1447,7 +1621,8 @@
                     statusParts.push(`<span class="status-value" style="color: var(--status-color);">${data.status}</span>`);
                 }
                 
-                statusContent = statusParts.join(' ');
+                // Keine zusätzlichen Text-Knoten zwischen Flex-Items erzeugen
+                statusContent = statusParts.join('');
                 statusContainer.innerHTML = statusContent;
             } else {
                 statusContainer.style.display = 'none';
@@ -1470,26 +1645,126 @@
                     return;
                 }
                 
-                // PRO-ASSOZIATION-ENTSCHEIDUNG: Welches Bild soll für diese Assoziation angezeigt werden?
-                if (data.statusBildauswahl === 'none') {
-                    // Keine Bild für diese Assoziation -> transparentes Platzhalter-Bild verwenden
-                    // 1x1 transparentes PNG als Data URI
-                    imageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI/hPbEEQAAAABJRU5ErkJggg==';
+                // PRO-ASSOZIATION-ENTSCHEIDUNG: Welches Bild/Icon soll für diese Assoziation angezeigt werden?
+                if (data.statusBildauswahl.startsWith('symcon_icon_')) {
+                    // FontAwesome Icon verwenden
+                    const iconName = data.statusBildauswahl.replace('symcon_icon_', '');
+                    // WICHTIG: #image darf NICHT Voraussetzung sein (wird im Icon-Modus entfernt)
+                    if (iconName && deviceImgContainer) {
+                        // Entferne das <img> Element komplett aus dem DOM (nur wenn vorhanden)
+                        if (deviceImg && deviceImg.parentNode) {
+                            deviceImg.parentNode.removeChild(deviceImg);
+                        }
+                        
+                        // Prüfe ob schon ein Icon-Container existiert
+                        let iconContainer = deviceImgContainer.querySelector('.fontawesome-icon-container');
+                        if (!iconContainer) {
+                            iconContainer = document.createElement('div');
+                            iconContainer.className = 'fontawesome-icon-container';
+                            deviceImgContainer.appendChild(iconContainer);
+                        }
+                        
+                        // Bereite FontAwesome Icon-Klasse vor (nutze zentrale Logik)
+                        const iconClass = prepareIconForDisplay(iconName);
+                        
+                        // Setze das FontAwesome Icon
+                        iconContainer.innerHTML = `<i class="${iconClass}"></i>`;
+                        // Farbwahl: individuelle Icon-Farbe oder Fallback auf --accent-color
+                        const chosenIconColor = (data.statusIconColor && data.statusIconColor !== '')
+                            ? data.statusIconColor
+                            : 'var(--accent-color)';
+                        iconContainer.style.color = chosenIconColor;
+                        // Wandle neu eingefügte <i>-Tags in SVG um (wichtig bei Statuswechsel)
+                        try {
+                            if (window.FontAwesome && window.FontAwesome.dom && typeof window.FontAwesome.dom.i2svg === 'function') {
+                                window.FontAwesome.dom.i2svg({ node: iconContainer, observeMutations: false });
+                            }
+                        } catch (e) {
+                            // still OK, FA wandelt ggf. asynchron per MutationObserver um
+                        }
+                        // Nur Anzeige steuern, restliche Layout-Eigenschaften kommen aus CSS
+                        // Entferne evtl. veraltetes display:none aus vorherigem Modus
+                        try { iconContainer.style.removeProperty('display'); } catch (_) {}
+                        iconContainer.style.display = 'flex';
+                        // WICHTIG: Nicht vollflächig, damit Ausrichtung links/rechts greift
+                        iconContainer.style.flex = '0 0 auto';
+                        iconContainer.style.width = 'auto';
+                        // Margin-basierte Ausrichtung für Icon-Container (wirkt unabhängig von Containerbreite)
+                        if (window.currentImageAlignment) {
+                            switch (window.currentImageAlignment) {
+                                case 'left':
+                                    iconContainer.style.margin = '0 auto 0 0';
+                                    break;
+                                case 'center':
+                                    iconContainer.style.margin = '0 auto';
+                                    break;
+                                case 'right':
+                                    iconContainer.style.margin = '0 0 0 auto';
+                                    break;
+                                default:
+                                    iconContainer.style.margin = '0 auto';
+                            }
+                        }
+                        
+                        deviceImgContainer.classList.remove('hidden');
+                        deviceImgContainer.classList.add('div1');
+                        return; // Verlasse die Funktion, da Icon gerendert wurde
+                    }
                 } else if (data.statusBildauswahl.startsWith('img_custom_')) {
                     // Custom Image über Asset-System verwenden
                     imageUrl = window.assets[data.statusBildauswahl];
                 } else if (data.statusBildauswahl.startsWith('img_default_')) {
                     // Standard-Bild (Fallback) über Asset-System verwenden
                     imageUrl = window.assets[data.statusBildauswahl];
+                } else if (data.statusBildauswahl === 'none') {
+                    // Keine Bild für diese Assoziation -> transparentes Platzhalter-Bild verwenden
+                    // 1x1 transparentes PNG als Data URI (neue, korrekte Variante)
+                    imageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABBJREFUeNpi+P//PwNAgAEACPwC/tuiTRYAAAAASUVORK5CYII=';
                 } else {
                     // Vorkonfigurierte Bilder verwenden (wm_an, wm_aus, dryer_on, dryer_off, etc.)
                     imageUrl = window.assets[`img_${data.statusBildauswahl}`];
                 }
                 
-                if (imageUrl && deviceImg && deviceImgContainer) {
-                    deviceImg.src = imageUrl;
-                    deviceImgContainer.classList.remove('hidden');
-                    deviceImgContainer.classList.add('div1');
+                // Für Bilder: Icon-Container entfernen und img-Element anzeigen
+                if (deviceImgContainer) {
+                    // Existierenden Icon-Container entfernen (mutual exclusive)
+                    const oldIcon = deviceImgContainer.querySelector('.fontawesome-icon-container');
+                    if (oldIcon) oldIcon.remove();
+                    // img-Element wiederherstellen falls es entfernt wurde
+                    let deviceImg = document.getElementById('image');
+                    if (!deviceImg) {
+                        deviceImg = document.createElement('img');
+                        deviceImg.id = 'image';
+                        deviceImg.alt = 'Device Image';
+                        deviceImgContainer.appendChild(deviceImg);
+                    }
+                    // VOR dem Laden verstecken, Sichtbarkeit erst in onload setzen
+                    deviceImg.style.display = 'none';
+                    deviceImg.style.visibility = 'hidden';
+                    // Event-Handler zurücksetzen
+                    deviceImg.onload = null;
+                    deviceImg.onerror = null;
+                }
+                
+                if (imageUrl && deviceImgContainer) {
+                    let deviceImg = document.getElementById('image');
+                    if (deviceImg) {
+                        // Nach erfolgreichem Laden erst anzeigen
+                        deviceImg.onload = () => {
+                            deviceImg.style.display = 'block';
+                            deviceImg.style.visibility = 'visible';
+                        };
+                        // Bei Fehler: transparentes Pixel setzen und verborgen lassen, um Blaue-Kasten zu vermeiden
+                        deviceImg.onerror = () => {
+                            deviceImg.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABBJREFUeNpi+P//PwNAgAEACPwC/tuiTRYAAAAASUVORK5CYII=';
+                            deviceImg.style.display = 'none';
+                            deviceImg.style.visibility = 'hidden';
+                            // Fehlerfall: Icon sichtbar lassen (kein Hide des Icon-Containers)
+                        };
+                        deviceImg.src = imageUrl;
+                        deviceImgContainer.classList.remove('hidden');
+                        deviceImgContainer.classList.add('div1');
+                    }
 
                 } else {
 
@@ -1731,8 +2006,17 @@
                             
                         }
                         
+                        // Bestimme gruppenweite Ausrichtung: nutze die erste Text/Button-Variable der Gruppe
+                        let groupAlign = 'left';
+                        // Verwende Text/Button/ODER Image als Quelle für die Gruppenausrichtung
+                        const alignSource = groupVariables.find(v => v.displayType === 'text' || v.displayType === 'button' || v.displayType === 'image');
+                        if (alignSource && alignSource.alignment) {
+                            groupAlign = alignSource.alignment;
+                        }
+                        const groupJustify = groupAlign === 'center' ? 'center' : (groupAlign === 'right' ? 'flex-end' : 'flex-start');
+
                         content += `
-                                <div class="variable-group-items" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; flex: 1;">
+                                <div class="variable-group-items" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; flex: 1; justify-content: ${groupJustify}; width: 100%;">
                         `;
                         
                         groupVariables.forEach(groupVar => {
@@ -1782,6 +2066,9 @@
             
             // Wrapper-Stil je nach Kontext - Progress-Balken unterstützen jetzt auch Gruppen
             let wrapperStyle;
+            // Alignment mapping for text/button
+            const alignment = (variable.alignment || 'left');
+            const justifyMap = alignment === 'center' ? 'center' : (alignment === 'right' ? 'flex-end' : 'flex-start');
             
             // Nur font-size setzen wenn nicht -1
             const fontSizeStyle = variable.fontSize !== -1 ? `font-size: ${variable.fontSize}px;` : '';
@@ -1791,12 +2078,18 @@
                     // Progress-Balken in Gruppen: Inline-flex damit sie nebeneinander passen, aber mit voller verfügbarer Breite
                     wrapperStyle = `display: inline-flex; align-items: center; margin: 0 2px 0 0; ${fontSizeStyle} color: ${getTextColor(variable)}; flex: none;`;
                 } else {
-                    // Text/Button-Variablen in Gruppen: Wie bisher
-                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0; white-space: nowrap; ${fontSizeStyle} color: ${getTextColor(variable)};`;
+                    // Text/Button-Variablen in Gruppen: eigene Breite, Ausrichtung übernimmt die Gruppe
+                    // SPEZIAL: Für Image in Gruppen zusätzlich die eigene Ausrichtung im Item anwenden
+                    const justifyForGroupItem = (variable.displayType === 'image') ? `justify-content: ${justifyMap};` : '';
+                    wrapperStyle = `display: inline-flex; align-items: center; ${justifyForGroupItem} margin: 0; white-space: nowrap; ${fontSizeStyle} color: ${getTextColor(variable)};`;
                 }
             } else {
-                // Ungrouped: Standard-Layout
-                wrapperStyle = `${fontSizeStyle} color: ${getTextColor(variable)};`;
+                // Ungrouped: Standard-Layout mit horizontaler Ausrichtung für Text/Button/Image
+                if (variable.displayType === 'text' || variable.displayType === 'button' || variable.displayType === 'image') {
+                    wrapperStyle = `display: flex; align-items: center; justify-content: ${justifyMap}; width: 100%; ${fontSizeStyle} color: ${getTextColor(variable)};`;
+                } else {
+                    wrapperStyle = `${fontSizeStyle} color: ${getTextColor(variable)};`;
+                }
             }
                 
             // CSS-Klassen für Variable zusammenstellen
@@ -1831,11 +2124,14 @@
                     
                     
                     // Progress-Bar Inhalt basierend auf Konfiguration
+                    // Transparenz-Stil für inaktive Progress-Bars
+                    const inactiveOpacity = variable.progressbarInactive ? 'opacity: 0.5;' : '';
+                    
                     let progressIconHtml = '';
                     if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
                         const iconClass = prepareIconForDisplay(variable.icon);
                         if (iconClass) {
-                            progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`;
+                            progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`;
                         }
                     }
                     
@@ -1846,16 +2142,16 @@
                     }
                     
                     if (variable.showLabel && variable.label) {
-                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.label}:&nbsp;</span>`);
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.label}:&nbsp;</span>`);
                     }
                     
                     if (variable.showValue) {
-                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${displayValue}</span>`);
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayValue}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
                     if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                        progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${displayValue}</span>`);
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayValue}</span>`);
                     }
                     
                     const progressText = progressTextParts.join(' ');
@@ -1869,23 +2165,23 @@
                         if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
                             const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
                             if (secondIconClass) {
-                                secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
+                                secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
                             }
                         }
                         
                         // Label für zweite Variable
                         if (variable.secondVariable.showLabel && variable.secondVariable.label) {
-                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.secondVariable.label}:&nbsp;</span>`);
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.secondVariable.label}:&nbsp;</span>`);
                         }
                         
                         // Wert für zweite Variable (Backend-Wert direkt verwenden)
                         if (variable.secondVariable.showValue) {
-                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
                         }
                         
                         // Falls nichts konfiguriert ist, zeige Wert als Fallback
                         if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
-                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
                         }
                         
                         if (secondVariableParts.length > 0) {
@@ -1948,6 +2244,43 @@
                             </div>
                         </div>
                     `;
+                } else if (variable.displayType === 'image') {
+                    // Rendering: Symcon Medienobjekt als Data-URI mit Breite/Radius und optional Icon/Label/Value
+                    let parts = [];
+                    // Image width is now percentage (1-100). Default 40% when not set.
+                    const imgWidth = Number.isFinite(variable.imageWidth) ? variable.imageWidth : 40;
+                    const imgRadius = Number.isFinite(variable.imageBorderRadius) ? variable.imageBorderRadius : 6;
+                    const imgWidthForDOM = isGrouped ? 100 : imgWidth;
+                    const imgFlex = isGrouped ? '1 1 auto' : '0 0 auto';
+
+                    // Icon optional anzeigen
+                    if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
+                        const iconClass = prepareIconForDisplay(variable.icon);
+                        if (iconClass) {
+                            parts.push(`<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
+                        }
+                    }
+
+                    // Label optional anzeigen (mit Doppelpunkt, wenn Value ebenfalls angezeigt wird)
+                    if (variable.showLabel && variable.label) {
+                        const labelText = variable.showValue ? `${variable.label}:&nbsp;` : variable.label;
+                        parts.push(`<span class="variable-label" style="color: ${getTextColor(variable)}; font-weight: 700;">${labelText}</span>`);
+                    }
+
+                    const imgAlt = variable.label ? String(variable.label).replace(/"/g, '&quot;') : 'Image';
+                    if (variable.imageDataUri && variable.imageDataUri !== '') {
+                        parts.push(`<img class="variable-inline-image" src="${variable.imageDataUri}" alt="${imgAlt}" style="width: ${imgWidthForDOM}%; height: auto; border-radius: ${imgRadius}px; flex: ${imgFlex};">`);
+                    } else {
+                        // Fallback falls kein Bild verfügbar
+                        parts.push(`<span class="variable-text" style="opacity: 0.6;">-</span>`);
+                    }
+
+                    // Value optional anzeigen
+                    if (variable.showValue && typeof variable.formattedValue !== 'undefined') {
+                        parts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
+                    }
+
+                    content += parts.join(' ');
                 } else if (variable.displayType === 'button') {
                     // Button für Bool-Variablen (VARIABLETYPE_BOOLEAN = 0) und Integer-Variablen (VARIABLETYPE_INTEGER = 1)
                     if (variable.variableType === 0) {
@@ -2049,8 +2382,10 @@
                         // Button-Styles: Bool-Button soll IMMER seine buttonWidth verwenden
                         let buttonStyleExtras = `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`;
                         
+                        // Für ungruppierte Buttons: horizontale Ausrichtung des Containers entsprechend Einstellung
+                        const buttonContainerJustify = (!isGrouped) ? `justify-content: ${justifyMap};` : '';
                         content += `
-                            <div class="variable-button-container">
+                            <div class="variable-button-container" style="${buttonContainerJustify}">
                                 <button class="variable-button" 
                                         onclick="requestAction('${variable.id}', 1);" 
                                         data-variable-id="${variable.id}"
@@ -2143,9 +2478,11 @@
                                 </button>`;
                         });
                         
+                        // Für ungruppierte Multi-Buttons: horizontale Ausrichtung des Containers entsprechend Einstellung
+                        const multiButtonContainerJustify = (!isGrouped) ? `display: flex; justify-content: ${justifyMap}; width: 100%;` : '';
                         content += `
-                            <div class="variable-button-container">
-                                <div class="variable-multi-button-container">
+                            <div class="variable-button-container" style="${multiButtonContainerJustify}">
+                                <div class="variable-multi-button-container" style="${multiButtonContainerJustify}">
                                     ${buttonsHtml}
                                 </div>
                             </div>
@@ -2205,9 +2542,11 @@
                                 </button>`;
                         });
                         
+                        // Für ungruppierte String-Multi-Buttons: horizontale Ausrichtung des Containers entsprechend Einstellung
+                        const stringMultiButtonContainerJustify = (!isGrouped) ? `display: flex; justify-content: ${justifyMap}; width: 100%;` : '';
                         content += `
-                            <div class="variable-button-container">
-                                <div class="variable-multi-button-container">
+                            <div class="variable-button-container" style="${stringMultiButtonContainerJustify}">
+                                <div class="variable-multi-button-container" style="${stringMultiButtonContainerJustify}">
                                     ${buttonsHtml}
                                 </div>
                             </div>
@@ -2232,12 +2571,12 @@
                         }
                         
                         if (variable.showValue) {
-                            textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                            textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
                         }
                         
                         // Falls nichts konfiguriert ist, zeige Wert als Fallback
                         if (!variable.showLabel && !variable.showValue) {
-                            textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                            textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
                         }
                         
                         content += `<div class="variable-item">
@@ -2263,14 +2602,15 @@
                     }
                     
                     if (variable.showValue) {
-                        textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                        textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
                     if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                        textParts.push(`<span class="variable-value variable-text">${variable.formattedValue}</span>`);
+                        textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
                     }
                     
+                    // Für ungruppierte Text-Variablen: Container richtet bereits aus
                     content += textParts.join('');
                 }
 
