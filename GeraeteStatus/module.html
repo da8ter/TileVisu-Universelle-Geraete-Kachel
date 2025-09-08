@@ -935,8 +935,37 @@
                         if (decodedData.hasOwnProperty('statusBildauswahl')) {
                             window.currentBildauswahl = decodedData.statusBildauswahl;
                         }
-                        renderStatus(decodedData);
-                        updateImageVisibility();
+
+                        // Build a minimal comparable snapshot of all status-relevant props
+                        const currentStatusSnapshot = {
+                            status: decodedData.status,
+                            statusValue: decodedData.statusValue,
+                            statusFontSize: decodedData.statusFontSize,
+                            statusAlignment: decodedData.statusAlignment,
+                            statusShowIcon: decodedData.statusShowIcon,
+                            statusShowLabel: decodedData.statusShowLabel,
+                            statusShowValue: decodedData.statusShowValue,
+                            statusLabel: decodedData.statusLabel,
+                            statusIcon: decodedData.statusIcon,
+                            statusBildauswahl: decodedData.statusBildauswahl,
+                            statusIconColor: decodedData.statusIconColor,
+                            isStatusIconColorTransparent: decodedData.isStatusIconColorTransparent,
+                            statusColor: decodedData.statusColor,
+                            isStatusColorTransparent: decodedData.isStatusColorTransparent,
+                            statusHidden: decodedData.statusHidden,
+                            hideImageColumn: decodedData.hideImageColumn,
+                            imageAlignment: window.currentImageAlignment || null
+                        };
+
+                        const lastStatusSnapshotJson = window._lastStatusSnapshotJson || null;
+                        const currentStatusSnapshotJson = JSON.stringify(currentStatusSnapshot);
+
+                        if (lastStatusSnapshotJson !== currentStatusSnapshotJson) {
+                            // Only re-render if something relevant changed
+                            renderStatus(decodedData);
+                            updateImageVisibility();
+                            window._lastStatusSnapshotJson = currentStatusSnapshotJson;
+                        }
                         
                         // Re-apply gespeicherte Bild-/Icon-Ausrichtung nach dem Rendering (Persistenz)
                         if (window.currentImageAlignment) {
@@ -1026,6 +1055,12 @@
                         renderStatus(decodedData);
                         break;
                     case 'variables':
+                        // Skip processing if incoming variables payload is IDENTICAL to the previous one
+                        if (window.lastVariablesData && JSON.stringify(value) === JSON.stringify(window.lastVariablesData)) {
+                            needsRerender = false; // Nothing changed at all
+                            break;
+                        }
+
                         if (window.lastVariablesData && window.variableDataCache) {
                             let hasMinimalUpdates = false;
                             let hasOtherChanges = false;
@@ -1037,23 +1072,32 @@
                             // Cache is variable-ID indexed (33670, 27157...)
                             // Same variable can appear multiple times with different displayTypes!
                             
-                            const processedVariables = new Set(); // Track which variables we've already processed
-                            const minimalUpdates = new Map(); // Store variables that can be updated minimally
+                            const processedEntries = new Set(); // Track processed (id + displayType) combinations
+                            const minimalUpdates = []; // Collect variables that can be updated minimally
                             
                             for (const arrayIndex in value) {
                                 const newVariable = value[arrayIndex];
                                 
                                 // Find matching variable in cache by variable ID, not array index
                                 const actualVariableId = newVariable?.variableId || newVariable?.id;
-                                const oldVariable = actualVariableId ? window.variableDataCache[actualVariableId] : null;
+                                // Find matching old variable from previous payload by same id and displayType
+                                let oldVariable = null;
+                                try {
+                                    if (window.lastVariablesData && actualVariableId) {
+                                        const prev = window.lastVariablesData.find(v => (v?.variableId || v?.id) === actualVariableId && (v?.displayType || 'text') === (newVariable?.displayType || 'text'));
+                                        if (prev) oldVariable = prev;
+                                    }
+                                } catch (_) { oldVariable = null; }
                                 
 
                                 
-                                // 🎯 DUPLICATE VARIABLE FIX: Skip if we already processed this variable ID
-                                if (processedVariables.has(actualVariableId)) {
+                                // 🎯 Handle duplicates by display type: process each (id + displayType) separately
+                                const displayType = newVariable?.displayType || 'text';
+                                const compositeKey = `${actualVariableId}::${displayType}`;
+                                if (processedEntries.has(compositeKey)) {
                                     continue;
                                 }
-                                processedVariables.add(actualVariableId);
+                                processedEntries.add(compositeKey);
                                 
                                 if (oldVariable && newVariable && actualVariableId) {
                                     // Prüfe ob sich nur rawValue oder formattedValue geändert hat
@@ -1062,17 +1106,9 @@
                                     
                                     if (valueChanged || formattedValueChanged) {
                                         // Check display type and determine if minimal update is possible
-                                        const displayType = newVariable.displayType;
-                                        
-                                        if (displayType === 'progress') {
+                                        if (displayType === 'progress' || displayType === 'button' || displayType === 'text') {
                                             hasMinimalUpdates = true;
-                                            minimalUpdates.set(actualVariableId, { type: 'progress', variable: newVariable });
-                                        } else if (displayType === 'button') {
-                                            hasMinimalUpdates = true;
-                                            minimalUpdates.set(actualVariableId, { type: 'button', variable: newVariable });
-                                        } else if (displayType === 'text') {
-                                            hasMinimalUpdates = true;
-                                            minimalUpdates.set(actualVariableId, { type: 'text', variable: newVariable });
+                                            minimalUpdates.push({ variableId: actualVariableId, type: displayType, variable: newVariable });
                                         } else {
                                             hasOtherChanges = true;
                                         }
@@ -1102,9 +1138,15 @@
                             if (hasMinimalUpdates && !hasOtherChanges) {
                                 
                                 // Führe Mini-Updates für alle geänderten Variablen durch
-                                minimalUpdates.forEach((updateData, variableId) => {
-                                    const { type, variable } = updateData;
+                                minimalUpdates.forEach((updateData) => {
+                                    const { variableId, type, variable } = updateData;
                                     
+                                    // Ensure cache reflects latest values for this variable before rendering
+                                    try {
+                                        if (!window.variableDataCache) window.variableDataCache = {};
+                                        window.variableDataCache[variableId] = variable;
+                                    } catch (_) {}
+
                                     switch (type) {
                                         case 'progress':
                                             updateProgressBarValue(variableId, variable.rawValue);
@@ -1127,22 +1169,33 @@
                         } else {
                         }
                         
+                        // Store latest variables and rebuild the ID-indexed cache for correct diffing next time
                         window.lastVariablesData = value;
-                        window.variableDataCache = value;
+                        updateVariableCache(value);
                         needsRerender = true;
                         break;
                     case 'progressbarconfig':
-                        updateProgressBarStyles(value);
-                        // 🚀 BATCH: Markiere für Re-Render statt sofort zu rendern
-                        if (window.lastVariablesData) {
-                            needsRerender = true;
+                        // Re-render nur, wenn sich die Konfiguration wirklich geändert hat
+                        const newPbCfg = value || {};
+                        const oldPbCfg = window.cachedProgressBarConfig || {};
+                        if (JSON.stringify(newPbCfg) !== JSON.stringify(oldPbCfg)) {
+                            updateProgressBarStyles(newPbCfg);
+                            window.cachedProgressBarConfig = newPbCfg;
+                            if (window.lastVariablesData) {
+                                needsRerender = true;
+                            }
                         }
                         break;
                     case 'buttonconfig':
-                        updateButtonStyles(value);
-                        // 🚀 BATCH: Markiere für Re-Render statt sofort zu rendern
-                        if (window.lastVariablesData) {
-                            needsRerender = true;
+                        // Re-render nur, wenn sich die Konfiguration wirklich geändert hat
+                        const newBtnCfg = value || {};
+                        const oldBtnCfg = window.cachedButtonConfig || {};
+                        if (JSON.stringify(newBtnCfg) !== JSON.stringify(oldBtnCfg)) {
+                            updateButtonStyles(newBtnCfg);
+                            window.cachedButtonConfig = newBtnCfg;
+                            if (window.lastVariablesData) {
+                                needsRerender = true;
+                            }
                         }
                         break;
                     case 'assets':
@@ -1153,11 +1206,14 @@
                         }
                         break;
                     case 'groupnames':
-                        // Speichere Gruppennamen für Frontend-Verwendung
-                        window.groupNames = value;
-                        // 🚀 BATCH: Markiere für Re-Render statt sofort zu rendern
-                        if (window.lastVariablesData) {
-                            needsRerender = true;
+                        // Nur aktualisieren und re-rendern, wenn sich die Gruppennamen geändert haben
+                        const newGroupNames = value || {};
+                        const oldGroupNames = window.groupNames || {};
+                        if (JSON.stringify(newGroupNames) !== JSON.stringify(oldGroupNames)) {
+                            window.groupNames = newGroupNames;
+                            if (window.lastVariablesData) {
+                                needsRerender = true;
+                            }
                         }
                         break;
                     case 'bildbreite':
@@ -1258,17 +1314,32 @@
             if (variable.displayType === 'button' && variableElement) {
                 // Button-Update
                 updateButtonDisplay(variableElement, variable);
+            } else if (variable.displayType === 'progress') {
+                // Progress: aktualisiere ausschließlich den Progress-Container (Text + ggf. width)
+                updateProgressDisplay(targetVariableId, variable);
             } else {
                 // Text-Variable-Update (auch in Gruppen)
-                updateTextDisplay(targetVariableId, variable);
+                updateTextValue(targetVariableId, variable);
             }
         }
         
         // Hilfsfunktion für Button-Display-Update
         function updateButtonDisplay(buttonElement, variable) {
             
-            // Check if this is a multi-button container (Integer or String variable)
-            const multiButtonContainer = buttonElement.querySelector('.variable-multi-button-container');
+            // Resolve the multi-button container robustly (works if buttonElement is a button or any descendant)
+            let multiButtonContainer = null;
+            if (buttonElement) {
+                if (buttonElement.classList && buttonElement.classList.contains('variable-multi-button-container')) {
+                    multiButtonContainer = buttonElement;
+                } else if (typeof buttonElement.closest === 'function') {
+                    multiButtonContainer = buttonElement.closest('.variable-multi-button-container');
+                } else {
+                    // Fallback: try querySelector from a container element
+                    try {
+                        multiButtonContainer = buttonElement.querySelector && buttonElement.querySelector('.variable-multi-button-container');
+                    } catch (_) {}
+                }
+            }
             
             // Support both Integer (variableType 1) and String (variableType 3) variables
             const associations = variable.variableAssociations || variable.integerAssociations;
@@ -1368,11 +1439,25 @@
                     }
                 }                
                 const opacity = isActive ? '1' : '0.7';
-                
+
+                // Resolve the actual button node; avoid mutating the wrapper
+                let targetButton = null;
+                if (buttonElement && buttonElement.classList && buttonElement.classList.contains('variable-button')) {
+                    targetButton = buttonElement;
+                } else if (typeof buttonElement.closest === 'function') {
+                    targetButton = buttonElement.closest('.variable-button');
+                }
+                if (!targetButton && buttonElement && buttonElement.querySelector) {
+                    targetButton = buttonElement.querySelector('.variable-button');
+                }
+                if (!targetButton) {
+                    return; // cannot safely update
+                }
+
                 // Aktualisiere Button-Style
-                buttonElement.style.backgroundColor = buttonColor;
-                // buttonElement.style.borderColor = buttonColor; // Border entfernt
-                buttonElement.style.opacity = opacity;
+                targetButton.style.backgroundColor = buttonColor;
+                // targetButton.style.borderColor = buttonColor; // Border entfernt
+                targetButton.style.opacity = opacity;
                 
                 // Button-Inhalt zusammenstellen
                 let buttonText = '';
@@ -1426,7 +1511,7 @@
                 // Button-Styles: Bool-Button soll IMMER seine buttonWidth verwenden
                 let buttonStyleExtras = `width: ${variable.buttonWidth}px; min-width: ${variable.buttonWidth}px;`;
                 
-                buttonElement.innerHTML = buttonText;
+                targetButton.innerHTML = buttonText;
             }
         }
         
@@ -2105,7 +2190,8 @@
                 cssClasses += ' with-border-line';
             }
                 
-            content += `<div class="${cssClasses}" style="${wrapperStyle}">`;
+            // Add data-variable-id to outer wrapper for minimal updates (text/button/image)
+            content += `<div class="${cssClasses}" style="${wrapperStyle}" data-variable-id="${variable.id}">`;
 
                 // Wert je nach Darstellungstyp hinzufügen
                 if (variable.displayType === 'progress') {
@@ -2621,19 +2707,53 @@
         
         // Mini-Update-Funktion für Button-Variablen
         function updateButtonValue(variableId, variable) {
-            const buttonElement = document.querySelector(`[data-variable-id="${variableId}"]`);
-            if (!buttonElement) {
+            // Prefer actual button elements to avoid mutating wrappers
+            let elements = document.querySelectorAll(`.variable-multi-button[data-variable-id="${variableId}"], .variable-button[data-variable-id="${variableId}"]`);
+            if (!elements || elements.length === 0) {
+                // Fallback to any node with the data attribute (e.g., wrapper) if no buttons found
+                elements = document.querySelectorAll(`[data-variable-id="${variableId}"]`);
+            }
+            if (!elements || elements.length === 0) {
                 return;
             }
-            
-            // Aktualisiere Button mit neuen Variablen-Daten
-            updateButtonDisplay(buttonElement, variable);
+            elements.forEach(el => updateButtonDisplay(el, variable));
         }
         
         // Mini-Update-Funktion für Text-Variablen
         function updateTextValue(variableId, variable) {
-            // Text-Variablen haben keinen speziellen Update-Prozess, da sie nur Text anzeigen
-            // Der Wert wird automatisch aus dem Cache gelesen beim nächsten Render
+            // Only target text variable wrappers to avoid altering buttons/images with same variable id
+            const nodes = document.querySelectorAll(`.variable-item.text-variable[data-variable-id="${variableId}"]`);
+            if (!nodes || nodes.length === 0) return;
+            nodes.forEach(node => {
+                try {
+                    // Update colors and font-size to reflect potential runtime changes
+                    const color = getTextColor(variable);
+                    if (color) node.style.color = color;
+                    if (typeof variable.fontSize === 'number' && variable.fontSize !== -1) {
+                        node.style.fontSize = `${variable.fontSize}px`;
+                    }
+
+                    // Update label if present
+                    const labelEl = node.querySelector('.variable-label');
+                    if (labelEl) {
+                        const labelText = variable.showValue ? `${variable.label}:\u00A0` : (variable.label || '');
+                        labelEl.innerHTML = labelText;
+                        labelEl.style.color = color;
+                    }
+
+                    // Update value if present
+                    const valueEl = node.querySelector('.variable-value');
+                    if (valueEl) {
+                        const display = (variable.formattedValue !== undefined && variable.formattedValue !== null)
+                            ? String(variable.formattedValue)
+                            : (variable.rawValue !== undefined && variable.rawValue !== null)
+                                ? String(variable.rawValue)
+                                : '';
+                        valueEl.textContent = display;
+                        valueEl.style.color = color;
+                    }
+                } catch (_) { /* ignore individual node errors */ }
+            });
         }
         
         // Cache-Update-Funktion mit korrekter Datenstruktur
@@ -2655,12 +2775,12 @@
 
         // Funktion zum Animieren aller Progress Bars nach Re-Renders
         function updateProgressBarValue(variableId, newValue) {
-            const progressBar = document.querySelector(`[data-variable-id="${variableId}"] .progress-bar`);
-            const valueSpan = document.querySelector(`[data-variable-id="${variableId}"] .progress-text .variable-value`);
-            
-            if (!progressBar || !valueSpan) {
-                return;
-            }
+            // Locate progress elements
+            const progressContainer = document.querySelector(`[data-variable-id="${variableId}"]`);
+            if (!progressContainer) return;
+            const progressBar = progressContainer.querySelector('.progress-bar');
+            const progressTextContainer = progressContainer.querySelector('.progress-text');
+            if (!progressBar) return;
             
             // Hole Variable-Konfiguration aus Cache
             const variableConfig = window.variableDataCache?.[variableId];
@@ -2669,18 +2789,44 @@
             }
             
             // Berechne alte und neue Breite
-            const minValue = parseFloat(variableConfig.minValue) || 0;
-            const maxValue = parseFloat(variableConfig.maxValue) || 100;
-            const oldValue = parseFloat(progressBar.dataset.oldValue || variableConfig.rawValue || 0);
-            const oldWidth = Math.max(0, Math.min(100, ((oldValue - minValue) / (maxValue - minValue)) * 100));
+            const minValue = parseFloat(variableConfig.progressMin) || 0;
+            const maxValue = parseFloat(variableConfig.progressMax) || 100;
+            // KRITISCH: Alte Breite aus dem DOM lesen, NICHT aus dem (soeben aktualisierten) Cache!
+            const oldWidth = parseFloat(progressBar.style.width) || 0;
             const newWidth = Math.max(0, Math.min(100, ((newValue - minValue) / (maxValue - minValue)) * 100));
             
 
             
-            // 1. UPDATE VALUE SPAN (sofort)
-            valueSpan.textContent = newValue;
+            // 1. Update cached values for immediate text refresh
+            try {
+                if (window.variableDataCache && window.variableDataCache[variableId]) {
+                    // Ensure cache has the newest raw value
+                    window.variableDataCache[variableId].rawValue = newValue;
+                    // If not inactive, provisionally update formattedValue to the new raw value for instant UI update.
+                    // The proper formatted value (with unit) will override this when its message arrives.
+                    const vc = window.variableDataCache[variableId];
+                    const shouldShow = vc && (vc.showValue === undefined || vc.showValue === true);
+                    if (shouldShow && !(vc && vc.progressbarInactive)) {
+                        if (typeof vc.formattedValue === 'undefined' || vc.formattedValue === null) {
+                            window.variableDataCache[variableId].formattedValue = String(newValue);
+                        }
+                    }
+                }
+            } catch (_) {}
+
+            // 2. Update progress text (if container exists). We rebuild from cached config to keep formatting consistent.
+            if (progressTextContainer) {
+                // Temporarily update cached raw/ formatted values if appropriate
+                try {
+                    if (window.variableDataCache && window.variableDataCache[variableId]) {
+                        // rawValue already updated by caller; formattedValue may be updated separately in same message
+                        // Re-render the text from current cache
+                        updateProgressText(progressTextContainer, window.variableDataCache[variableId]);
+                    }
+                } catch (_) {}
+            }
             
-            // 2. ANIMATE PROGRESS BAR WIDTH (nur wenn sich Wert geändert hat)
+            // 3. ANIMATE PROGRESS BAR WIDTH (nur wenn sich Wert geändert hat)
             if (Math.abs(oldWidth - newWidth) > 0.1) {
                 // Setze Bar auf alte Breite
                 progressBar.style.width = oldWidth + '%';
