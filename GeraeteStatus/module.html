@@ -1218,6 +1218,15 @@
                         if (typeof value === 'object') {
                             window.assets = window.assets || {};
                             Object.assign(window.assets, value);
+                            // Wichtig: Wenn sich Medieninhalte geändert haben, muss das Statusbild neu gerendert werden,
+                            // da das <img>-src bereits auf den alten base64-String gesetzt wurde.
+                            // Re-render mit dem zuletzt bekannten Status-Payload.
+                            try {
+                                if (window._lastStatusPayload) {
+                                    renderStatus(window._lastStatusPayload);
+                                    updateImageVisibility();
+                                }
+                            } catch (_) {}
                         }
                         break;
                     case 'groupnames':
@@ -1664,6 +1673,8 @@
 
 
         function renderStatus(data) {
+            // Speichere den letzten Status-Payload für spätere Re-Renders (z.B. bei Asset-/Medien-Updates)
+            try { window._lastStatusPayload = data; } catch(_) {}
             const statusContainer = document.getElementById('status-container');
             const root = document.documentElement;
             

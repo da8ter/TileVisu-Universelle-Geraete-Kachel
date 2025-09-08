@@ -385,6 +385,8 @@ class UniversalDeviceTile extends IPSModule
         
         // Sammle alle Variablen-IDs
         $ids = [$this->ReadPropertyInteger('bgImage')];
+        // Sammle relevante Medienobjekte für Referenzen & Nachrichten (Default + Custom Images + Hintergrund)
+        $mediaIds = [];
         
         // Füge Status-Variable hinzu
         $statusId = $this->ReadPropertyInteger('Status');
@@ -402,6 +404,34 @@ class UniversalDeviceTile extends IPSModule
                     $ids[] = $variable['SecondVariable'];
                 }
             }
+        }
+
+        // DefaultImage referenzieren und für Medien-Events vormerken
+        $defaultImageId = $this->ReadPropertyInteger('DefaultImage');
+        if ($defaultImageId > 0 && IPS_MediaExists($defaultImageId)) {
+            $ids[] = $defaultImageId;
+            $mediaIds[] = $defaultImageId;
+        }
+
+        // Custom Images aus ProfilAssoziazionen einsammeln
+        $profilAssoziazionen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+        if (is_array($profilAssoziazionen)) {
+            foreach ($profilAssoziazionen as $assoziation) {
+                $bildauswahl = $assoziation['Bildauswahl'] ?? 'none';
+                if ($bildauswahl === 'custom' && !empty($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
+                    $mid = intval($assoziation['EigenesBild']);
+                    if (IPS_MediaExists($mid)) {
+                        $ids[] = $mid;
+                        $mediaIds[] = $mid;
+                    }
+                }
+            }
+        }
+
+        // Hintergrundbild (bgImage) als Media-Eventquelle vormerken
+        $bgImageId = $this->ReadPropertyInteger('bgImage');
+        if ($bgImageId > 0 && IPS_MediaExists($bgImageId)) {
+            $mediaIds[] = $bgImageId;
         }
         
         // Entferne alle alten Referenzen
@@ -441,6 +471,15 @@ class UniversalDeviceTile extends IPSModule
                 if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
                     $this->RegisterMessage($variable['SecondVariable'], VM_UPDATE);
                 }
+            }
+        }
+
+        // Registriere Nachrichten für Medien-Objekte (Inhalte geändert)
+        foreach (array_unique($mediaIds) as $mid) {
+            if ($mid > 0) {
+                // Aktualisierung und Dateiänderung beobachten
+                $this->RegisterMessage($mid, MM_UPDATE);
+                $this->RegisterMessage($mid, MM_CHANGEFILE);
             }
         }
 
