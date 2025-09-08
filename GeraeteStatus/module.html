@@ -95,6 +95,8 @@
             width: var(--bildbreite) !important;
             min-width: var(--bildbreite) !important;
             max-width: var(--bildbreite) !important;
+            height: auto !important; /* Preserve aspect ratio */
+            object-fit: contain;     /* Keep image inside its box without stretching */
             display: block;
             box-sizing: border-box;
         }
@@ -110,6 +112,13 @@
         .main_container.image-left {
             flex-direction: row;
             gap: 10px;
+        }
+
+        /* Bei links/rechts: Bild in der linken/rechten Spalte oben ausrichten */
+        .main_container.image-left .div1,
+        .main_container.image-right .div1 {
+            display: flex;
+            align-items: flex-start; /* oben */
         }
 
         /* Bildposition: Rechts */
@@ -140,11 +149,14 @@
             padding-bottom: 20px;
             display: flex;
             justify-content: center; /* Standard: Zentriert */
+            align-items: center;      /* Verhindert vertikales Strecken von img */
         }
         
         .main_container.image-top .div1 img {
             width: var(--bildbreite);
             max-width: var(--bildbreite);
+            height: auto;           /* Preserve aspect ratio */
+            object-fit: contain;    /* Avoid stretching when container grows */
             display: block;
         }
 
@@ -165,11 +177,14 @@
             padding-top: 20px;
             display: flex;
             justify-content: center; /* Standard: Zentriert */
+            align-items: center;      /* Verhindert vertikales Strecken von img */
         }
         
         .main_container.image-bottom .div1 img {
             width: var(--bildbreite);
             max-width: var(--bildbreite);
+            height: auto;           /* Preserve aspect ratio */
+            object-fit: contain;    /* Avoid stretching when container grows */
             display: block;
         }
         
