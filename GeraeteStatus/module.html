@@ -1326,9 +1326,9 @@
             // Finde das DOM-Element für diese Variable
             const variableElement = document.querySelector(`[data-variable-id="${targetVariableId}"]`);
             
-            if (variable.displayType === 'button' && variableElement) {
-                // Button-Update
-                updateButtonDisplay(variableElement, variable);
+            if (variable.displayType === 'button') {
+                // Button-Update: auf alle passenden Button-Instanzen anwenden
+                updateButtonValue(targetVariableId, variable);
             } else if (variable.displayType === 'progress') {
                 // Progress: aktualisiere ausschließlich den Progress-Container (Text + ggf. width)
                 updateProgressDisplay(targetVariableId, variable);

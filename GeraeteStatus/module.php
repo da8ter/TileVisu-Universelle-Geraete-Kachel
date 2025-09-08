@@ -92,6 +92,80 @@ class UniversalDeviceTile extends IPSModule
         // Lade das Icon-Mapping
         $this->LoadIconMapping();
     }
+
+    // === Minimal-Update Builder: Status ===
+    private function buildMinimalStatusUpdate(array $fullPayload): array
+    {
+        if (!is_array($fullPayload)) return [];
+        $keys = [
+            'status',
+            'statusValue',
+            'statusAlignment',
+            'statusLabel',
+            'statusShowIcon',
+            'statusShowLabel',
+            'statusShowValue',
+            'statusFontSize',
+            'statusBildauswahl',
+            'statusColor',
+            'isStatusColorTransparent',
+            'statusIconColor',
+            'isStatusIconColorTransparent',
+            'hideImageColumn'
+        ];
+        $minimal = [];
+        foreach ($keys as $k) {
+            if (array_key_exists($k, $fullPayload)) {
+                $minimal[$k] = $fullPayload[$k];
+            }
+        }
+        return $minimal;
+    }
+
+    // === Minimal-Update Builder: var_<index> für Haupt-Variable ===
+    private function buildMinimalVarUpdateForVariable(array $fullPayload, int $changedVariableId): array
+    {
+        if (!isset($fullPayload['variables']) || !is_array($fullPayload['variables'])) {
+            return [];
+        }
+        foreach ($fullPayload['variables'] as $i => $var) {
+            $vid = $var['variableId'] ?? ($var['id'] ?? 0);
+            if ($vid === $changedVariableId) {
+                $key = 'var_' . $i;
+                $payload = [];
+                // Rohwert und formatierter Wert bereitstellen
+                if (array_key_exists('rawValue', $var)) {
+                    $payload[$key . '_value'] = $var['rawValue'];
+                }
+                $payload[$key] = $var['formattedValue'] ?? '';
+                return $payload;
+            }
+        }
+        return [];
+    }
+
+    // === Minimal-Update Builder: var_<index> für zugehörige Haupt-Variable anhand SecondVariable-ID ===
+    private function buildMinimalVarUpdateForSecondVariable(array $fullPayload, int $secondVariableId): array
+    {
+        if (!isset($fullPayload['variables']) || !is_array($fullPayload['variables'])) {
+            return [];
+        }
+        foreach ($fullPayload['variables'] as $i => $var) {
+            if (isset($var['secondVariable']) && is_array($var['secondVariable'])) {
+                $sid = $var['secondVariable']['id'] ?? 0;
+                if ($sid === $secondVariableId) {
+                    $key = 'var_' . $i;
+                    $payload = [];
+                    if (array_key_exists('rawValue', $var)) {
+                        $payload[$key . '_value'] = $var['rawValue'];
+                    }
+                    $payload[$key] = $var['formattedValue'] ?? '';
+                    return $payload;
+                }
+            }
+        }
+        return [];
+    }
     
 
     /**
@@ -544,10 +618,17 @@ class UniversalDeviceTile extends IPSModule
         if ($statusId > 0 && $SenderID === $statusId) {
             switch ($Message) {
             case VM_UPDATE:
-                // Status-Änderung: Vollständige Nachricht mit abgefangenen Progress-Werten senden  
+                // Status-Änderung: Sende minimalen Status-Update-Payload
                 $fullMessage = $this->GetFullUpdateMessage();
                 $interceptedMessage = $this->InterceptProgressValuesIfNeeded($fullMessage);
-                $this->UpdateVisualizationValue($interceptedMessage);
+                $fullArray = json_decode($interceptedMessage, true);
+                $minimal = $this->buildMinimalStatusUpdate($fullArray);
+                if (!empty($minimal)) {
+                    $this->UpdateVisualizationValue(json_encode($minimal));
+                } else {
+                    // Fallback: vollständige Nachricht
+                    $this->UpdateVisualizationValue($interceptedMessage);
+                }
                     break;
             }
         }
@@ -561,10 +642,27 @@ class UniversalDeviceTile extends IPSModule
             if (isset($variable['Variable']) && $SenderID === $variable['Variable']) {
                 switch ($Message) {
                     case VM_UPDATE:
-                        // Variable-Änderung: Vollständige Nachricht mit abgefangenen Progress-Werten senden
+                        // Variable-Änderung: Sende minimalen var_<index> und var_<index>_value Payload
                         $fullMessage = $this->GetFullUpdateMessage();
                         $interceptedMessage = $this->InterceptProgressValuesIfNeeded($fullMessage);
-                        $this->UpdateVisualizationValue($interceptedMessage);
+                        $fullArray = json_decode($interceptedMessage, true);
+                        $minimal = $this->buildMinimalVarUpdateForVariable($fullArray, $SenderID);
+                        if (!empty($minimal)) {
+                            // Split into two messages like Wallbox: formatted first, then rawValue
+                            foreach ($minimal as $k => $v) {
+                                if (substr($k, -6) !== '_value') {
+                                    $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                }
+                            }
+                            foreach ($minimal as $k => $v) {
+                                if (substr($k, -6) === '_value') {
+                                    $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                }
+                            }
+                        } else {
+                            // Fallback: vollständige Nachricht
+                            $this->UpdateVisualizationValue($interceptedMessage);
+                        }
                         break;
                 }
             }
@@ -572,10 +670,27 @@ class UniversalDeviceTile extends IPSModule
             elseif (isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable']) {
                 switch ($Message) {
                     case VM_UPDATE:
-                        // SecondVariable-Änderung: Vollständige Nachricht mit abgefangenen Progress-Werten senden
+                        // SecondVariable-Änderung: Sende minimalen Update-Payload für die zugehörige Progress-Variable
                         $fullMessage = $this->GetFullUpdateMessage();
                         $interceptedMessage = $this->InterceptProgressValuesIfNeeded($fullMessage);
-                        $this->UpdateVisualizationValue($interceptedMessage);
+                        $fullArray = json_decode($interceptedMessage, true);
+                        $minimal = $this->buildMinimalVarUpdateForSecondVariable($fullArray, $SenderID);
+                        if (!empty($minimal)) {
+                            // Split into two messages like Wallbox: formatted first, then rawValue
+                            foreach ($minimal as $k => $v) {
+                                if (substr($k, -6) !== '_value') {
+                                    $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                }
+                            }
+                            foreach ($minimal as $k => $v) {
+                                if (substr($k, -6) === '_value') {
+                                    $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                }
+                            }
+                        } else {
+                            // Fallback: vollständige Nachricht
+                            $this->UpdateVisualizationValue($interceptedMessage);
+                        }
                         break;
                 }
             }
