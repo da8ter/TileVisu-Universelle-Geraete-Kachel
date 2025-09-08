@@ -413,6 +413,13 @@ class UniversalDeviceTile extends IPSModule
                 if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
                     $ids[] = $variable['SecondVariable'];
                 }
+                // Sammle Medien für DisplayType=image
+                if ((($variable['DisplayType'] ?? 'text') === 'image')) {
+                    $imageId = intval($variable['ImageMedia'] ?? 0);
+                    if ($imageId > 0 && IPS_MediaExists($imageId)) {
+                        $mediaIds[] = $imageId;
+                    }
+                }
             }
         }
 
@@ -753,6 +760,54 @@ class UniversalDeviceTile extends IPSModule
                 $assets = $this->GenerateAssets();
                 if (!empty($assets)) {
                     $this->UpdateVisualizationValue(json_encode(['assets' => $assets]));
+                }
+            } catch (Exception $e) {
+                // ignore
+            } catch (Error $e) {
+                // ignore
+            }
+
+            // Minimal-Updates für Variablen mit DisplayType=image, deren ImageMedia dieses Media ist
+            try {
+                $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
+                if (is_array($variablesList) && $SenderID > 0) {
+                    $imageVarUpdates = [];
+                    foreach ($variablesList as $idx => $variable) {
+                        if ((($variable['DisplayType'] ?? 'text') === 'image')) {
+                            $imageId = intval($variable['ImageMedia'] ?? 0);
+                            if ($imageId === $SenderID) {
+                                // Data-URI neu aufbauen
+                                $dataUri = '';
+                                if (IPS_MediaExists($imageId)) {
+                                    $media = IPS_GetMedia($imageId);
+                                    if ($media['MediaType'] === MEDIATYPE_IMAGE) {
+                                        $ext = '';
+                                        if (!empty($media['MediaFile'])) {
+                                            $parts = explode('.', $media['MediaFile']);
+                                            $ext = end($parts);
+                                        }
+                                        $prefix = $this->GetImageDataUri($ext ?: 'png');
+                                        if ($prefix) {
+                                            $dataUri = $prefix . IPS_GetMediaContent($imageId);
+                                        }
+                                    }
+                                }
+
+                                // Bestimme DOM-ID: mit Variable-ID falls vorhanden, sonst 'image_<index>'
+                                $domId = isset($variable['Variable']) && $variable['Variable'] > 0
+                                    ? strval($variable['Variable'])
+                                    : ('image_' . $idx);
+
+                                $imageVarUpdates[] = [
+                                    'id' => $domId,
+                                    'imageDataUri' => $dataUri
+                                ];
+                            }
+                        }
+                    }
+                    if (!empty($imageVarUpdates)) {
+                        $this->UpdateVisualizationValue(json_encode(['imageVarUpdate' => $imageVarUpdates]));
+                    }
                 }
             } catch (Exception $e) {
                 // ignore

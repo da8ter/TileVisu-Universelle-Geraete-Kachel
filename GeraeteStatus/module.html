@@ -1248,6 +1248,27 @@
                             } catch (_) {}
                         }
                         break;
+                    case 'imageVarUpdate':
+                        // Minimal-Update vom Backend für Variablen mit displayType 'image'
+                        try {
+                            const updates = Array.isArray(value) ? value : [];
+                            for (const u of updates) {
+                                const id = u?.id;
+                                const dataUri = u?.imageDataUri || '';
+                                if (!id || !dataUri) continue;
+                                // Selektor für Variable-Wrapper
+                                const wrapper = document.querySelector(`.variable-item[data-variable-id="${CSS.escape(String(id))}"]`);
+                                if (!wrapper) continue;
+                                // Suche img innerhalb des Wrappers
+                                const img = wrapper.querySelector('img.variable-inline-image');
+                                if (!img) continue;
+                                img.style.display = 'none';
+                                img.onload = function() { this.style.display = ''; };
+                                img.onerror = function() { this.style.display = 'none'; };
+                                img.src = dataUri;
+                            }
+                        } catch (_) {}
+                        break;
                     case 'groupnames':
                         // Nur aktualisieren und re-rendern, wenn sich die Gruppennamen geändert haben
                         const newGroupNames = value || {};
