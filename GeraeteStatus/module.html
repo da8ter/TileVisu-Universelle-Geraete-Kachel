@@ -1218,13 +1218,32 @@
                         if (typeof value === 'object') {
                             window.assets = window.assets || {};
                             Object.assign(window.assets, value);
+                            try { console.info('[UDT] Assets updated:', Object.keys(value)); } catch(_) {}
                             // Wichtig: Wenn sich Medieninhalte geändert haben, muss das Statusbild neu gerendert werden,
                             // da das <img>-src bereits auf den alten base64-String gesetzt wurde.
                             // Re-render mit dem zuletzt bekannten Status-Payload.
                             try {
                                 if (window._lastStatusPayload) {
+                                    try { console.info('[UDT] Re-render status due to assets update (using last payload)'); } catch(_) {}
                                     renderStatus(window._lastStatusPayload);
                                     updateImageVisibility();
+                                } else if (window.currentBildauswahl) {
+                                    // Fallback: Kein gespeicherter Payload vorhanden -> Bild direkt aktualisieren
+                                    const key = window.currentBildauswahl;
+                                    let imageUrl = '';
+                                    if (key && (key.startsWith('img_custom_') || key.startsWith('img_default_'))) {
+                                        imageUrl = window.assets[key] || '';
+                                    } else if (key && key !== 'none') {
+                                        imageUrl = window.assets[`img_${key}`] || '';
+                                    }
+                                    const deviceImg = document.getElementById('image');
+                                    if (deviceImg && imageUrl) {
+                                        try { console.info('[UDT] Directly updating image src due to assets update'); } catch(_) {}
+                                        deviceImg.style.display = 'none';
+                                        deviceImg.onload = function() { this.style.display = ''; };
+                                        deviceImg.onerror = function() { this.style.display = 'none'; };
+                                        deviceImg.src = imageUrl;
+                                    }
                                 }
                             } catch (_) {}
                         }

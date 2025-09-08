@@ -11,6 +11,16 @@ if (!defined('VARIABLETYPE_STRING')) {
     define('VARIABLETYPE_STRING', 3);
 }
 
+// Ensure media message constants are defined (for older environments)
+if (!defined('MM_CHANGEFILE')) {
+    // IPS_BASE (10000) + IPS_MEDIAMESSAGE (900) + 3
+    define('MM_CHANGEFILE', 10903);
+}
+if (!defined('MM_UPDATE')) {
+    // IPS_BASE (10000) + IPS_MEDIAMESSAGE (900) + 5
+    define('MM_UPDATE', 10905);
+}
+
 class UniversalDeviceTile extends IPSModule
 {
     // Variablen-Zugriff und Status-Variable-ID
@@ -735,6 +745,45 @@ class UniversalDeviceTile extends IPSModule
             }
         }
     }
+
+        // Medien-Änderungen (DefaultImage, Custom Images aus Assoziationen, Hintergrundbild)
+        if ($Message === MM_UPDATE || $Message === MM_CHANGEFILE) {
+            // Aktualisiere Assets (img_custom_*, img_default_* sowie vorkonfigurierte Assets)
+            try {
+                $assets = $this->GenerateAssets();
+                if (!empty($assets)) {
+                    $this->UpdateVisualizationValue(json_encode(['assets' => $assets]));
+                }
+            } catch (Exception $e) {
+                // ignore
+            } catch (Error $e) {
+                // ignore
+            }
+
+            // Falls das Hintergrundbild betroffen ist: Aktualisiere image1 separat
+            $bgImageId = $this->ReadPropertyInteger('bgImage');
+            if ($SenderID === $bgImageId && $bgImageId > 0 && IPS_MediaExists($bgImageId)) {
+                $image = IPS_GetMedia($bgImageId);
+                if ($image['MediaType'] === MEDIATYPE_IMAGE) {
+                    $imageFile = explode('.', $image['MediaFile']);
+                    $imageContent = '';
+                    switch (end($imageFile)) {
+                        case 'bmp':  $imageContent = 'data:image/bmp;base64,'; break;
+                        case 'jpg':
+                        case 'jpeg': $imageContent = 'data:image/jpeg;base64,'; break;
+                        case 'gif':  $imageContent = 'data:image/gif;base64,'; break;
+                        case 'png':  $imageContent = 'data:image/png;base64,'; break;
+                        case 'ico':  $imageContent = 'data:image/x-icon;base64,'; break;
+                        case 'webp': $imageContent = 'data:image/webp;base64,'; break;
+                    }
+                    if ($imageContent) {
+                        $imageContent .= IPS_GetMediaContent($bgImageId);
+                        $this->UpdateVisualizationValue(json_encode(['image1' => $imageContent]));
+                    }
+                }
+            }
+            return; // nichts weiter zu tun
+        }
 }
 
 
