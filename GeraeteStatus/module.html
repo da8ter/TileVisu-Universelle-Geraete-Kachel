@@ -1218,7 +1218,56 @@
                         if (typeof value === 'object') {
                             window.assets = window.assets || {};
                             Object.assign(window.assets, value);
+                            try { console.info('[UDT] Assets updated:', Object.keys(value)); } catch(_) {}
+                            // Wichtig: Wenn sich Medieninhalte geändert haben, muss das Statusbild neu gerendert werden,
+                            // da das <img>-src bereits auf den alten base64-String gesetzt wurde.
+                            // Re-render mit dem zuletzt bekannten Status-Payload.
+                            try {
+                                if (window._lastStatusPayload) {
+                                    try { console.info('[UDT] Re-render status due to assets update (using last payload)'); } catch(_) {}
+                                    renderStatus(window._lastStatusPayload);
+                                    updateImageVisibility();
+                                } else if (window.currentBildauswahl) {
+                                    // Fallback: Kein gespeicherter Payload vorhanden -> Bild direkt aktualisieren
+                                    const key = window.currentBildauswahl;
+                                    let imageUrl = '';
+                                    if (key && (key.startsWith('img_custom_') || key.startsWith('img_default_'))) {
+                                        imageUrl = window.assets[key] || '';
+                                    } else if (key && key !== 'none') {
+                                        imageUrl = window.assets[`img_${key}`] || '';
+                                    }
+                                    const deviceImg = document.getElementById('image');
+                                    if (deviceImg && imageUrl) {
+                                        try { console.info('[UDT] Directly updating image src due to assets update'); } catch(_) {}
+                                        deviceImg.style.display = 'none';
+                                        deviceImg.onload = function() { this.style.display = ''; };
+                                        deviceImg.onerror = function() { this.style.display = 'none'; };
+                                        deviceImg.src = imageUrl;
+                                    }
+                                }
+                            } catch (_) {}
                         }
+                        break;
+                    case 'imageVarUpdate':
+                        // Minimal-Update vom Backend für Variablen mit displayType 'image'
+                        try {
+                            const updates = Array.isArray(value) ? value : [];
+                            for (const u of updates) {
+                                const id = u?.id;
+                                const dataUri = u?.imageDataUri || '';
+                                if (!id || !dataUri) continue;
+                                // Selektor für Variable-Wrapper
+                                const wrapper = document.querySelector(`.variable-item[data-variable-id="${CSS.escape(String(id))}"]`);
+                                if (!wrapper) continue;
+                                // Suche img innerhalb des Wrappers
+                                const img = wrapper.querySelector('img.variable-inline-image');
+                                if (!img) continue;
+                                img.style.display = 'none';
+                                img.onload = function() { this.style.display = ''; };
+                                img.onerror = function() { this.style.display = 'none'; };
+                                img.src = dataUri;
+                            }
+                        } catch (_) {}
                         break;
                     case 'groupnames':
                         // Nur aktualisieren und re-rendern, wenn sich die Gruppennamen geändert haben
@@ -1664,6 +1713,8 @@
 
 
         function renderStatus(data) {
+            // Speichere den letzten Status-Payload für spätere Re-Renders (z.B. bei Asset-/Medien-Updates)
+            try { window._lastStatusPayload = data; } catch(_) {}
             const statusContainer = document.getElementById('status-container');
             const root = document.documentElement;
             

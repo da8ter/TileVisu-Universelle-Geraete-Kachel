@@ -11,6 +11,16 @@ if (!defined('VARIABLETYPE_STRING')) {
     define('VARIABLETYPE_STRING', 3);
 }
 
+// Ensure media message constants are defined (for older environments)
+if (!defined('MM_CHANGEFILE')) {
+    // IPS_BASE (10000) + IPS_MEDIAMESSAGE (900) + 3
+    define('MM_CHANGEFILE', 10903);
+}
+if (!defined('MM_UPDATE')) {
+    // IPS_BASE (10000) + IPS_MEDIAMESSAGE (900) + 5
+    define('MM_UPDATE', 10905);
+}
+
 class UniversalDeviceTile extends IPSModule
 {
     // Variablen-Zugriff und Status-Variable-ID
@@ -385,6 +395,8 @@ class UniversalDeviceTile extends IPSModule
         
         // Sammle alle Variablen-IDs
         $ids = [$this->ReadPropertyInteger('bgImage')];
+        // Sammle relevante Medienobjekte für Referenzen & Nachrichten (Default + Custom Images + Hintergrund)
+        $mediaIds = [];
         
         // Füge Status-Variable hinzu
         $statusId = $this->ReadPropertyInteger('Status');
@@ -401,7 +413,42 @@ class UniversalDeviceTile extends IPSModule
                 if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
                     $ids[] = $variable['SecondVariable'];
                 }
+                // Sammle Medien für DisplayType=image
+                if ((($variable['DisplayType'] ?? 'text') === 'image')) {
+                    $imageId = intval($variable['ImageMedia'] ?? 0);
+                    if ($imageId > 0 && IPS_MediaExists($imageId)) {
+                        $mediaIds[] = $imageId;
+                    }
+                }
             }
+        }
+
+        // DefaultImage referenzieren und für Medien-Events vormerken
+        $defaultImageId = $this->ReadPropertyInteger('DefaultImage');
+        if ($defaultImageId > 0 && IPS_MediaExists($defaultImageId)) {
+            $ids[] = $defaultImageId;
+            $mediaIds[] = $defaultImageId;
+        }
+
+        // Custom Images aus ProfilAssoziazionen einsammeln
+        $profilAssoziazionen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+        if (is_array($profilAssoziazionen)) {
+            foreach ($profilAssoziazionen as $assoziation) {
+                $bildauswahl = $assoziation['Bildauswahl'] ?? 'none';
+                if ($bildauswahl === 'custom' && !empty($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
+                    $mid = intval($assoziation['EigenesBild']);
+                    if (IPS_MediaExists($mid)) {
+                        $ids[] = $mid;
+                        $mediaIds[] = $mid;
+                    }
+                }
+            }
+        }
+
+        // Hintergrundbild (bgImage) als Media-Eventquelle vormerken
+        $bgImageId = $this->ReadPropertyInteger('bgImage');
+        if ($bgImageId > 0 && IPS_MediaExists($bgImageId)) {
+            $mediaIds[] = $bgImageId;
         }
         
         // Entferne alle alten Referenzen
@@ -441,6 +488,15 @@ class UniversalDeviceTile extends IPSModule
                 if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
                     $this->RegisterMessage($variable['SecondVariable'], VM_UPDATE);
                 }
+            }
+        }
+
+        // Registriere Nachrichten für Medien-Objekte (Inhalte geändert)
+        foreach (array_unique($mediaIds) as $mid) {
+            if ($mid > 0) {
+                // Aktualisierung und Dateiänderung beobachten
+                $this->RegisterMessage($mid, MM_UPDATE);
+                $this->RegisterMessage($mid, MM_CHANGEFILE);
             }
         }
 
@@ -696,6 +752,93 @@ class UniversalDeviceTile extends IPSModule
             }
         }
     }
+
+        // Medien-Änderungen (DefaultImage, Custom Images aus Assoziationen, Hintergrundbild)
+        if ($Message === MM_UPDATE || $Message === MM_CHANGEFILE) {
+            // Aktualisiere Assets (img_custom_*, img_default_* sowie vorkonfigurierte Assets)
+            try {
+                $assets = $this->GenerateAssets();
+                if (!empty($assets)) {
+                    $this->UpdateVisualizationValue(json_encode(['assets' => $assets]));
+                }
+            } catch (Exception $e) {
+                // ignore
+            } catch (Error $e) {
+                // ignore
+            }
+
+            // Minimal-Updates für Variablen mit DisplayType=image, deren ImageMedia dieses Media ist
+            try {
+                $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
+                if (is_array($variablesList) && $SenderID > 0) {
+                    $imageVarUpdates = [];
+                    foreach ($variablesList as $idx => $variable) {
+                        if ((($variable['DisplayType'] ?? 'text') === 'image')) {
+                            $imageId = intval($variable['ImageMedia'] ?? 0);
+                            if ($imageId === $SenderID) {
+                                // Data-URI neu aufbauen
+                                $dataUri = '';
+                                if (IPS_MediaExists($imageId)) {
+                                    $media = IPS_GetMedia($imageId);
+                                    if ($media['MediaType'] === MEDIATYPE_IMAGE) {
+                                        $ext = '';
+                                        if (!empty($media['MediaFile'])) {
+                                            $parts = explode('.', $media['MediaFile']);
+                                            $ext = end($parts);
+                                        }
+                                        $prefix = $this->GetImageDataUri($ext ?: 'png');
+                                        if ($prefix) {
+                                            $dataUri = $prefix . IPS_GetMediaContent($imageId);
+                                        }
+                                    }
+                                }
+
+                                // Bestimme DOM-ID: mit Variable-ID falls vorhanden, sonst 'image_<index>'
+                                $domId = isset($variable['Variable']) && $variable['Variable'] > 0
+                                    ? strval($variable['Variable'])
+                                    : ('image_' . $idx);
+
+                                $imageVarUpdates[] = [
+                                    'id' => $domId,
+                                    'imageDataUri' => $dataUri
+                                ];
+                            }
+                        }
+                    }
+                    if (!empty($imageVarUpdates)) {
+                        $this->UpdateVisualizationValue(json_encode(['imageVarUpdate' => $imageVarUpdates]));
+                    }
+                }
+            } catch (Exception $e) {
+                // ignore
+            } catch (Error $e) {
+                // ignore
+            }
+
+            // Falls das Hintergrundbild betroffen ist: Aktualisiere image1 separat
+            $bgImageId = $this->ReadPropertyInteger('bgImage');
+            if ($SenderID === $bgImageId && $bgImageId > 0 && IPS_MediaExists($bgImageId)) {
+                $image = IPS_GetMedia($bgImageId);
+                if ($image['MediaType'] === MEDIATYPE_IMAGE) {
+                    $imageFile = explode('.', $image['MediaFile']);
+                    $imageContent = '';
+                    switch (end($imageFile)) {
+                        case 'bmp':  $imageContent = 'data:image/bmp;base64,'; break;
+                        case 'jpg':
+                        case 'jpeg': $imageContent = 'data:image/jpeg;base64,'; break;
+                        case 'gif':  $imageContent = 'data:image/gif;base64,'; break;
+                        case 'png':  $imageContent = 'data:image/png;base64,'; break;
+                        case 'ico':  $imageContent = 'data:image/x-icon;base64,'; break;
+                        case 'webp': $imageContent = 'data:image/webp;base64,'; break;
+                    }
+                    if ($imageContent) {
+                        $imageContent .= IPS_GetMediaContent($bgImageId);
+                        $this->UpdateVisualizationValue(json_encode(['image1' => $imageContent]));
+                    }
+                }
+            }
+            return; // nichts weiter zu tun
+        }
 }
 
 
