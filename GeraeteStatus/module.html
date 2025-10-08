@@ -840,7 +840,20 @@
         }
 
         function handleMessage(data) {
-            const decodedData = JSON.parse(data);
+            let decodedData;
+            if (typeof data === 'string') {
+                try {
+                    decodedData = JSON.parse(data);
+                } catch (e) {
+                    console.error('handleMessage: invalid JSON string', data, e);
+                    return;
+                }
+            } else if (data && typeof data === 'object') {
+                decodedData = data; // already parsed object
+            } else {
+                console.error('handleMessage: unsupported data type', typeof data, data);
+                return;
+            }
             const root = document.documentElement;
             
 
