@@ -10,6 +10,9 @@ if (!defined('VARIABLETYPE_INTEGER')) {
 if (!defined('VARIABLETYPE_STRING')) {
     define('VARIABLETYPE_STRING', 3);
 }
+if (!defined('VARIABLETYPE_FLOAT')) {
+    define('VARIABLETYPE_FLOAT', 2);
+}
 
 // Ensure media message constants are defined (for older environments)
 if (!defined('MM_CHANGEFILE')) {
@@ -24,7 +27,6 @@ if (!defined('MM_UPDATE')) {
 class UniversalDeviceTile extends IPSModule
 {
     // Variablen-Zugriff und Status-Variable-ID
-    private $statusId = 0;
     
     /**
      * Icon-Mapping Tabelle (IP-Symcon zu FontAwesome)
@@ -113,6 +115,7 @@ class UniversalDeviceTile extends IPSModule
             'statusAlignment',
             'statusLabel',
             'statusShowIcon',
+            'statusIcon',
             'statusShowLabel',
             'statusShowValue',
             'statusFontSize',
@@ -148,6 +151,10 @@ class UniversalDeviceTile extends IPSModule
                     $payload[$key . '_value'] = $var['rawValue'];
                 }
                 $payload[$key] = $var['formattedValue'] ?? '';
+                // NEU: Icon der Hauptvariable mitschicken
+                if (isset($var['icon'])) {
+                    $payload[$key . '_icon'] = $var['icon'];
+                }
                 return $payload;
             }
         }
@@ -170,6 +177,16 @@ class UniversalDeviceTile extends IPSModule
                         $payload[$key . '_value'] = $var['rawValue'];
                     }
                     $payload[$key] = $var['formattedValue'] ?? '';
+                    // NEU: Werte und Icon der SecondVariable mitschicken
+                    if (array_key_exists('rawValue', $var['secondVariable'])) {
+                        $payload[$key . '_second_value'] = $var['secondVariable']['rawValue'];
+                    }
+                    if (array_key_exists('formattedValue', $var['secondVariable'])) {
+                        $payload[$key . '_second'] = $var['secondVariable']['formattedValue'];
+                    }
+                    if (isset($var['secondVariable']['icon'])) {
+                        $payload[$key . '_second_icon'] = $var['secondVariable']['icon'];
+                    }
                     return $payload;
                 }
             }
@@ -319,43 +336,6 @@ class UniversalDeviceTile extends IPSModule
             }
         }
     }
-    
-    /**
-     * Findet die VariablesList in der Form-Struktur
-     * @param array &$form Das Form-Array (per Referenz)
-     * @return array|null Die VariablesList oder null wenn nicht gefunden
-     */
-    private function findVariablesList(&$form)
-    {
-        return $this->findElementByName($form, 'VariablesList');
-    }
-    
-    /**
-     * Rekursive Suche nach einem Element mit bestimmtem Namen
-     * @param array &$element Das aktuelle Element (per Referenz)
-     * @param string $name Der gesuchte Name
-     * @return array|null Das gefundene Element oder null
-     */
-    private function findElementByName(&$element, $name)
-    {
-        if (is_array($element)) {
-            // Prüfe, ob dies das gesuchte Element ist
-            if (isset($element['name']) && $element['name'] === $name) {
-                return $element;
-            }
-            
-            // Rekursive Suche in allen Array-Elementen
-            foreach ($element as &$subElement) {
-                $found = $this->findElementByName($subElement, $name);
-                if ($found !== null) {
-                    return $found;
-                }
-            }
-        }
-        
-        return null;
-    }
-    
     /**
      * Ermittelt den Anzeigenamen für einen technischen Gruppenwert
      * @param string $technicalGroup Der technische Gruppenwert (z.B. "Gruppe 1")
@@ -432,23 +412,30 @@ class UniversalDeviceTile extends IPSModule
 
         // Custom Images aus ProfilAssoziazionen einsammeln
         $profilAssoziazionen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+        $neededAssets = [];
+        
         if (is_array($profilAssoziazionen)) {
             foreach ($profilAssoziazionen as $assoziation) {
                 $bildauswahl = $assoziation['Bildauswahl'] ?? 'none';
+                
                 if ($bildauswahl === 'custom' && !empty($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
-                    $mid = intval($assoziation['EigenesBild']);
-                    if (IPS_MediaExists($mid)) {
-                        $ids[] = $mid;
-                        $mediaIds[] = $mid;
+                    // Custom Images
+                    $mediaId = $assoziation['EigenesBild'];
+                    if (IPS_MediaExists($mediaId)) {
+                        $media = IPS_GetMedia($mediaId);
+                        if ($media['MediaType'] === MEDIATYPE_IMAGE) {
+                            $imageFile = explode('.', $media['MediaFile']);
+                            $imageContent = $this->GetImageDataUri(end($imageFile));
+                            if ($imageContent) {
+                                $neededAssets['img_custom_' . $mediaId] = $imageContent . IPS_GetMediaContent($mediaId);
+                            }
+                        }
                     }
+                } elseif (in_array($bildauswahl, ['wm_an', 'wm_aus', 'dryer_on', 'dryer_off'])) {
+                    // Sammle benötigte vorkonfigurierte Assets
+                    $neededAssets[$bildauswahl] = true;
                 }
             }
-        }
-
-        // Hintergrundbild (bgImage) als Media-Eventquelle vormerken
-        $bgImageId = $this->ReadPropertyInteger('bgImage');
-        if ($bgImageId > 0 && IPS_MediaExists($bgImageId)) {
-            $mediaIds[] = $bgImageId;
         }
         
         // Entferne alle alten Referenzen
@@ -676,82 +663,79 @@ class UniversalDeviceTile extends IPSModule
             case VM_UPDATE:
                 // Status-Änderung: Sende minimalen Status-Update-Payload
                 $fullMessage = $this->GetFullUpdateMessage();
-                $interceptedMessage = $this->InterceptProgressValuesIfNeeded($fullMessage);
-                $fullArray = json_decode($interceptedMessage, true);
+                $fullArray = json_decode($fullMessage, true);
                 $minimal = $this->buildMinimalStatusUpdate($fullArray);
                 if (!empty($minimal)) {
                     $this->UpdateVisualizationValue(json_encode($minimal));
                 } else {
                     // Fallback: vollständige Nachricht
-                    $this->UpdateVisualizationValue($interceptedMessage);
+                    $this->UpdateVisualizationValue($fullMessage);
                 }
-                    break;
+                break;
             }
         }
 
         // Dynamische Verarbeitung der konfigurierten Variablen
         $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
     
-    if (is_array($variablesList)) {
-        foreach ($variablesList as $index => $variable) {
-            // Prüfe Haupt-Variable
-            if (isset($variable['Variable']) && $SenderID === $variable['Variable']) {
-                switch ($Message) {
-                    case VM_UPDATE:
-                        // Variable-Änderung: Sende minimalen var_<index> und var_<index>_value Payload
-                        $fullMessage = $this->GetFullUpdateMessage();
-                        $interceptedMessage = $this->InterceptProgressValuesIfNeeded($fullMessage);
-                        $fullArray = json_decode($interceptedMessage, true);
-                        $minimal = $this->buildMinimalVarUpdateForVariable($fullArray, $SenderID);
-                        if (!empty($minimal)) {
-                            // Split into two messages like Wallbox: formatted first, then rawValue
-                            foreach ($minimal as $k => $v) {
-                                if (substr($k, -6) !== '_value') {
-                                    $this->UpdateVisualizationValue(json_encode([$k => $v]));
+        if (is_array($variablesList)) {
+            foreach ($variablesList as $index => $variable) {
+                // Prüfe Haupt-Variable
+                if (isset($variable['Variable']) && $SenderID === $variable['Variable']) {
+                    switch ($Message) {
+                        case VM_UPDATE:
+                            // Variable-Änderung: Sende minimalen var_<index> und var_<index>_value Payload
+                            $fullMessage = $this->GetFullUpdateMessage();
+                            $fullArray = json_decode($fullMessage, true);
+                            $minimal = $this->buildMinimalVarUpdateForVariable($fullArray, $SenderID);
+                            if (!empty($minimal)) {
+                                // Split into two messages like Wallbox: formatted first, then rawValue
+                                foreach ($minimal as $k => $v) {
+                                    if (substr($k, -6) !== '_value') {
+                                        $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                    }
                                 }
-                            }
-                            foreach ($minimal as $k => $v) {
-                                if (substr($k, -6) === '_value') {
-                                    $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                foreach ($minimal as $k => $v) {
+                                    if (substr($k, -6) === '_value') {
+                                        $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                    }
                                 }
+                            } else {
+                                // Fallback: vollständige Nachricht
+                                $this->UpdateVisualizationValue($fullMessage);
                             }
-                        } else {
-                            // Fallback: vollständige Nachricht
-                            $this->UpdateVisualizationValue($interceptedMessage);
-                        }
-                        break;
+                            break;
+                    }
                 }
-            }
-            // Prüfe SecondVariable
-            elseif (isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable']) {
-                switch ($Message) {
-                    case VM_UPDATE:
-                        // SecondVariable-Änderung: Sende minimalen Update-Payload für die zugehörige Progress-Variable
-                        $fullMessage = $this->GetFullUpdateMessage();
-                        $interceptedMessage = $this->InterceptProgressValuesIfNeeded($fullMessage);
-                        $fullArray = json_decode($interceptedMessage, true);
-                        $minimal = $this->buildMinimalVarUpdateForSecondVariable($fullArray, $SenderID);
-                        if (!empty($minimal)) {
-                            // Split into two messages like Wallbox: formatted first, then rawValue
-                            foreach ($minimal as $k => $v) {
-                                if (substr($k, -6) !== '_value') {
-                                    $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                // Prüfe SecondVariable
+                elseif (isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable']) {
+                    switch ($Message) {
+                        case VM_UPDATE:
+                            // SecondVariable-Änderung: Sende minimalen Update-Payload für die zugehörige Progress-Variable
+                            $fullMessage = $this->GetFullUpdateMessage();
+                            $fullArray = json_decode($fullMessage, true);
+                            $minimal = $this->buildMinimalVarUpdateForSecondVariable($fullArray, $SenderID);
+                            if (!empty($minimal)) {
+                                // Split into two messages like Wallbox: formatted first, then rawValue
+                                foreach ($minimal as $k => $v) {
+                                    if (substr($k, -6) !== '_value') {
+                                        $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                    }
                                 }
-                            }
-                            foreach ($minimal as $k => $v) {
-                                if (substr($k, -6) === '_value') {
-                                    $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                foreach ($minimal as $k => $v) {
+                                    if (substr($k, -6) === '_value') {
+                                        $this->UpdateVisualizationValue(json_encode([$k => $v]));
+                                    }
                                 }
+                            } else {
+                                // Fallback: vollständige Nachricht
+                                $this->UpdateVisualizationValue($fullMessage);
                             }
-                        } else {
-                            // Fallback: vollständige Nachricht
-                            $this->UpdateVisualizationValue($interceptedMessage);
-                        }
-                        break;
+                            break;
+                    }
                 }
             }
         }
-    }
 
         // Medien-Änderungen (DefaultImage, Custom Images aus Assoziationen, Hintergrundbild)
         if ($Message === MM_UPDATE || $Message === MM_CHANGEFILE) {
@@ -823,14 +807,32 @@ class UniversalDeviceTile extends IPSModule
                     $imageFile = explode('.', $image['MediaFile']);
                     $imageContent = '';
                     switch (end($imageFile)) {
-                        case 'bmp':  $imageContent = 'data:image/bmp;base64,'; break;
+                        case 'bmp':
+                            $imageContent = 'data:image/bmp;base64,';
+                            break;
+
                         case 'jpg':
-                        case 'jpeg': $imageContent = 'data:image/jpeg;base64,'; break;
-                        case 'gif':  $imageContent = 'data:image/gif;base64,'; break;
-                        case 'png':  $imageContent = 'data:image/png;base64,'; break;
-                        case 'ico':  $imageContent = 'data:image/x-icon;base64,'; break;
-                        case 'webp': $imageContent = 'data:image/webp;base64,'; break;
+                        case 'jpeg':
+                            $imageContent = 'data:image/jpeg;base64,';
+                            break;
+
+                        case 'gif':
+                            $imageContent = 'data:image/gif;base64,';
+                            break;
+
+                        case 'png':
+                            $imageContent = 'data:image/png;base64,';
+                            break;
+
+                        case 'ico':
+                            $imageContent = 'data:image/x-icon;base64,';
+                            break;
+
+                        case 'webp':
+                            $imageContent = 'data:image/webp;base64,';
+                            break;
                     }
+
                     if ($imageContent) {
                         $imageContent .= IPS_GetMediaContent($bgImageId);
                         $this->UpdateVisualizationValue(json_encode(['image1' => $imageContent]));
@@ -892,7 +894,7 @@ class UniversalDeviceTile extends IPSModule
     public function GetVisualizationTile()
     {
         // Füge ein Skript hinzu, um beim Laden, analog zu Änderungen bei Laufzeit, die Werte zu setzen
-        $initialHandling = '<script>handleMessage(' . json_encode($this->GetFullUpdateMessage()) . ')</script>';
+        $initialHandling = '<script>handleMessage(' . $this->GetFullUpdateMessage() . ')</script>';
         $bildauswahl = $this->ReadPropertyInteger('Bildauswahl');
 
 
@@ -1298,7 +1300,7 @@ class UniversalDeviceTile extends IPSModule
                     // Extrahiere Min/Max-Werte aus Variablenprofil für Progress-Balken
                     $progressMinMax = $this->GetProgressMinMax($variable['Variable']);
                     
-                    // Ermittle Progressbar Active Status basierend auf ProfilAssoziazionen
+                    // Ermittle Progressbar Active Status basierend auf ProfilAssoziationen
                     $progressbarActive = true; // Standard: aktiv
                     $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
                     if (is_array($profilAssoziationen)) {
@@ -1344,7 +1346,6 @@ class UniversalDeviceTile extends IPSModule
                         'displayType' => $variable['DisplayType'] ?? 'text',
                         'variableType' => $variableInfo['VariableType'], // Für Button-Validierung
                         'group' => $variable['Group'] ?? 'keine Gruppe', // Group-Information für Frontend-Gruppierung
-                        'showGroupName' => $variable['ShowGroupName'] ?? false, // Show Group Name Flag für Frontend
                         'showIcon' => $variable['ShowIcon'],
                         'showLabel' => $variable['ShowLabel'] ?? true,
                         'showValue' => $variable['ShowValue'] ?? true,
@@ -1380,7 +1381,6 @@ class UniversalDeviceTile extends IPSModule
                                     $parts = explode('.', $media['MediaFile']);
                                     $ext = end($parts);
                                 }
-                                // Prefix anhand Extension bestimmen (Fallback PNG)
                                 $prefix = $this->GetImageDataUri($ext ?: 'png');
                                 if ($prefix) {
                                     $dataUri = $prefix . IPS_GetMediaContent($imageId);
@@ -1434,13 +1434,7 @@ class UniversalDeviceTile extends IPSModule
                         ];
                     }
                     
-                    // Spezielle Behandlung für Zeitwerte
-                    if (is_string($variableData['rawValue']) && preg_match('/^(\d{2}):(\d{2}):(\d{2})$/', $variableData['rawValue'], $matches)) {
-                        $hours = (int)$matches[1];
-                        $minutes = (int)$matches[2];
-                        $seconds = (int)$matches[3];
-                        $variableData['timeInSeconds'] = $hours * 3600 + $minutes * 60 + $seconds;
-                    }
+                    // Spezielle Behandlung für Zeitwerte entfernt (nicht verwendet)
                     
                     $variables[] = $variableData;
                 } else if ((($variable['DisplayType'] ?? 'text') === 'image')) {
@@ -1580,6 +1574,7 @@ class UniversalDeviceTile extends IPSModule
         }
         else{
             $imageContent = 'data:image/png;base64,';
+
             $imageContent .= base64_encode(file_get_contents(__DIR__ . '/../imgs/kachelhintergrund1.png'));
 
             if ($this->ReadPropertyBoolean('BG_Off')) {
@@ -1600,16 +1595,10 @@ class UniversalDeviceTile extends IPSModule
         return json_encode($result);
     }
 
-    /**
-     * Legacy function: Progress value interception is now handled in GetFullUpdateMessage()
-     * This function is kept for compatibility but does minimal processing
-     * @param string $fullMessageJson JSON-String der vollständigen Update-Nachricht
-     * @return string Unveränderte JSON-Nachricht (Verarbeitung erfolgt bereits in GetFullUpdateMessage)
-     */
-    private function InterceptProgressValuesIfNeeded($fullMessageJson) {
-        // Progress value processing is now handled directly in GetFullUpdateMessage()
-        // to avoid code duplication and ensure consistency
-        return $fullMessageJson;
+    public function UDST_UpdateList(int $id, int $Status): void
+    {
+        // $id is provided by the form system (InstanceID or row context) but not required here
+        $this->UpdateList($Status);
     }
 
     public function UpdateList(int $StatusID)
@@ -1679,13 +1668,13 @@ class UniversalDeviceTile extends IPSModule
     }
     
     // Temporary alias for cached form calls - can be removed after Symcon restart
-    public function UDST_UpdateDisplayTypeVisibility($id, $displayType, $rowIndex = null)
+    public function UDST_UpdateDisplayTypeVisibility(int $id, string $displayType, ?int $rowIndex = null): void
     {
-        // Forward to the new RequestAction system
-        $this->UpdateDisplayTypeVisibility($id, $displayType);
+        // Forward to the new RequestAction system (displayType first, then optional row index/id)
+        $this->UpdateDisplayTypeVisibility($displayType, $rowIndex);
     }
     
-    public function UpdateDisplayTypeVisibility(string $displayType, int $rowId = null)
+    public function UpdateDisplayTypeVisibility(string $displayType, ?int $rowId = null)
     {
         // Basierend auf Display Type verschiedene Felder ein-/ausblenden
         switch ($displayType) {
@@ -1847,54 +1836,7 @@ class UniversalDeviceTile extends IPSModule
     }
 
 
-    private function CheckAndGetValueFormatted($property) {
-        $id = $this->ReadPropertyInteger($property);
-        if (IPS_VariableExists($id)) {
-            return GetValueFormatted($id);
-        }
-        return false;
-    }
-
-
-    private function GetColor($id) {
-        $variable = IPS_GetVariable($id);
-        $Value = GetValue($id);
-        $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-
-        if ($profile && IPS_VariableProfileExists($profile)) {
-            $p = IPS_GetVariableProfile($profile);
-            
-            foreach ($p['Associations'] as $association) {
-                if (isset($association['Value'], $association['Color']) && $association['Value'] == $Value) {
-                    return $association['Color'] === -1 ? "" : sprintf('%06X', $association['Color']);
-                    
-                }
-            }
-        }
-        return "";
-    }
-
-
-    private function GetColorRGB($hexcolor) {
-        $transparenz = $this->ReadPropertyFloat('InfoMenueTransparenz');
-        if($hexcolor != "-1")
-        {
-                $hexColor = sprintf('%06X', $hexcolor);
-                // Prüft, ob der Hex-Farbwert gültig ist
-                if (strlen($hexColor) == 6) {
-                    $r = hexdec(substr($hexColor, 0, 2));
-                    $g = hexdec(substr($hexColor, 2, 2));
-                    $b = hexdec(substr($hexColor, 4, 2));
-                    return "rgba($r, $g, $b, $transparenz)";
-                } else {
-                    // Fallback für ungültige Eingaben
-                    return $hexColor;
-                }
-        }
-        else {
-            return "";
-        }
-    }
+    // Entfernte Helferfunktionen (CheckAndGetValueFormatted, GetColor, GetColorRGB) wurden bereinigt, da ungenutzt
 
     private function GetIcon($id) {
         try {
@@ -1977,6 +1919,281 @@ class UniversalDeviceTile extends IPSModule
                 }
             }
             
+            // Zusätzliche Unterstützung: Numerische Variablen (INTEGER/FLOAT) mit INTERVALS/OPTIONS
+            if ($variable['VariableType'] == VARIABLETYPE_INTEGER || $variable['VariableType'] == VARIABLETYPE_FLOAT) {
+                $options = null;
+                $numericIconFound = false; // Wenn true, nicht mehr mit OPTIONS überschreiben
+                
+                // 1) INTERVALS direkt aus der CustomPresentation (JSON-String oder Array)
+                $intervals = null;
+                if (isset($customPresentation['INTERVALS'])) {
+                    $intervals = is_string($customPresentation['INTERVALS']) ? @json_decode($customPresentation['INTERVALS'], true) : $customPresentation['INTERVALS'];
+                }
+                // Nur anwenden wenn aktiv oder Flag fehlt
+                $intervalsActive = isset($customPresentation['INTERVALS_ACTIVE']) ? (bool)$customPresentation['INTERVALS_ACTIVE'] : true;
+                if ($intervalsActive && is_array($intervals)) {
+                    $current = floatval($Value);
+                    foreach ($intervals as $interval) {
+                        $iconActive = isset($interval['IconActive']) ? (bool)$interval['IconActive'] : false;
+                        $iconValue = isset($interval['IconValue']) ? trim((string)$interval['IconValue']) : '';
+                        if (!$iconActive || $iconValue === '') {
+                            continue;
+                        }
+                        $min = array_key_exists('IntervalMinValue', $interval) ? floatval($interval['IntervalMinValue']) : -INF;
+                        $max = array_key_exists('IntervalMaxValue', $interval) ? floatval($interval['IntervalMaxValue']) : INF;
+                        if ($current >= $min && $current <= $max) {
+                            $icon = $iconValue;
+                            $numericIconFound = true;
+                            break;
+                        }
+                    }
+                }
+                // FALL A: Direkte OPTIONS in der CustomPresentation (kann Array oder JSON-String sein)
+                if (isset($customPresentation['OPTIONS'])) {
+                    $options = is_string($customPresentation['OPTIONS']) ? @json_decode($customPresentation['OPTIONS'], true) : $customPresentation['OPTIONS'];
+                }
+                // FALL B: TEMPLATE liefert OPTIONS
+                if (!is_array($options) && isset($customPresentation['TEMPLATE']) && function_exists('IPS_GetTemplate')) {
+                    try {
+                        $templateData = IPS_GetTemplate($customPresentation['TEMPLATE']);
+                        if (isset($templateData['Values']['OPTIONS'])) {
+                            $options = is_string($templateData['Values']['OPTIONS']) ? @json_decode($templateData['Values']['OPTIONS'], true) : $templateData['Values']['OPTIONS'];
+                        }
+                    } catch (Exception $e) {
+                    }
+                }
+                // FALL B.2: OPTIONS verweist direkt auf eine GUID mit OPTIONS-Definitionen
+                if (!is_array($options) && isset($customPresentation['OPTIONS']) && is_string($customPresentation['OPTIONS'])) {
+                    $optionsGuid = trim($customPresentation['OPTIONS'], '{}');
+                    try {
+                        if (function_exists('IPS_PresentationExists') && @IPS_PresentationExists($optionsGuid)) {
+                            $presentationData = IPS_GetPresentation($optionsGuid);
+                            if ($presentationData) {
+                                $presentationArray = is_string($presentationData) ? json_decode($presentationData, true) : $presentationData;
+                                if (is_array($presentationArray)) {
+                                    // Versuche gängige Stellen für OPTIONS zu finden
+                                    if (isset($presentationArray['Values']['OPTIONS'])) {
+                                        $options = is_string($presentationArray['Values']['OPTIONS']) ? @json_decode($presentationArray['Values']['OPTIONS'], true) : $presentationArray['Values']['OPTIONS'];
+                                    } elseif (isset($presentationArray['presentationParameters']['OPTIONS'])) {
+                                        $options = is_string($presentationArray['presentationParameters']['OPTIONS']) ? @json_decode($presentationArray['presentationParameters']['OPTIONS'], true) : $presentationArray['presentationParameters']['OPTIONS'];
+                                    } elseif (isset($presentationArray['OPTIONS'])) {
+                                        $options = is_string($presentationArray['OPTIONS']) ? @json_decode($presentationArray['OPTIONS'], true) : $presentationArray['OPTIONS'];
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception $e) {
+                    }
+                }
+                // FALL C: PRESENTATION GUID -> Gruppe "Numeric" enthält OPTIONS
+                if (!is_array($options) && isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
+                    try {
+                        $presentationGuid = trim($customPresentation['PRESENTATION'], '{}');
+                        
+                        // IPS_GetPresentation für GUID-Auflösung verwenden - mit Validation
+                        if (@IPS_PresentationExists($presentationGuid)) {
+                            $presentationData = IPS_GetPresentation($presentationGuid);
+                            if ($presentationData && is_string($presentationData)) {
+                                $presentationArray = json_decode($presentationData, true);
+                                if ($presentationArray && is_array($presentationArray)) {
+                                    
+                                    // Boolean Variable: Icons sind in presentationParameters gespeichert
+                                    if ($variable['VariableType'] == 0) { // Boolean
+                                        if (isset($presentationArray['presentationParameters']) && is_array($presentationArray['presentationParameters'])) {
+                                            $params = $presentationArray['presentationParameters'];
+                                            $currentValue = GetValue($id);
+                                            
+                                            // CORRECT LOGIC: Prüfe USE_ICON_FALSE Flag
+                                            $useIconFalse = isset($params['USE_ICON_FALSE']) ? $params['USE_ICON_FALSE'] : true;
+                                            
+                                            if ($useIconFalse) {
+                                                // Verwende beide Icons basierend auf Wert
+                                                $iconKey = $currentValue ? 'ICON_TRUE' : 'ICON_FALSE';
+                                            } else {
+                                                // Immer ICON_TRUE
+                                                $iconKey = 'ICON_TRUE';
+                                            }
+                                            
+                                            if (isset($params[$iconKey]) && !empty($params[$iconKey])) {
+                                                $icon = $params[$iconKey];
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception $e) {
+                    }
+                    
+                    // Auswertung der Optionen (unterstützt Value und Min/Max-Intervalle)
+                    if (!$numericIconFound && is_array($options)) {
+                        $current = floatval($Value);
+                        foreach ($options as $option) {
+                            // Icon-Feld ermitteln (IconValue bevorzugt, sonst Icon)
+                            $optIcon = null;
+                            if (isset($option['IconValue']) && trim((string)$option['IconValue']) !== '') {
+                                $optIcon = $option['IconValue'];
+                            } elseif (isset($option['Icon']) && trim((string)$option['Icon']) !== '') {
+                                $optIcon = $option['Icon'];
+                            }
+                            if ($optIcon === null) {
+                                continue; // Kein Icon definiert
+                            }
+                            
+                            $hasRange = (isset($option['Min']) || isset($option['Max']) || isset($option['MinValue']) || isset($option['MaxValue']));
+                            if ($hasRange) {
+                                $min = isset($option['Min']) ? floatval($option['Min']) : (isset($option['MinValue']) ? floatval($option['MinValue']) : -INF);
+                                $max = isset($option['Max']) ? floatval($option['Max']) : (isset($option['MaxValue']) ? floatval($option['MaxValue']) : INF);
+                                if ($current >= $min && $current <= $max) {
+                                    $icon = $optIcon;
+                                    break;
+                                }
+                            } elseif (isset($option['Value'])) {
+                                // Diskreter Vergleich (Float-Toleranz)
+                                $optVal = $option['Value'];
+                                if (is_numeric($optVal)) {
+                                    if (abs(floatval($optVal) - $current) < 1e-9) {
+                                        $icon = $optIcon;
+                                        break;
+                                    }
+                                } else {
+                                    if ($optVal == $Value) { // String-Vergleich für gemischte Optionen
+                                        $icon = $optIcon;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Nur wenn noch kein Standard-Icon gefunden wurde, prüfe PRESENTATION GUID und Associations
+            if ($icon == "") {
+                // Zuerst prüfen ob die Variable eine neue Darstellung/Visualisierung hat
+                if (function_exists('IPS_GetVariableVisualization')) {
+                    try {
+                        $visualization = IPS_GetVariableVisualization($id);
+                        if ($visualization && isset($visualization['ValueMappings'])) {
+                            foreach ($visualization['ValueMappings'] as $mapping) {
+                                // Bereichsunterstützung: Min/Max Felder prüfen (verschiedene Schlüssel möglich)
+                                if (isset($mapping['Icon']) && $mapping['Icon'] != "") {
+                                    $v = floatval($Value);
+                                    $hasRange = (isset($mapping['MinValue']) || isset($mapping['MaxValue']) || isset($mapping['Minimum']) || isset($mapping['Maximum']) || isset($mapping['Min']) || isset($mapping['Max']));
+                                    if ($hasRange) {
+                                        $min = isset($mapping['MinValue']) ? floatval($mapping['MinValue']) : (isset($mapping['Minimum']) ? floatval($mapping['Minimum']) : (isset($mapping['Min']) ? floatval($mapping['Min']) : -INF));
+                                        $max = isset($mapping['MaxValue']) ? floatval($mapping['MaxValue']) : (isset($mapping['Maximum']) ? floatval($mapping['Maximum']) : (isset($mapping['Max']) ? floatval($mapping['Max']) : INF));
+                                        if ($v >= $min && $v <= $max) {
+                                            $icon = $mapping['Icon'];
+                                            break;
+                                        }
+                                    }
+                                }
+                                // Exakter Value-Match als Fallback
+                                if (isset($mapping['Value']) && isset($mapping['Icon']) && $mapping['Icon'] != "") {
+                                    if ($mapping['Value'] == $Value) {
+                                        $icon = $mapping['Icon'];
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // Falls kein spezifisches Icon gefunden, verwende Default-Icon der Darstellung
+                            if ($icon == "" && isset($visualization['Icon']) && $visualization['Icon'] != "") {
+                                $icon = $visualization['Icon'];
+                            }
+                        }
+                    } catch (Exception $e) {
+                    }
+                }
+                
+                // Fallback zu klassischen Variablenprofilen wenn kein Icon über Darstellung gefunden
+                if ($icon == "") {
+                    $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+                    if ($profile && IPS_VariableProfileExists($profile)) {
+                        $p = IPS_GetVariableProfile($profile);
+                        foreach ($p['Associations'] as $association) {
+                            if (isset($association['Value']) && $association['Icon'] != "" && $association['Value'] == $Value) {
+                                $icon = $association['Icon'];
+                                break;
+                            }
+                        }
+
+                        if ($icon == "" && isset($p['Icon']) && $p['Icon'] != "") {
+                            $icon = $p['Icon'];
+                        }
+                    }
+                }
+                
+                // Finaler Fallback wenn nichts gefunden wurde
+                if ($icon == "") {
+                    $icon = "Transparent";
+                }
+            }
+            
+            // Icon-Mapping zu FontAwesome durchführen
+            $mappedIcon = $this->MapIconToFontAwesome($icon);
+            
+            return $mappedIcon;
+        }
+        
+        // Schließe VariableCustomPresentation if-Block (Zeile 1110)
+        
+        // Wenn noch kein Icon gefunden wurde, prüfe Darstellung/Visualisierung und Profile
+        if ($icon == "") {
+            // Zuerst prüfen ob die Variable eine neue Darstellung/Visualisierung hat
+            if (function_exists('IPS_GetVariableVisualization')) {
+                try {
+                    $visualization = IPS_GetVariableVisualization($id);
+                    if ($visualization && isset($visualization['ValueMappings'])) {
+                        foreach ($visualization['ValueMappings'] as $mapping) {
+                            // Bereichsunterstützung: Min/Max Felder prüfen (verschiedene Schlüssel möglich)
+                            if (isset($mapping['Icon']) && $mapping['Icon'] != "") {
+                                $v = floatval($Value);
+                                $hasRange = (isset($mapping['MinValue']) || isset($mapping['MaxValue']) || isset($mapping['Minimum']) || isset($mapping['Maximum']) || isset($mapping['Min']) || isset($mapping['Max']));
+                                if ($hasRange) {
+                                    $min = isset($mapping['MinValue']) ? floatval($mapping['MinValue']) : (isset($mapping['Minimum']) ? floatval($mapping['Minimum']) : (isset($mapping['Min']) ? floatval($mapping['Min']) : -INF));
+                                    $max = isset($mapping['MaxValue']) ? floatval($mapping['MaxValue']) : (isset($mapping['Maximum']) ? floatval($mapping['Maximum']) : (isset($mapping['Max']) ? floatval($mapping['Max']) : INF));
+                                    if ($v >= $min && $v <= $max) {
+                                        $icon = $mapping['Icon'];
+                                        break;
+                                    }
+                                }
+                            }
+                            // Exakter Value-Match als Fallback
+                            if (isset($mapping['Value']) && isset($mapping['Icon']) && $mapping['Icon'] != "") {
+                                if ($mapping['Value'] == $Value) {
+                                    $icon = $mapping['Icon'];
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Falls kein spezifisches Icon gefunden, verwende Default-Icon der Darstellung
+                        if ($icon == "" && isset($visualization['Icon']) && $visualization['Icon'] != "") {
+                            $icon = $visualization['Icon'];
+                        }
+                    }
+                } catch (Exception $e) {
+                }
+                
+                // ALTERNATIVE: Prüfe ob GetBooleanAssociations bereits Icons extrahiert hat
+                if ($variable['VariableType'] == 0) { // Boolean Variable
+                    $associations = $this->GetBooleanAssociations($id);
+                    if (is_array($associations) && count($associations) > 0) {
+                        $currentValue = GetValue($id);
+                        foreach ($associations as $assoc) {
+                            if (isset($assoc['value']) && $assoc['value'] == $currentValue && isset($assoc['icon']) && !empty($assoc['icon'])) {
+                                $icon = $assoc['icon'];
+                                break;
+                            }
+                        }
+                        if ($icon == "") {
+                        }
+                    }
+                }
+            }
+            
             // Nur wenn noch kein Standard-Icon gefunden wurde, prüfe PRESENTATION GUID und Associations
             if ($icon == "" && isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
                 // PRESENTATION GUID Auflösung für Icons - REAKTIVIERT für Variable 37220
@@ -2036,50 +2253,6 @@ class UniversalDeviceTile extends IPSModule
                         }
                         if ($icon == "") {
                         }
-                    }
-                }
-            }
-        }
-        
-        // Schließe VariableCustomPresentation if-Block (Zeile 1110)
-        
-        // Wenn noch kein Icon gefunden wurde, prüfe Darstellung/Visualisierung und Profile
-        if ($icon == "") {
-            // Zuerst prüfen ob die Variable eine neue Darstellung/Visualisierung hat
-            if (function_exists('IPS_GetVariableVisualization')) {
-                try {
-                    $visualization = IPS_GetVariableVisualization($id);
-                    if ($visualization && isset($visualization['ValueMappings'])) {
-                        foreach ($visualization['ValueMappings'] as $mapping) {
-                            if (isset($mapping['Value']) && $mapping['Value'] == $Value && isset($mapping['Icon']) && $mapping['Icon'] != "") {
-                                $icon = $mapping['Icon'];
-                                break;
-                            }
-                        }
-                        
-                        // Falls kein spezifisches Icon gefunden, verwende Default-Icon der Darstellung
-                        if ($icon == "" && isset($visualization['Icon']) && $visualization['Icon'] != "") {
-                            $icon = $visualization['Icon'];
-                        }
-                    }
-                } catch (Exception $e) {
-                }
-            }
-            
-            // Fallback zu klassischen Variablenprofilen wenn kein Icon über Darstellung gefunden
-            if ($icon == "") {
-                $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-                if ($profile && IPS_VariableProfileExists($profile)) {
-                    $p = IPS_GetVariableProfile($profile);
-                    foreach ($p['Associations'] as $association) {
-                        if (isset($association['Value']) && $association['Icon'] != "" && $association['Value'] == $Value) {
-                            $icon = $association['Icon'];
-                            break;
-                        }
-                    }
-
-                    if ($icon == "" && isset($p['Icon']) && $p['Icon'] != "") {
-                        $icon = $p['Icon'];
                     }
                 }
             }
