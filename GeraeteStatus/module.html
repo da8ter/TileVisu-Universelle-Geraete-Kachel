@@ -730,6 +730,130 @@
             return `fa-fw fa-kit fak fa-${baseName}`;
         }
         
+        // Globaler Spin-State pro Button-Ident (nur Script-Buttons)
+        window._scriptButtonSpinUntil = window._scriptButtonSpinUntil || {};
+        
+        // === Button-Icon Spin Helper ===
+        function startButtonIconSpin(buttonEl) {
+            if (!buttonEl) return;
+            // Entferne FA-Kommentare (<!-- i ... -->), die i2svg hinterlässt
+            try {
+                const childNodes = Array.from(buttonEl.childNodes);
+                for (const n of childNodes) {
+                    if (n.nodeType === 8) { // Kommentar
+                        buttonEl.removeChild(n);
+                    }
+                }
+            } catch (_) {}
+            // Script-Buttons während des Spins optisch aktiv setzen
+            if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
+                try {
+                    if (!buttonEl.dataset.originalOpacityValue) {
+                        const inlineOpacity = buttonEl.style.opacity;
+                        if (inlineOpacity) {
+                            buttonEl.dataset.originalOpacityValue = inlineOpacity;
+                        } else if (window.getComputedStyle) {
+                            const computedOpacity = window.getComputedStyle(buttonEl).opacity;
+                            if (computedOpacity) {
+                                buttonEl.dataset.originalOpacityValue = computedOpacity;
+                            }
+                        }
+                    }
+                    buttonEl.style.setProperty('opacity', '1', 'important');
+                } catch (_) {}
+            }
+            // Ersten vorhandenen Icon-Knoten (svg oder i) ermitteln
+            let icon = buttonEl.querySelector('i[class*="fa-"], svg[class*="fa-"]');
+            if (icon) {
+                // Ursprüngliches Icon-HTML sichern und Icon-Knoten entfernen
+                if (!buttonEl.dataset.originalIconHtml) {
+                    try { buttonEl.dataset.originalIconHtml = icon.outerHTML; } catch (_) {}
+                }
+                try { icon.remove(); } catch (_) {}
+            }
+            // Neues Spinner-Icon einfügen; verwende FA "rotate" als Glyph
+            const temp = document.createElement('i');
+            const tempBase = prepareIconForDisplay('rotate') || 'fa-fw fa-kit fak fa-rotate';
+            temp.className = `${tempBase} fa-spin`;
+            temp.setAttribute('data-temp-spinner', '1');
+            temp.style.marginRight = '6px';
+            try { buttonEl.insertBefore(temp, buttonEl.firstChild); } catch (_) { buttonEl.appendChild(temp); }
+            // Sofortige Konvertierung von <i> zu <svg>, falls FA Kit verfügbar ist
+            try {
+                if (window.FontAwesome && window.FontAwesome.dom && typeof window.FontAwesome.dom.i2svg === 'function') {
+                    window.FontAwesome.dom.i2svg({ node: temp, observeMutations: false });
+                }
+            } catch (_) {}
+        }
+
+        function stopButtonIconSpin(buttonEl) {
+            if (!buttonEl) return;
+            // Entferne Spinner (konvertiert evtl. zu <svg>) – identifiziere über fa-spin
+            try {
+                const spinIcons = buttonEl.querySelectorAll('svg.fa-spin, i.fa-spin');
+                spinIcons.forEach(node => node.remove());
+            } catch (_) {}
+            // Entferne evtl. verbliebene FA-Kommentar-Knoten
+            try {
+                const childNodes = Array.from(buttonEl.childNodes);
+                for (const n of childNodes) {
+                    if (n.nodeType === 8) {
+                        buttonEl.removeChild(n);
+                    }
+                }
+            } catch (_) {}
+            // Script-Buttons wieder abdunkeln sobald der Spin endet
+            if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
+                try {
+                    const fallbackOpacity = buttonEl.dataset.originalOpacityValue || '0.5';
+                    buttonEl.style.setProperty('opacity', fallbackOpacity, 'important');
+                } catch (_) {}
+            }
+            // Ursprüngliches Icon (falls gesichert) wiederherstellen
+            try {
+                const html = buttonEl.dataset.originalIconHtml;
+                if (html && typeof html === 'string' && html.length > 0) {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = html;
+                    const restored = wrapper.firstElementChild;
+                    if (restored) {
+                        restored.style.marginRight = restored.style.marginRight || '6px';
+                        buttonEl.insertBefore(restored, buttonEl.firstChild);
+                        // Falls es ein <i> war, direkt konvertieren
+                        try {
+                            if (restored.tagName.toLowerCase() === 'i' && window.FontAwesome && window.FontAwesome.dom && typeof window.FontAwesome.dom.i2svg === 'function') {
+                                window.FontAwesome.dom.i2svg({ node: restored, observeMutations: false });
+                            }
+                        } catch (_) {}
+                    }
+                }
+                delete buttonEl.dataset.originalIconHtml;
+            } catch (_) {}
+        }
+
+        function handleButtonClick(buttonEl, ident, value) {
+            const shouldSpin = (typeof ident === 'string' && ident.indexOf('script_') === 0);
+            try { if (shouldSpin) {
+                // 5 Sekunden Spin-Zustand merken (für Re-Renders)
+                window._scriptButtonSpinUntil[ident] = Date.now() + 5000;
+                startButtonIconSpin(buttonEl);
+            } } catch (_) {}
+            try {
+                if (typeof requestAction === 'function') {
+                    requestAction(ident, value);
+                } else {
+                    console.error('requestAction is not available');
+                }
+            } finally {
+                if (shouldSpin) {
+                    setTimeout(() => {
+                        try { stopButtonIconSpin(buttonEl); } catch (_) {}
+                        try { delete window._scriptButtonSpinUntil[ident]; } catch (_) {}
+                    }, 5000);
+                }
+            }
+        }
+        
         // Hilfsfunktion zur Bestimmung der Textfarbe
         function getTextColor(variable) {
             // Verwende --content-color wenn TextColor transparent ist, ansonsten die konfigurierte Farbe
@@ -2180,7 +2304,7 @@
                         const groupJustify = groupAlign === 'center' ? 'center' : (groupAlign === 'right' ? 'flex-end' : 'flex-start');
 
                         content += `
-                                <div class="variable-group-items" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; flex: 1; justify-content: ${groupJustify}; width: 100%;">
+                                <div class="variable-group-items" style="display: flex; flex-wrap: wrap; column-gap: 16px; row-gap: calc(var(–-element-spacing, 8px)); align-items: flex-start; flex: 1; justify-content: ${groupJustify}; width: 100%;">
                         `;
                         
                         groupVariables.forEach(groupVar => {
@@ -2452,7 +2576,9 @@
                         // Boolean-Variable: Einzelner Button
                         
                         // Erweiterte Bool-Wert-Erkennung
-                        const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+                        const isScriptButton = (typeof variable.id === 'string' && variable.id.indexOf('script_') === 0);
+                        const spinActive = (isScriptButton && window._scriptButtonSpinUntil && window._scriptButtonSpinUntil[variable.id] && Date.now() < window._scriptButtonSpinUntil[variable.id]);
+                        const isActive = isScriptButton ? !!spinActive : (variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true');
                         // Verwende den tatsächlichen Boolean-Wert für Association-Matching (nicht Integer-Konvertierung!)
                         const currentBoolValue = variable.rawValue; // Direkt verwenden, da Associations auch Boolean-Werte haben
                         
@@ -2481,7 +2607,7 @@
 
                             }
                         }                
-                        const opacity = isActive ? '1' : '0.5';
+                        const opacity = isActive ? '1' : '0.5'; // Script-Buttons gelten immer als aktiv → oben isActive=true
                         const buttonWidth = variable.buttonWidth || 120;
                         
                         // Prüfe ob die aktuelle Gruppe im stretch-Modus ist
@@ -2503,12 +2629,15 @@
                         // Icon-Verarbeitung für Button - Verwende Association-Icon falls vorhanden
                         let finalIcon = associationIcon || variable.icon; // Association-Icon hat Priorität
                         if (variable.showIcon && finalIcon && finalIcon !== 'Transparent') {
-                            const iconClass = prepareIconForDisplay(finalIcon);
-                
-                            
-                            if (iconClass) {
+                            const baseClass = prepareIconForDisplay(finalIcon);
+                            if (baseClass) {
+                                const iconClass = spinActive ? `${baseClass} fa-spin` : baseClass; // nur fa-spin hinzufügen
                                 iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
                             }
+                        } else if (spinActive) {
+                            // Kein Icon konfiguriert, aber Spin aktiv → temporären Spinner darstellen
+                            const spinBase = prepareIconForDisplay('rotate') || 'fa-fw fa-kit fak fa-rotate';
+                            iconHtml = `<i class="${spinBase} fa-spin" style="margin-right: 6px;"></i>`;
                         }
                         let textParts = [];
                         
@@ -2552,8 +2681,9 @@
                         content += `
                             <div class="variable-button-container" style="${buttonContainerJustify}">
                                 <button class="variable-button" 
-                                        onclick="requestAction('${variable.id}', 1);" 
+                                        onclick="handleButtonClick(this, '${variable.id}', 1);" 
                                         data-variable-id="${variable.id}"
+                                        data-script-button="${isScriptButton ? '1' : '0'}"
                                         style="background-color: ${buttonColor} !important; opacity: ${opacity} !important; color: ${getTextColor(variable)} !important; ${buttonStyleExtras}">
                                     ${buttonText}
                                 </button>
@@ -2635,7 +2765,7 @@
                             
                             buttonsHtml += `
                                 <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
-                                        onclick="requestAction('${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"});" 
+                                        onclick="handleButtonClick(this, '${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"});" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
                                         style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
@@ -2699,7 +2829,7 @@
                             
                             buttonsHtml += `
                                 <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
-                                        onclick="requestAction('${variable.id}', '${association.value}');" 
+                                        onclick="handleButtonClick(this, '${variable.id}', '${association.value}');" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
                                         style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
