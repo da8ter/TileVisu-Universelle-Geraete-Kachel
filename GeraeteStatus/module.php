@@ -124,7 +124,8 @@ class UniversalDeviceTile extends IPSModule
             'isStatusColorTransparent',
             'statusIconColor',
             'isStatusIconColorTransparent',
-            'hideImageColumn'
+            'hideImageColumn',
+            'statusHidden'
         ];
         $minimal = [];
         foreach ($keys as $k) {
@@ -856,9 +857,23 @@ class UniversalDeviceTile extends IPSModule
             return;
         }
         
+        // Script-Buttons unterstützen: Ident kann 'script_<ID>' sein → Script ausführen
+        if (is_string($Ident) && strpos($Ident, 'script_') === 0) {
+            $scriptId = intval(substr($Ident, 7));
+            if ($scriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($scriptId)) {
+                @IPS_RunScript($scriptId);
+            }
+            return;
+        }
+        
         // Nachrichten von der HTML-Darstellung schicken immer den Ident passend zur Eigenschaft und im Wert die Differenz, welche auf die Variable gerechnet werden soll
     $variableID = $Ident;
     if (!IPS_VariableExists($variableID)) {
+        // Falls eine Script-ID direkt gesendet wurde (z. B. numerisch), führe Script aus
+        $maybeScriptId = intval($Ident);
+        if ($maybeScriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($maybeScriptId)) {
+            @IPS_RunScript($maybeScriptId);
+        }
         return;
     }
     
@@ -1367,6 +1382,7 @@ class UniversalDeviceTile extends IPSModule
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
                         'progressbarInactive' => !$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress', // 50% Transparenz Flag
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
+                        'scriptId' => intval($variable['ScriptID'] ?? 0),
                     ];
 
                     // Bild (Symcon Medienobjekt) als eigene Darstellungsart
@@ -1482,6 +1498,56 @@ class UniversalDeviceTile extends IPSModule
                         'variableType' => 3,
                         'progressbarActive' => true,
                         'progressbarInactive' => false,
+                    ];
+                } else if ((($variable['DisplayType'] ?? 'text') === 'button') && intval($variable['ScriptID'] ?? 0) > 0) {
+                    // SUPPORT BUTTON ROWS WITHOUT A VARIABLE ID: Script-Button (stateless)
+                    $scriptId = intval($variable['ScriptID']);
+                    // Label ermitteln
+                    $label = $variable['Label'] ?? '';
+                    // Wenn kein eigenes Label gesetzt ist, verwende den Skript-Namen
+                    if ($label === '' && IPS_ScriptExists($scriptId)) {
+                        $obj = IPS_GetObject($scriptId);
+                        if (isset($obj['ObjectName'])) {
+                            $label = $obj['ObjectName'];
+                        }
+                    }
+                    // Script-Objekt-Icon (falls gesetzt) mappen
+                    $scriptIcon = '';
+                    try {
+                        if (IPS_ScriptExists($scriptId)) {
+                            $obj = IPS_GetObject($scriptId);
+                            $objIcon = isset($obj['ObjectIcon']) ? trim($obj['ObjectIcon']) : '';
+                            if ($objIcon !== '') {
+                                $scriptIcon = $this->MapIconToFontAwesome($objIcon);
+                            }
+                        }
+                    } catch (Exception $e) { /* ignore */ }
+                    // Farben/Styles wie bei anderen Buttons
+                    $textColor = isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000';
+                    $isTextColorTransparent = isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215);
+                    $variables[] = [
+                        'id' => 'script_' . $scriptId,
+                        'label' => $label,
+                        'displayType' => 'button',
+                        'variableType' => 0, // Behandle als Bool-Button für Rendering
+                        'group' => $variable['Group'] ?? 'keine Gruppe',
+                        'showGroupName' => $variable['ShowGroupName'] ?? false,
+                        'showIcon' => $variable['ShowIcon'] ?? false,
+                        'showLabel' => $variable['ShowLabel'] ?? true,
+                        'showValue' => $variable['ShowValue'] ?? false,
+                        'fontSize' => $variable['FontSize'] ?? 12,
+                        'textColor' => $textColor,
+                        'isTextColorTransparent' => $isTextColorTransparent,
+                        'alignment' => $variable['VerticalAlignment'] ?? 'left',
+                        'formattedValue' => '',
+                        'rawValue' => 0,
+                        'icon' => $scriptIcon,
+                        'boolButtonColor' => isset($variable['boolButtonColor']) ? '#' . sprintf('%06X', $variable['boolButtonColor']) : '#CCCCCC',
+                        'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
+                        'buttonWidth' => $variable['ButtonWidth'] ?? 120,
+                        'progressbarActive' => true,
+                        'progressbarInactive' => false,
+                        'scriptId' => $scriptId,
                     ];
                 }
                 
@@ -1685,6 +1751,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowValue', 'visible', true);
                 // Variable wieder einblenden
                 $this->UpdateFormField('Variable', 'visible', true);
+                // ScriptID ausblenden
+                $this->UpdateFormField('ScriptID', 'visible', false);
                 // Generelle Text-Einstellungen sichtbar
                 $this->UpdateFormField('Label', 'visible', true);
                 $this->UpdateFormField('FontSize', 'visible', true);
@@ -1721,6 +1789,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('Label', 'visible', false);
                 // SelectVariable ausblenden, Media zeigen
                 $this->UpdateFormField('Variable', 'visible', false);
+                // ScriptID ausblenden
+                $this->UpdateFormField('ScriptID', 'visible', false);
 
                 // Progress-Felder ausblenden
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
@@ -1751,6 +1821,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowValue', 'visible', true);
                 // Variable benötigt
                 $this->UpdateFormField('Variable', 'visible', true);
+                // ScriptID ausblenden
+                $this->UpdateFormField('ScriptID', 'visible', false);
                 // Generelle Text-Einstellungen sichtbar
                 $this->UpdateFormField('Label', 'visible', true);
                 $this->UpdateFormField('FontSize', 'visible', true);
@@ -1784,6 +1856,12 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowValue', 'visible', false);
                 // Variable sichtbar
                 $this->UpdateFormField('Variable', 'visible', true);
+                // ScriptID sichtbar (optional, ermöglicht Script-Buttons ohne Variable)
+                $this->UpdateFormField('ScriptID', 'visible', true);
+                // Button-spezifische Felder sichtbar
+                $this->UpdateFormField('boolButtonColor', 'visible', true);
+                $this->UpdateFormField('ButtonWidth', 'visible', true);
+                $this->UpdateFormField('VerticalAlignment', 'visible', true);
                 // Generelle Text-Einstellungen sichtbar
                 $this->UpdateFormField('Label', 'visible', true);
                 $this->UpdateFormField('FontSize', 'visible', true);
@@ -1831,6 +1909,7 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ImageBorderRadius', 'visible', false);
                 $this->UpdateFormField('VerticalAlignment', 'visible', false);
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                $this->UpdateFormField('ScriptID', 'visible', false);
                 break;
         }
     }

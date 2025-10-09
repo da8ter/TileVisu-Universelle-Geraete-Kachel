@@ -726,6 +726,16 @@
             }
             ,
             {
+              "caption": "Script",
+              "name": "ScriptID",
+              "width": "180px",
+              "save": true,
+              "add": 0,
+              "visible": false,
+              "edit": { "type": "SelectScript" }
+            }
+            ,
+            {
               "caption": "Alignment",
               "name": "VerticalAlignment",
               "width": "140px",
@@ -782,6 +792,8 @@
     "",
     "// ---------- Grund-Felder ----------",
     "$form[] = [ 'caption' => 'Variable', 'name' => 'Variable', 'width' => '100%', 'type' => 'SelectVariable', 'validVariableTypes' => [], 'save' => true, 'add' => 0, 'visible' => ($displayType !== 'image') ];",
+    "// Script-Auswahl (optional, für Button-Display nutzbar) – direkt unter Variable",
+    "$form[] = [ 'caption' => 'Script', 'name' => 'ScriptID', 'type' => 'SelectScript', 'width' => '100%', 'save' => true, 'add' => 0, 'visible' => false ];",
     "// IMAGE-FELDER (immer vorhanden, standardmäßig ausgeblendet) – vor Display Type",
     "$form[] = [ 'type' => 'RowLayout', 'items' => [",
     "    [ 'caption' => 'Media object',    'name' => 'ImageMedia',        'type' => 'SelectMedia',   'save' => true, 'add' => 0,  'visible' => ($displayType === 'image') ],",
@@ -840,15 +852,15 @@
     "$form[] = [ 'caption' => 'Label (Overrides the variable name)', 'name' => 'SecondVariableLabel', 'type' => 'ValidationTextBox', 'width' => '100%', 'save' => true, 'add' => '', 'visible' => false ];",
     "",
     "// Button-Felder (standardmäßig ausgeblendet)",
-    "$form[] = [ 'caption' => 'Bool Button Color', 'name' => 'boolButtonColor', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => -1, 'value' => -1, 'visible' => false ];",
-    "$form[] = [ 'caption' => 'Button Width', 'name' => 'ButtonWidth', 'type' => 'NumberSpinner', 'minimum' => 20, 'maximum' => 500, 'suffix' => 'px', 'save' => true, 'add' => 120, 'visible' => false ];",
+    "$form[] = [ 'caption' => 'Bool Button Color', 'name' => 'boolButtonColor', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => -1, 'value' => -1, 'visible' => ($displayType === 'button') ];",
+    "$form[] = [ 'caption' => 'Button Width', 'name' => 'ButtonWidth', 'type' => 'NumberSpinner', 'minimum' => 20, 'maximum' => 500, 'suffix' => 'px', 'save' => true, 'add' => 120, 'visible' => ($displayType === 'button') ];",
     "",
     "// Allgemeine Felder (einmalig vorhanden, standardmäßig ausgeblendet; werden je nach Typ sichtbar gemacht)",
     "$form[] = [ 'caption' => 'Alignment', 'name' => 'VerticalAlignment', 'type' => 'Select', 'width' => '100%', 'options' => [",
     "    [ 'caption' => 'right',  'value' => 'right'   ],",
     "    [ 'caption' => 'center', 'value' => 'center' ],",
     "    [ 'caption' => 'left',   'value' => 'left'   ]",
-    "], 'save' => true, 'add' => 'left', 'visible' => false ];",
+    "], 'save' => true, 'add' => 'left', 'visible' => ($displayType === 'button') ];",
     "$form[] = [ 'caption' => 'Separator line', 'name' => 'ShowBorderLine', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => false ];",
     "",
     "return $form;"
