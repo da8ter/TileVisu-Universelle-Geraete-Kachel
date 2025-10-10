@@ -347,6 +347,8 @@
             border-radius: var(--progress-bar-border-radius, 10px) 0 0 var(--progress-bar-border-radius, 10px);
             transition: width 3s ease-in-out;
             background: linear-gradient(to right, var(--progress-color1), var(--progress-color2));
+            /* Prefer OKLCH interpolation where supported for smoother, perceptually uniform gradients */
+            background: linear-gradient(to right in oklch, var(--progress-color1), var(--progress-color2));
             min-height: var(--progress-bar-height, 20px);
         }
 
@@ -553,6 +555,12 @@
             min-width: 80px;
             justify-content: center;
             box-sizing: border-box;
+            /* iOS/WebKit: ensure custom background covers full button area */
+            -webkit-appearance: none;
+            appearance: none;
+            -moz-appearance: none;
+            -webkit-tap-highlight-color: transparent;
+            background-clip: padding-box;
         }
 
         /* Multi-Button-Container für Integer-Variablen */
@@ -582,6 +590,12 @@
             justify-content: center;
             box-sizing: border-box;
             flex: 0 0 auto; /* Verhindere automatisches Stretching, respektiere explizite Breite */
+            /* iOS/WebKit: ensure custom background covers full button area */
+            -webkit-appearance: none;
+            appearance: none;
+            -moz-appearance: none;
+            -webkit-tap-highlight-color: transparent;
+            background-clip: padding-box;
         }
 
         .variable-multi-button:hover {
@@ -590,6 +604,12 @@
 
         .variable-multi-button.active {
             font-weight: 600;
+        }
+
+        /* Explicit inactive state to force full-button dimming on mobile */
+        .variable-button.inactive,
+        .variable-multi-button.inactive {
+            opacity: 0.5 !important;
         }
 
         /* Button-Gruppierung: Spezielle Border-Radius für zusammenhängende Button-Gruppe */
@@ -759,7 +779,27 @@
                             }
                         }
                     }
+                    if (!buttonEl.dataset.originalFilterValue) {
+                        let computedFilter = '';
+                        try {
+                            if (buttonEl.style.filter) {
+                                computedFilter = buttonEl.style.filter;
+                            } else if (window.getComputedStyle) {
+                                computedFilter = window.getComputedStyle(buttonEl).filter || '';
+                            }
+                        } catch (_) { computedFilter = ''; }
+                        if (computedFilter) {
+                            buttonEl.dataset.originalFilterValue = computedFilter;
+                        }
+                    }
+                    // Entferne inaktiv-Status und setze volle Sichtbarkeit
+                    if (buttonEl.classList) {
+                        buttonEl.classList.remove('inactive');
+                        buttonEl.classList.add('active');
+                    }
                     buttonEl.style.setProperty('opacity', '1', 'important');
+                    // iOS/WebKit: Filter überschreibt Opacity → deaktivieren
+                    buttonEl.style.setProperty('filter', 'none', 'important');
                 } catch (_) {}
             }
             // Ersten vorhandenen Icon-Knoten (svg oder i) ermitteln
@@ -806,7 +846,14 @@
             if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
                 try {
                     const fallbackOpacity = buttonEl.dataset.originalOpacityValue || '0.5';
+                    // Stelle inaktiv-Status wieder her
+                    if (buttonEl.classList) {
+                        buttonEl.classList.add('inactive');
+                        buttonEl.classList.remove('active');
+                    }
                     buttonEl.style.setProperty('opacity', fallbackOpacity, 'important');
+                    // Entferne expliziten Filter, damit CSS-Klasse 'inactive' wirkt
+                    try { buttonEl.style.removeProperty('filter'); } catch (_) {}
                 } catch (_) {}
             }
             // Ursprüngliches Icon (falls gesichert) wiederherstellen
@@ -1565,11 +1612,13 @@
                     // Update button state
                     button.style.backgroundColor = buttonColor;
                     button.style.opacity = opacity;
-                    
+                    // Maintain active/inactive classes (used by mobile to dim full surface)
                     if (isActive) {
                         button.classList.add('active');
+                        button.classList.remove('inactive');
                     } else {
                         button.classList.remove('active');
+                        button.classList.add('inactive');
                     }
                     
                     // Update button content based on display configuration
@@ -1639,7 +1688,7 @@
 
                     }
                 }                
-                const opacity = isActive ? '1' : '0.7';
+                const opacity = isActive ? '1' : '0.5';
 
                 // Resolve the actual button node; avoid mutating the wrapper
                 let targetButton = null;
@@ -1659,6 +1708,12 @@
                 targetButton.style.backgroundColor = buttonColor;
                 // targetButton.style.borderColor = buttonColor; // Border entfernt
                 targetButton.style.opacity = opacity;
+                // Maintain inactive class for mobile dimming
+                if (isActive) {
+                    targetButton.classList.remove('inactive');
+                } else {
+                    targetButton.classList.add('inactive');
+                }
                 
                 // Button-Inhalt zusammenstellen
                 let buttonText = '';
@@ -2680,7 +2735,7 @@
                         const buttonContainerJustify = (!isGrouped) ? `justify-content: ${justifyMap};` : '';
                         content += `
                             <div class="variable-button-container" style="${buttonContainerJustify}">
-                                <button class="variable-button" 
+                                <button class="variable-button ${isActive ? '' : 'inactive'}" 
                                         onclick="handleButtonClick(this, '${variable.id}', 1);" 
                                         data-variable-id="${variable.id}"
                                         data-script-button="${isScriptButton ? '1' : '0'}"
@@ -2764,11 +2819,11 @@
                             const buttonText = buttonContentParts.join(' ');
                             
                             buttonsHtml += `
-                                <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
+                                <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''} ${isActive ? '' : 'inactive'}" 
                                         onclick="handleButtonClick(this, '${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"});" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
-                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity} !important; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
                                     ${buttonText}
                                 </button>`;
                         });
