@@ -463,23 +463,33 @@
             display: flex !important;
             /* Margins beibehalten für konsistente vertikale Abstände */
         }
-        
+
         /* Reine Bool-Gruppen: Buttons volle Container-Breite */
         .variable-group.stretch-buttons:not(:has(.variable-multi-button-container)) .variable-group-item .variable-button-container .variable-button {
             width: 100% !important;
             min-width: 100% !important;
             max-width: 100% !important;
-            flex: none !important;
         }
+
+        /* Fallback ohne :has() Unterstützung – immer volle Breite für Bool-Buttons in Stretch-Gruppen */
+        .variable-group.stretch-buttons .variable-group-item .variable-button-container {
+            width: 100% !important;
+            display: flex !important;
+        }
+        .variable-group.stretch-buttons .variable-group-item .variable-button-container .variable-button {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            flex: 1 1 0% !important; /* Ensure buttons fill width */
+        }
+        
         
         /* === GEMISCHTE GRUPPEN: Bool feste Breite, Integer restlicher Platz === */
         
         /* Gemischte Gruppen: Bool-Button Items feste Breite */
         .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item:has(.variable-button-container) {
-            flex: none !important;
             display: flex !important;
         }
-        
         /* Gemischte Gruppen: Bool-Button Container */
         .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item .variable-button-container {
             display: flex !important;
@@ -505,13 +515,18 @@
         .variable-group.stretch-buttons .variable-group-item .variable-multi-button-container {
             width: 100% !important;
             display: flex !important;
+            align-items: stretch !important; /* ensure buttons fill height */
             /* Margins beibehalten für konsistente vertikale Abstände */
         }
         
         /* Multi-Buttons: Gleichmäßige Verteilung innerhalb des Containers */
         .variable-group.stretch-buttons .variable-group-item .variable-multi-button-container .variable-multi-button {
-            flex: 1 !important;
+            /* Equal distribution across container; flex-basis:0 for Safari/WebKit */
+            flex: 1 1 0% !important;
             min-width: 0 !important;
+            width: auto !important;
+            display: flex !important; /* avoid inline-flex + abs overlay quirks */
+            align-items: center !important;
         }
         
 
@@ -555,6 +570,9 @@
             min-width: 80px;
             justify-content: center;
             box-sizing: border-box;
+            position: relative; /* needed for ::after overlay */
+            overflow: hidden;  /* clip overlay to rounded corners */
+            z-index: 0; /* establish stacking context below overlay */
             /* iOS/WebKit: ensure custom background covers full button area */
             -webkit-appearance: none;
             appearance: none;
@@ -590,6 +608,9 @@
             justify-content: center;
             box-sizing: border-box;
             flex: 0 0 auto; /* Verhindere automatisches Stretching, respektiere explizite Breite */
+            position: relative; /* needed for ::after overlay */
+            overflow: hidden;  /* clip overlay to rounded corners */
+            z-index: 0; /* establish stacking context below overlay */
             /* iOS/WebKit: ensure custom background covers full button area */
             -webkit-appearance: none;
             appearance: none;
@@ -606,10 +627,16 @@
             font-weight: 600;
         }
 
-        /* Explicit inactive state to force full-button dimming on mobile */
-        .variable-button.inactive,
-        .variable-multi-button.inactive {
-            opacity: 0.5 !important;
+        /* Explicit inactive state overlay to force full-surface dimming on mobile/webviews */
+        .variable-button.inactive::after,
+        .variable-multi-button.inactive::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: inherit;
+            pointer-events: none;
+            z-index: 1;
         }
 
         /* Button-Gruppierung: Spezielle Border-Radius für zusammenhängende Button-Gruppe */
@@ -768,38 +795,11 @@
             // Script-Buttons während des Spins optisch aktiv setzen
             if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
                 try {
-                    if (!buttonEl.dataset.originalOpacityValue) {
-                        const inlineOpacity = buttonEl.style.opacity;
-                        if (inlineOpacity) {
-                            buttonEl.dataset.originalOpacityValue = inlineOpacity;
-                        } else if (window.getComputedStyle) {
-                            const computedOpacity = window.getComputedStyle(buttonEl).opacity;
-                            if (computedOpacity) {
-                                buttonEl.dataset.originalOpacityValue = computedOpacity;
-                            }
-                        }
-                    }
-                    if (!buttonEl.dataset.originalFilterValue) {
-                        let computedFilter = '';
-                        try {
-                            if (buttonEl.style.filter) {
-                                computedFilter = buttonEl.style.filter;
-                            } else if (window.getComputedStyle) {
-                                computedFilter = window.getComputedStyle(buttonEl).filter || '';
-                            }
-                        } catch (_) { computedFilter = ''; }
-                        if (computedFilter) {
-                            buttonEl.dataset.originalFilterValue = computedFilter;
-                        }
-                    }
-                    // Entferne inaktiv-Status und setze volle Sichtbarkeit
+                    // Entferne inaktiv-Status für die Spin-Dauer
                     if (buttonEl.classList) {
                         buttonEl.classList.remove('inactive');
                         buttonEl.classList.add('active');
                     }
-                    buttonEl.style.setProperty('opacity', '1', 'important');
-                    // iOS/WebKit: Filter überschreibt Opacity → deaktivieren
-                    buttonEl.style.setProperty('filter', 'none', 'important');
                 } catch (_) {}
             }
             // Ersten vorhandenen Icon-Knoten (svg oder i) ermitteln
@@ -845,15 +845,11 @@
             // Script-Buttons wieder abdunkeln sobald der Spin endet
             if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
                 try {
-                    const fallbackOpacity = buttonEl.dataset.originalOpacityValue || '0.5';
                     // Stelle inaktiv-Status wieder her
                     if (buttonEl.classList) {
                         buttonEl.classList.add('inactive');
                         buttonEl.classList.remove('active');
                     }
-                    buttonEl.style.setProperty('opacity', fallbackOpacity, 'important');
-                    // Entferne expliziten Filter, damit CSS-Klasse 'inactive' wirkt
-                    try { buttonEl.style.removeProperty('filter'); } catch (_) {}
                 } catch (_) {}
             }
             // Ursprüngliches Icon (falls gesichert) wiederherstellen
@@ -1611,7 +1607,7 @@
                     
                     // Update button state
                     button.style.backgroundColor = buttonColor;
-                    button.style.opacity = opacity;
+                    // Do not set inline opacity; rely on classes for consistent full-surface dimming
                     // Maintain active/inactive classes (used by mobile to dim full surface)
                     if (isActive) {
                         button.classList.add('active');
@@ -1707,7 +1703,7 @@
                 // Aktualisiere Button-Style
                 targetButton.style.backgroundColor = buttonColor;
                 // targetButton.style.borderColor = buttonColor; // Border entfernt
-                targetButton.style.opacity = opacity;
+                // Do not set inline opacity; rely on classes for consistent full-surface dimming
                 // Maintain inactive class for mobile dimming
                 if (isActive) {
                     targetButton.classList.remove('inactive');
@@ -2735,13 +2731,13 @@
                         const buttonContainerJustify = (!isGrouped) ? `justify-content: ${justifyMap};` : '';
                         content += `
                             <div class="variable-button-container" style="${buttonContainerJustify}">
-                                <button class="variable-button ${isActive ? '' : 'inactive'}" 
+                                <div class="variable-button ${isActive ? '' : 'inactive'}" role="button" tabindex="0"
                                         onclick="handleButtonClick(this, '${variable.id}', 1);" 
                                         data-variable-id="${variable.id}"
                                         data-script-button="${isScriptButton ? '1' : '0'}"
-                                        style="background-color: ${buttonColor} !important; opacity: ${opacity} !important; color: ${getTextColor(variable)} !important; ${buttonStyleExtras}">
+                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${buttonStyleExtras}">
                                     ${buttonText}
-                                </button>
+                                </div>
                             </div>
                         `;
                         
@@ -2752,6 +2748,19 @@
                         
                         // ButtonWidth aus Variablenkonfiguration verwenden (wie bei Boolean-Buttons)
                         const buttonWidth = variable.buttonWidth || 80; // Etwas schmaler für Multi-Buttons
+                        
+                        // Prüfe ob die aktuelle Gruppe im stretch-Modus ist (dann keine feste Breite setzen)
+                        let isGroupStretched = false;
+                        if (isGrouped && variable.group && window.groupNames) {
+                            const groupMatch = variable.group.match(/Gruppe (\d+)/);
+                            if (groupMatch) {
+                                const groupNumber = parseInt(groupMatch[1]);
+                                const groupConfig = window.groupNames[groupNumber];
+                                if (groupConfig && groupConfig.stretch) {
+                                    isGroupStretched = true;
+                                }
+                            }
+                        }
                         
                         let buttonsHtml = '';
                         const currentValue = variable.variableType === 1 ? parseInt(variable.rawValue) : variable.rawValue;
@@ -2819,13 +2828,13 @@
                             const buttonText = buttonContentParts.join(' ');
                             
                             buttonsHtml += `
-                                <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''} ${isActive ? '' : 'inactive'}" 
+                                <div class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''} ${isActive ? '' : 'inactive'}" role="button" tabindex="0"
                                         onclick="handleButtonClick(this, '${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"});" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
-                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity} !important; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${isGroupStretched ? '' : `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`}">
                                     ${buttonText}
-                                </button>`;
+                                </div>`;
                         });
                         
                         // Für ungruppierte Multi-Buttons: horizontale Ausrichtung des Containers entsprechend Einstellung
@@ -2883,13 +2892,13 @@
                             }
                             
                             buttonsHtml += `
-                                <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
+                                <div class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''} ${isActive ? '' : 'inactive'}" role="button" tabindex="0"
                                         onclick="handleButtonClick(this, '${variable.id}', '${association.value}');" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
-                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${isGroupStretched ? '' : `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`}">
                                     ${buttonText}
-                                </button>`;
+                                </div>`;
                         });
                         
                         // Für ungruppierte String-Multi-Buttons: horizontale Ausrichtung des Containers entsprechend Einstellung
