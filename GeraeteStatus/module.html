@@ -1480,6 +1480,35 @@
                         mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
                         break;
                     default:
+                        // Handle minimal updates for SecondVariable (var_X_second*, var_X_second_value, var_X_second_icon)
+                        if (parameter.startsWith('var_') && parameter.includes('_second')) {
+                            const baseVarKey = parameter.split('_second')[0];
+                            const targetVariableId = window.varKeyToIdMapping?.[baseVarKey];
+                            if (targetVariableId && window.variableDataCache && window.variableDataCache[targetVariableId]) {
+                                const variable = window.variableDataCache[targetVariableId];
+                                variable.secondVariable = variable.secondVariable || {};
+                                if (parameter.endsWith('_second_value')) {
+                                    variable.secondVariable.rawValue = value;
+                                } else if (parameter.endsWith('_second_icon')) {
+                                    variable.secondVariable.icon = value;
+                                } else {
+                                    // formatted value update: 'var_X_second'
+                                    variable.secondVariable.formattedValue = value;
+                                }
+
+                                // For progress bars, only the text needs updating (width is based on main rawValue)
+                                if (variable.displayType === 'progress') {
+                                    const progressContainer = document.querySelector(`.progress-container[data-variable-id="${targetVariableId}"]`);
+                                    if (progressContainer) {
+                                        const progressTextContainer = progressContainer.querySelector('.progress-text');
+                                        if (progressTextContainer) {
+                                            updateProgressText(progressTextContainer, variable);
+                                        }
+                                    }
+                                }
+                            }
+                            break; // handled in this branch
+                        }
                         // Prüfe auf Variable-Updates (Parameter endet mit '_value')
                         if (parameter.endsWith('_value')) {
                             // Extrahiere Variable-ID aus Parameter (z.B. 'var_3_value' -> 'var_3')
@@ -1827,11 +1856,13 @@
         function updateProgressText(progressTextContainer, variable) {
             
             // Progress-Bar Inhalt basierend auf Konfiguration
+            // Transparenz-Stil für inaktive Progress-Bars (Konsistenz mit Initial-Render)
+            const inactiveOpacity = variable.progressbarInactive ? 'opacity: 0.5;' : '';
             let progressIconHtml = '';
             if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
                 const iconClass = prepareIconForDisplay(variable.icon);
                 if (iconClass) {
-                    progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`;
+                    progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`;
                 }
             }
             
@@ -1842,16 +1873,16 @@
             }
             
             if (variable.showLabel && variable.label) {
-                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.label}:&nbsp;</span>`);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.label}:&nbsp;</span>`);
             }
             
             if (variable.showValue) {
-                progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.formattedValue}</span>`);
             }
             
             // Falls nichts konfiguriert ist, zeige Wert als Fallback
             if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.formattedValue}</span>`);
             }
             
             const progressText = progressTextParts.join(' ');
@@ -1872,23 +1903,23 @@
                     if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
                         const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
                         if (secondIconClass) {
-                            secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
+                            secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
                         }
                     }
                     
                     // Label für zweite Variable
                     if (variable.secondVariable.showLabel && variable.secondVariable.label) {
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.secondVariable.label}:&nbsp;</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.secondVariable.label}:&nbsp;</span>`);
                     }
                     
                     // Wert für zweite Variable (Backend-Wert direkt verwenden)
                     if (variable.secondVariable.showValue) {
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
                     if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
                     }
                     
                     if (secondVariableParts.length > 0) {
