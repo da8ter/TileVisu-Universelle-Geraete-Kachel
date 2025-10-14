@@ -2547,7 +2547,14 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // **FALL 2: CustomPresentation mit direkten MIN/MAX Parametern**
-        $customPresentation = isset($variable['VariableCustomPresentation']) ? $variable['VariableCustomPresentation'] : [];
+        // Presentation source: prefer CustomPresentation, fallback to standard VariablePresentation (Option B)
+        // This enables button rendering for standard (non-custom) presentations with OPTIONS/PRESENTATION/TEMPLATE
+        $customPresentation = [];
+        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
+            $customPresentation = $variable['VariableCustomPresentation'];
+        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
+            $customPresentation = $variable['VariablePresentation'];
+        }
         
         if (!empty($customPresentation)) {
             // Direkte MIN/MAX Parameter
@@ -2786,7 +2793,14 @@ class UniversalDeviceTile extends IPSModule
             }
         }
         
-        $customPresentation = isset($variable['VariableCustomPresentation']) ? $variable['VariableCustomPresentation'] : [];
+        // Presentation source for associations: prefer VariableCustomPresentation, fallback to VariablePresentation (Option B)
+        // Enables buttons for standard (non-custom) presentations that define OPTIONS/PRESENTATION/TEMPLATE
+        $customPresentation = [];
+        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
+            $customPresentation = $variable['VariableCustomPresentation'];
+        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
+            $customPresentation = $variable['VariablePresentation'];
+        }
 // **FALL 1.5: Boolean-Präsentationen mit direkten ICON_TRUE/ICON_FALSE Parametern**
         if ($expectedVariableType === VARIABLETYPE_BOOLEAN) {
             // **KRITISCHER FIX: Baue ASSOCIATIONS aus ICON_TRUE/ICON_FALSE auf**
