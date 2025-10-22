@@ -100,6 +100,8 @@ class UniversalDeviceTile extends IPSModule
 
         // Visualisierungstyp auf 1 setzen, da wir HTML anbieten möchten
         $this->SetVisualizationType(1);
+
+        $this->RegisterAttributeString('HookToken', '');
         
         // Lade das Icon-Mapping
         $this->LoadIconMapping();
@@ -370,6 +372,9 @@ class UniversalDeviceTile extends IPSModule
         
         // Stelle sicher, dass das Icon-Mapping geladen ist
         $this->LoadIconMapping();
+
+        // WebHook für Bildauslieferung registrieren
+        $this->RegisterUDTImageHook('/hook/udtimages/' . $this->InstanceID);
         
         // Dynamische Referenzen und Nachrichten für konfigurierte Variablen
         $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
@@ -411,33 +416,6 @@ class UniversalDeviceTile extends IPSModule
             $mediaIds[] = $defaultImageId;
         }
 
-        // Custom Images aus ProfilAssoziazionen einsammeln
-        $profilAssoziazionen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-        $neededAssets = [];
-        
-        if (is_array($profilAssoziazionen)) {
-            foreach ($profilAssoziazionen as $assoziation) {
-                $bildauswahl = $assoziation['Bildauswahl'] ?? 'none';
-                
-                if ($bildauswahl === 'custom' && !empty($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
-                    // Custom Images
-                    $mediaId = $assoziation['EigenesBild'];
-                    if (IPS_MediaExists($mediaId)) {
-                        $media = IPS_GetMedia($mediaId);
-                        if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                            $imageFile = explode('.', $media['MediaFile']);
-                            $imageContent = $this->GetImageDataUri(end($imageFile));
-                            if ($imageContent) {
-                                $neededAssets['img_custom_' . $mediaId] = $imageContent . IPS_GetMediaContent($mediaId);
-                            }
-                        }
-                    }
-                } elseif (in_array($bildauswahl, ['wm_an', 'wm_aus', 'dryer_on', 'dryer_off'])) {
-                    // Sammle benötigte vorkonfigurierte Assets
-                    $neededAssets[$bildauswahl] = true;
-                }
-            }
-        }
         
         // Entferne alle alten Referenzen
         $refs = $this->GetReferenceList();
@@ -570,88 +548,326 @@ class UniversalDeviceTile extends IPSModule
         
         // Sammle alle benötigten Assets basierend auf ProfilAssoziazionen
         $profilAssoziazionen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-        $neededAssets = [];
-        
         if (is_array($profilAssoziazionen)) {
             foreach ($profilAssoziazionen as $assoziation) {
                 $bildauswahl = $assoziation['Bildauswahl'] ?? 'none';
                 
                 if ($bildauswahl === 'custom' && isset($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
-                    // Custom Images
-                    $mediaId = $assoziation['EigenesBild'];
-                    if (IPS_MediaExists($mediaId)) {
-                        $media = IPS_GetMedia($mediaId);
-                        if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                            $imageFile = explode('.', $media['MediaFile']);
-                            $imageContent = $this->GetImageDataUri(end($imageFile));
-                            if ($imageContent) {
-                                $assets['img_custom_' . $mediaId] = $imageContent . IPS_GetMediaContent($mediaId);
-                            }
-                        }
+                    $mediaId = (int)$assoziation['EigenesBild'];
+                    if ($mediaId > 0 && IPS_MediaExists($mediaId)) {
+                        $assets['img_custom_' . $mediaId] = $this->BuildImageHookUrl($mediaId);
                     }
                 } elseif (in_array($bildauswahl, ['wm_an', 'wm_aus', 'dryer_on', 'dryer_off'])) {
-                    // Sammle benötigte vorkonfigurierte Assets
-                    $neededAssets[$bildauswahl] = true;
+                    $assets['img_' . $bildauswahl] = $this->BuildAssetHookUrl($bildauswahl);
                 }
             }
         }
-        
-        // Lade die benötigten vorkonfigurierten Assets
-        foreach ($neededAssets as $assetName => $needed) {
-            switch ($assetName) {
-                case 'wm_an':
-                    $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp'));
-                    break;
-                case 'wm_aus':
-                    $assets['img_wm_aus'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp'));
-                    break;
-                case 'dryer_on':
-                    $assets['img_dryer_on'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_an.webp'));
-                    break;
-                case 'dryer_off':
-                    $assets['img_dryer_off'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_aus.webp'));
-                    break;
-            }
-        }
-        
-        // Standard-Bild laden wenn konfiguriert (für Fallback-Zwecke)
+        // Standard-Bild optional als Hook-URL mappen (nur für Konsistenz, Status nutzt ohnehin statusImageUrl)
         $defaultImageId = $this->ReadPropertyInteger('DefaultImage');
         if ($defaultImageId > 0 && IPS_MediaExists($defaultImageId)) {
-            $media = IPS_GetMedia($defaultImageId);
-            if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                $imageFile = explode('.', $media['MediaFile']);
-                $imageContent = $this->GetImageDataUri(end($imageFile));
-                if ($imageContent) {
-                    $assets['img_default_' . $defaultImageId] = $imageContent . IPS_GetMediaContent($defaultImageId);
-                }
-            }
+            $assets['img_default_' . $defaultImageId] = $this->BuildImageHookUrl($defaultImageId);
         }
-        
-        // Transparentes Platzhalter-Bild wird jetzt inline im Frontend als Data URI verwendet
-        
+
         // Fallback: Wenn keine Statusvariable konfiguriert ist und noch kein img_wm_an Asset vorhanden, 
-        // lade Standard-Waschmaschinen-Asset als Fallback
+        // mappe Standard-Waschmaschinen-Asset als Fallback (WebHook)
         if ($needsFallbackAssets && !isset($assets['img_wm_an'])) {
-            $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp'));
+            $assets['img_wm_an'] = $this->BuildAssetHookUrl('wm_an');
         }
         
         
         return $assets;
     }
-    
-    // Hilfsmethode für Data URI basierend auf Dateierweiterung
-    private function GetImageDataUri($extension) {
-        switch (strtolower($extension)) {
-            case 'bmp': return 'data:image/bmp;base64,';
-            case 'jpg':
-            case 'jpeg': return 'data:image/jpeg;base64,';
-            case 'gif': return 'data:image/gif;base64,';
-            case 'png': return 'data:image/png;base64,';
-            case 'ico': return 'data:image/x-icon;base64,';
-            case 'webp': return 'data:image/webp;base64,';
-            default: return null;
+
+    private function RegisterUDTImageHook(string $hookPath): void
+    {
+        $webhookModuleId = '{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}';
+        $ids = @IPS_GetInstanceListByModuleID($webhookModuleId);
+        if (!is_array($ids) || count($ids) === 0) {
+            $this->LogMessage('WebHook Control not found. Skipping hook registration.', KL_WARNING);
+            return;
+        }
+        $whId = $ids[0];
+
+        $scriptId = $this->ensureUDTImageHookScript();
+
+        $hooks = @json_decode(IPS_GetProperty($whId, 'Hooks'), true);
+        if (!is_array($hooks)) {
+            $hooks = [];
+        }
+        $found = false;
+        foreach ($hooks as &$h) {
+            if (isset($h['Hook']) && $h['Hook'] === $hookPath) {
+                $h['TargetID'] = $scriptId;
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            $hooks[] = [
+                'Hook' => $hookPath,
+                'TargetID' => $scriptId
+            ];
+        }
+        IPS_SetProperty($whId, 'Hooks', json_encode($hooks));
+        IPS_ApplyChanges($whId);
+    }
+
+    private function ensureUDTImageHookScript(): int
+    {
+        $ident = 'UDTImageHookScript';
+        $sid = @IPS_GetObjectIDByIdent($ident, $this->InstanceID);
+        $assetsDir = __DIR__ . '/assets';
+        $placeholder = __DIR__ . '/../imgs/transparent.webp';
+
+        $instToken = $this->ReadAttributeString('HookToken');
+        if ($instToken === '') {
+            try {
+                $instToken = bin2hex(random_bytes(16));
+            } catch (Throwable $e) {
+                $instToken = substr(sha1(uniqid('', true)), 0, 32);
+            }
+            $this->WriteAttributeString('HookToken', $instToken);
+        }
+
+        $code = sprintf(<<<'PHP'
+<?php
+if (isset($_IPS['SENDER']) && $_IPS['SENDER'] === 'WebHook') {
+    $assetsDir = '%s';
+    $placeholder = '%s';
+    $instT = '%s';
+
+    $token = isset($_GET['token']) ? (string)$_GET['token'] : '';
+    if (!is_string($token) || $token === '' || !hash_equals($instT, $token)) {
+        http_response_code(403);
+        exit;
+    }
+
+    if (function_exists('ob_get_level')) {
+        while (ob_get_level() > 0) { ob_end_clean(); }
+    }
+    header('X-Accel-Buffering: no');
+    if (function_exists('ignore_user_abort')) { ignore_user_abort(true); }
+    if (function_exists('set_time_limit')) { @set_time_limit(0); }
+
+    $MAX_SIZE = 5 * 1024 * 1024; // 5MB
+
+    $detectMime = function(string $bin) {
+        $hdr = substr($bin, 0, 12);
+        if (strncmp($hdr, "\xFF\xD8\xFF", 3) === 0) return 'image/jpeg';
+        if (strncmp($hdr, "\x89PNG\x0D\x0A\x1A\x0A", 8) === 0) return 'image/png';
+        if (strncmp($hdr, 'GIF87a', 6) === 0 || strncmp($hdr, 'GIF89a', 6) === 0) return 'image/gif';
+        if (substr($hdr, 0, 4) === 'RIFF' && substr($hdr, 8, 4) === 'WEBP') return 'image/webp';
+        if (strncmp($hdr, 'BM', 2) === 0) return 'image/bmp';
+        return 'application/octet-stream';
+    };
+
+    $sendNotModified = function(string $etag = '', int $lastMod = 0) {
+        $ifNoneMatch = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim($_SERVER['HTTP_IF_NONE_MATCH']) : '';
+        $ifModifiedSince = isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']) : 0;
+        if ($etag !== '' && $ifNoneMatch === $etag) {
+            header('ETag: ' . $etag);
+            http_response_code(304);
+            exit;
+        }
+        if ($lastMod > 0 && $ifModifiedSince && $ifModifiedSince >= $lastMod) {
+            header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $lastMod) . ' GMT');
+            http_response_code(304);
+            exit;
+        }
+    };
+
+    $streamFile = function(string $file, string $mime, bool $longCache = false) use ($MAX_SIZE, $sendNotModified) {
+        if (!is_file($file) || !is_readable($file)) {
+            http_response_code(404);
+            IPS_LogMessage('UDTImagesHook', 'File not found or unreadable: ' . $file);
+            exit;
+        }
+        $size = filesize($file);
+        if ($size === false) {
+            http_response_code(500);
+            IPS_LogMessage('UDTImagesHook', 'filesize failed: ' . $file);
+            exit;
+        }
+        if ($size > $MAX_SIZE) {
+            http_response_code(413);
+            IPS_LogMessage('UDTImagesHook', 'File too large: ' . $size);
+            exit;
+        }
+        $mtime = filemtime($file) ?: time();
+        $etag = 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
+        if ($longCache) {
+            header('Cache-Control: public, max-age=31536000, immutable');
+        } else {
+            header('Cache-Control: public, max-age=0, must-revalidate');
+        }
+        header('ETag: ' . $etag);
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
+        $sendNotModified($etag, $mtime);
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . $size);
+        $fh = fopen($file, 'rb');
+        if ($fh === false) {
+            http_response_code(500);
+            IPS_LogMessage('UDTImagesHook', 'fopen failed: ' . $file);
+            exit;
+        }
+        $chunk = 65536;
+        while (!feof($fh)) {
+            $buf = fread($fh, $chunk);
+            if ($buf === false) { break; }
+            echo $buf;
+            flush();
+        }
+        fclose($fh);
+        exit;
+    };
+
+    // Symcon Media (Bild) per ID
+    $mid = isset($_GET['mid']) ? (int)$_GET['mid'] : 0;
+    if ($mid > 0 && IPS_MediaExists($mid)) {
+        $m = IPS_GetMedia($mid);
+        if ($m['MediaType'] === MEDIATYPE_IMAGE) {
+            // Stream from file if available
+            if (!empty($m['MediaFile']) && is_file($m['MediaFile'])) {
+                $fh = fopen($m['MediaFile'], 'rb');
+                if ($fh !== false) {
+                    $hdr = fread($fh, 12);
+                    fclose($fh);
+                    $mime = $detectMime($hdr ?: '');
+                    $streamFile($m['MediaFile'], $mime, false);
+                }
+            }
+
+            // Fallback: Base64 content streaming with decode filter (chunked)
+            $b64 = IPS_GetMediaContent($mid);
+            if (!is_string($b64) || $b64 === '') {
+                http_response_code(404);
+                IPS_LogMessage('UDTImagesHook', 'Empty media content mid=' . $mid);
+                exit;
+            }
+            $prefixSample = base64_decode(substr($b64, 0, 24), true);
+            $mime = $detectMime($prefixSample ?: '');
+            $len = strlen($b64);
+            $padding = 0;
+            if ($len >= 2 && substr($b64, -2) === '==') { $padding = 2; }
+            elseif ($len >= 1 && substr($b64, -1) === '=') { $padding = 1; }
+            $decodedLen = (int)floor($len / 4) * 3 - $padding;
+            if ($decodedLen > $MAX_SIZE) {
+                http_response_code(413);
+                IPS_LogMessage('UDTImagesHook', 'Media too large mid=' . $mid . ' size=' . $decodedLen);
+                exit;
+            }
+            header('Cache-Control: no-store');
+            header('Content-Type: ' . $mime);
+            header('Content-Length: ' . max(0, $decodedLen));
+            $out = fopen('php://output', 'wb');
+            if ($out === false) {
+                http_response_code(500);
+                IPS_LogMessage('UDTImagesHook', 'open php://output failed');
+                exit;
+            }
+            $filter = stream_filter_append($out, 'convert.base64-decode', STREAM_FILTER_WRITE);
+            $buffer = '';
+            $chunkSize = 65536;
+            for ($i = 0; $i < $len; $i += $chunkSize) {
+                $chunk = substr($b64, $i, $chunkSize);
+                $buffer .= $chunk;
+                $toWrite = strlen($buffer) - (strlen($buffer) %% 4);
+                if ($toWrite > 0) {
+                    fwrite($out, substr($buffer, 0, $toWrite));
+                    $buffer = substr($buffer, $toWrite);
+                    flush();
+                }
+            }
+            if ($buffer !== '') {
+                fwrite($out, $buffer);
+            }
+            if (is_resource($filter)) { stream_filter_remove($filter); }
+            fclose($out);
+            exit;
         }
     }
+
+    // Asset aus Modul-Ordner ausliefern
+    $asset = isset($_GET['asset']) ? preg_replace('/[^a-z0-9_\-]/i', '', (string)$_GET['asset']) : '';
+    if ($asset !== '') {
+        $candidates = [
+            $assetsDir . '/' . $asset . '.webp',
+            $assetsDir . '/' . $asset . '.png',
+            $assetsDir . '/' . $asset . '.jpg',
+            $assetsDir . '/' . $asset . '.jpeg',
+            $assetsDir . '/' . $asset . '.gif',
+        ];
+        foreach ($candidates as $file) {
+            if (is_file($file)) {
+                $fh = fopen($file, 'rb');
+                if ($fh === false) { continue; }
+                $hdr = fread($fh, 12);
+                fclose($fh);
+                $mime = $detectMime($hdr ?: '');
+                $streamFile($file, $mime, true);
+            }
+        }
+    }
+
+    // Placeholder
+    if (isset($_GET['placeholder']) && is_file($placeholder)) {
+        $fh = fopen($placeholder, 'rb');
+        if ($fh !== false) { $hdr = fread($fh, 12); fclose($fh); }
+        $mime = $detectMime(isset($hdr) ? $hdr : '');
+        $streamFile($placeholder, $mime, true);
+    }
+
+    http_response_code(404);
+    IPS_LogMessage('UDTImagesHook', 'Not found');
+    exit;
+}
+PHP,
+        addslashes($assetsDir),
+        addslashes($placeholder),
+        addslashes($instToken)
+        );
+
+        if ($sid && @IPS_ObjectExists($sid)) {
+            IPS_SetScriptContent($sid, $code);
+            return $sid;
+        }
+        $sid = IPS_CreateScript(0);
+        IPS_SetName($sid, 'UDT Images WebHook');
+        IPS_SetParent($sid, $this->InstanceID);
+        IPS_SetIdent($sid, $ident);
+        IPS_SetHidden($sid, true);
+        IPS_SetScriptContent($sid, $code);
+        return $sid;
+    }
+
+    private function BuildImageHookUrl(int $mediaId): string
+    {
+        $base = '/hook/udtimages/' . $this->InstanceID;
+        $token = $this->ReadAttributeString('HookToken');
+        if ($mediaId > 0) {
+            $q = 'mid=' . (int)$mediaId;
+        } else {
+            $q = 'placeholder=1&ts=' . time();
+        }
+        if ($token !== '') {
+            $q .= '&token=' . rawurlencode($token);
+        }
+        return $base . '?' . $q;
+    }
+
+    private function BuildAssetHookUrl(string $name): string
+    {
+        $safe = preg_replace('/[^a-z0-9_\-]/i', '', $name);
+        $token = $this->ReadAttributeString('HookToken');
+        $base = '/hook/udtimages/' . $this->InstanceID;
+        $q = 'asset=' . $safe;
+        if ($token !== '') {
+            $q .= '&token=' . rawurlencode($token);
+        }
+        return $base . '?' . $q;
+    }
+
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
@@ -668,6 +884,10 @@ class UniversalDeviceTile extends IPSModule
                 $minimal = $this->buildMinimalStatusUpdate($fullArray);
                 if (!empty($minimal)) {
                     $this->UpdateVisualizationValue(json_encode($minimal));
+                    // WICHTIG: Variablen neu schicken, damit progressbarActive/Inaktiv sofort wirkt
+                    if (isset($fullArray['variables']) && is_array($fullArray['variables'])) {
+                        $this->UpdateVisualizationValue(json_encode(['variables' => $fullArray['variables']]));
+                    }
                 } else {
                     // Fallback: vollständige Nachricht
                     $this->UpdateVisualizationValue($fullMessage);
@@ -761,23 +981,6 @@ class UniversalDeviceTile extends IPSModule
                         if ((($variable['DisplayType'] ?? 'text') === 'image')) {
                             $imageId = intval($variable['ImageMedia'] ?? 0);
                             if ($imageId === $SenderID) {
-                                // Data-URI neu aufbauen
-                                $dataUri = '';
-                                if (IPS_MediaExists($imageId)) {
-                                    $media = IPS_GetMedia($imageId);
-                                    if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                                        $ext = '';
-                                        if (!empty($media['MediaFile'])) {
-                                            $parts = explode('.', $media['MediaFile']);
-                                            $ext = end($parts);
-                                        }
-                                        $prefix = $this->GetImageDataUri($ext ?: 'png');
-                                        if ($prefix) {
-                                            $dataUri = $prefix . IPS_GetMediaContent($imageId);
-                                        }
-                                    }
-                                }
-
                                 // Bestimme DOM-ID: mit Variable-ID falls vorhanden, sonst 'image_<index>'
                                 $domId = isset($variable['Variable']) && $variable['Variable'] > 0
                                     ? strval($variable['Variable'])
@@ -785,7 +988,7 @@ class UniversalDeviceTile extends IPSModule
 
                                 $imageVarUpdates[] = [
                                     'id' => $domId,
-                                    'imageDataUri' => $dataUri
+                                    'imageUrl' => $this->BuildImageHookUrl($imageId)
                                 ];
                             }
                         }
@@ -800,44 +1003,12 @@ class UniversalDeviceTile extends IPSModule
                 // ignore
             }
 
-            // Falls das Hintergrundbild betroffen ist: Aktualisiere image1 separat
+            // Falls das Hintergrundbild betroffen ist: Aktualisiere image1Url separat
             $bgImageId = $this->ReadPropertyInteger('bgImage');
             if ($SenderID === $bgImageId && $bgImageId > 0 && IPS_MediaExists($bgImageId)) {
                 $image = IPS_GetMedia($bgImageId);
                 if ($image['MediaType'] === MEDIATYPE_IMAGE) {
-                    $imageFile = explode('.', $image['MediaFile']);
-                    $imageContent = '';
-                    switch (end($imageFile)) {
-                        case 'bmp':
-                            $imageContent = 'data:image/bmp;base64,';
-                            break;
-
-                        case 'jpg':
-                        case 'jpeg':
-                            $imageContent = 'data:image/jpeg;base64,';
-                            break;
-
-                        case 'gif':
-                            $imageContent = 'data:image/gif;base64,';
-                            break;
-
-                        case 'png':
-                            $imageContent = 'data:image/png;base64,';
-                            break;
-
-                        case 'ico':
-                            $imageContent = 'data:image/x-icon;base64,';
-                            break;
-
-                        case 'webp':
-                            $imageContent = 'data:image/webp;base64,';
-                            break;
-                    }
-
-                    if ($imageContent) {
-                        $imageContent .= IPS_GetMediaContent($bgImageId);
-                        $this->UpdateVisualizationValue(json_encode(['image1' => $imageContent]));
-                    }
+                    $this->UpdateVisualizationValue(json_encode(['image1Url' => $this->BuildImageHookUrl($bgImageId)]));
                 }
             }
             return; // nichts weiter zu tun
@@ -1150,9 +1321,16 @@ class UniversalDeviceTile extends IPSModule
                             if (isset($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
                                 // Asset-Name für Custom Image (wird in GenerateAssets() als base64 geladen)
                                 $result['statusBildauswahl'] = 'img_custom_' . $assoziation['EigenesBild'];
+                                $result['statusImageUrl'] = $this->BuildImageHookUrl((int)$assoziation['EigenesBild']);
                             } else {
                                 // Fallback: Verwende Standard-Bild wenn konfiguriert, sonst 'none'
                                 $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
+                                if ($result['statusBildauswahl'] !== 'none' && strpos($result['statusBildauswahl'], 'img_default_') === 0) {
+                                    $mid = (int)substr($result['statusBildauswahl'], strlen('img_default_'));
+                                    $result['statusImageUrl'] = $this->BuildImageHookUrl($mid);
+                                } else {
+                                    $result['statusImageUrl'] = $this->BuildImageHookUrl(0);
+                                }
                             }
                         } elseif ($bildauswahl === 'symcon_icon') {
                             // Verwende Symcon Icon aus SelectIcon-Feld
@@ -1178,11 +1356,18 @@ class UniversalDeviceTile extends IPSModule
                         } elseif ($bildauswahl === 'none') {
                             // Fallback: Verwende Standard-Bild wenn konfiguriert, sonst wirklich 'none'
                             $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
+                            if ($result['statusBildauswahl'] !== 'none' && strpos($result['statusBildauswahl'], 'img_default_') === 0) {
+                                $mid = (int)substr($result['statusBildauswahl'], strlen('img_default_'));
+                                $result['statusImageUrl'] = $this->BuildImageHookUrl($mid);
+                            } else {
+                                $result['statusImageUrl'] = $this->BuildImageHookUrl(0);
+                            }
                             $result['statusIconColor'] = '';
                             $result['isStatusIconColorTransparent'] = true;
                         } else {
                             // Verwende vorkonfigurierte Bilder (wm_an, wm_aus, dryer_on, dryer_off, etc.)
                             $result['statusBildauswahl'] = $bildauswahl;
+                            $result['statusImageUrl'] = $this->BuildAssetHookUrl($bildauswahl);
                             $result['statusIconColor'] = '';
                             $result['isStatusIconColorTransparent'] = true;
                         }
@@ -1198,7 +1383,13 @@ class UniversalDeviceTile extends IPSModule
             
             // Ensure statusBildauswahl is set if we have a status variable
             if (!$statusBildauswahlSet) {
-                $result['statusBildauswahl'] = $this->getDefaultImageOrNone(); // Fallback auf Standard-Bild oder 'none'
+                $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
+                if ($result['statusBildauswahl'] !== 'none' && strpos($result['statusBildauswahl'], 'img_default_') === 0) {
+                    $mid = (int)substr($result['statusBildauswahl'], strlen('img_default_'));
+                    $result['statusImageUrl'] = $this->BuildImageHookUrl($mid);
+                } else {
+                    $result['statusImageUrl'] = $this->BuildImageHookUrl(0);
+                }
             }
         } else {
             // Fallback: Wenn keine Statusvariable konfiguriert ist
@@ -1388,22 +1579,8 @@ class UniversalDeviceTile extends IPSModule
                     // Bild (Symcon Medienobjekt) als eigene Darstellungsart
                     if (($variable['DisplayType'] ?? 'text') === 'image') {
                         $imageId = intval($variable['ImageMedia'] ?? 0);
-                        $dataUri = '';
-                        if ($imageId > 0 && IPS_MediaExists($imageId)) {
-                            $media = IPS_GetMedia($imageId);
-                            if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                                $ext = '';
-                                if (!empty($media['MediaFile'])) {
-                                    $parts = explode('.', $media['MediaFile']);
-                                    $ext = end($parts);
-                                }
-                                $prefix = $this->GetImageDataUri($ext ?: 'png');
-                                if ($prefix) {
-                                    $dataUri = $prefix . IPS_GetMediaContent($imageId);
-                                }
-                            }
-                        }
-                        $variableData['imageDataUri'] = $dataUri;
+                        $variableData['imageMediaId'] = $imageId;
+                        $variableData['imageUrl'] = $this->BuildImageHookUrl($imageId);
                         // Image width now in percent (1-100), default 40
                         $variableData['imageWidth'] = max(1, min(100, intval($variable['ImageWidth'] ?? 40)));
                         $variableData['imageBorderRadius'] = intval($variable['ImageBorderRadius'] ?? 6);
@@ -1456,21 +1633,6 @@ class UniversalDeviceTile extends IPSModule
                 } else if ((($variable['DisplayType'] ?? 'text') === 'image')) {
                     // SUPPORT IMAGE ROWS WITHOUT A VARIABLE ID
                     $imageId = intval($variable['ImageMedia'] ?? 0);
-                    $dataUri = '';
-                    if ($imageId > 0 && IPS_MediaExists($imageId)) {
-                        $media = IPS_GetMedia($imageId);
-                        if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                            $ext = '';
-                            if (!empty($media['MediaFile'])) {
-                                $parts = explode('.', $media['MediaFile']);
-                                $ext = end($parts);
-                            }
-                            $prefix = $this->GetImageDataUri($ext ?: 'png');
-                            if ($prefix) {
-                                $dataUri = $prefix . IPS_GetMediaContent($imageId);
-                            }
-                        }
-                    }
                     // Label-Fallback
                     $label = $variable['Label'] ?? '';
                     // Alignment/Textfarbe
@@ -1489,7 +1651,8 @@ class UniversalDeviceTile extends IPSModule
                         'textColor' => $textColor,
                         'isTextColorTransparent' => $isTextColorTransparent,
                         'alignment' => $variable['VerticalAlignment'] ?? 'left',
-                        'imageDataUri' => $dataUri,
+                        'imageMediaId' => $imageId,
+                        'imageUrl' => $this->BuildImageHookUrl($imageId),
                         // Image width now in percent (1-100), default 40
                         'imageWidth' => max(1, min(100, intval($variable['ImageWidth'] ?? 40))),
                         'imageBorderRadius' => intval($variable['ImageBorderRadius'] ?? 6),
@@ -1632,9 +1795,9 @@ class UniversalDeviceTile extends IPSModule
 
                 // Nur fortfahren, falls Inhalt gesetzt wurde. Ansonsten ist das Bild kein unterstützter Dateityp
                 if ($imageContent) {
-                    // Hänge base64-codierten Inhalt des Bildes an
                     $imageContent .= IPS_GetMediaContent($imageID);
                     $result['image1'] = $imageContent;
+                    $result['image1Url'] = $this->BuildImageHookUrl($imageID);
                 }
             }
         }
@@ -2547,7 +2710,14 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // **FALL 2: CustomPresentation mit direkten MIN/MAX Parametern**
-        $customPresentation = isset($variable['VariableCustomPresentation']) ? $variable['VariableCustomPresentation'] : [];
+        // Presentation source: prefer CustomPresentation, fallback to standard VariablePresentation (Option B)
+        // This enables button rendering for standard (non-custom) presentations with OPTIONS/PRESENTATION/TEMPLATE
+        $customPresentation = [];
+        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
+            $customPresentation = $variable['VariableCustomPresentation'];
+        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
+            $customPresentation = $variable['VariablePresentation'];
+        }
         
         if (!empty($customPresentation)) {
             // Direkte MIN/MAX Parameter
@@ -2786,7 +2956,14 @@ class UniversalDeviceTile extends IPSModule
             }
         }
         
-        $customPresentation = isset($variable['VariableCustomPresentation']) ? $variable['VariableCustomPresentation'] : [];
+        // Presentation source for associations: prefer VariableCustomPresentation, fallback to VariablePresentation (Option B)
+        // Enables buttons for standard (non-custom) presentations that define OPTIONS/PRESENTATION/TEMPLATE
+        $customPresentation = [];
+        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
+            $customPresentation = $variable['VariableCustomPresentation'];
+        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
+            $customPresentation = $variable['VariablePresentation'];
+        }
 // **FALL 1.5: Boolean-Präsentationen mit direkten ICON_TRUE/ICON_FALSE Parametern**
         if ($expectedVariableType === VARIABLETYPE_BOOLEAN) {
             // **KRITISCHER FIX: Baue ASSOCIATIONS aus ICON_TRUE/ICON_FALSE auf**
