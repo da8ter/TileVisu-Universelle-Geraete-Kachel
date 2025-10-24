@@ -387,6 +387,57 @@
             overflow: hidden;
         }
 
+        /* Target SOC marker overlay (mirrors Wallbox zielsoc marker) */
+        .progress-container .target-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: calc(var(--target-percent, -1000%) - 4px);
+            width: 8px;
+            pointer-events: none;
+            z-index: 1;
+            background: none;
+        }
+        .progress-container .soc-triangle {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 3px solid transparent;
+            border-right: 3px solid transparent;
+            opacity: 0.3;
+        }
+        .progress-container .soc-triangle-top {
+            top: 0;
+            border-bottom: 0;
+            border-top: 3px solid #000;
+        }
+        .progress-container .soc-triangle-bottom {
+            bottom: 0;
+            border-top: 0;
+            border-bottom: 3px solid #000;
+        }
+        .progress-container .target-marker-text {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            left: calc(var(--target-percent, 0%) + 5px);
+            color: inherit;
+            z-index: 2;
+            font-size: var(--balkenschriftgroesse, inherit);
+            line-height: 1em;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 5px;
+            white-space: nowrap;
+            visibility: visible;
+        }
+        .progress-container .target-marker-text.position-before-bar {
+            left: auto;
+            right: calc(100% - var(--target-percent, 0%) + 5px);
+        }
+
         .progress-main-text {
             flex: 1;
             text-align: left;
@@ -410,6 +461,24 @@
             transform: translateY(-1px); /* Icon 1px höher */
             margin-top: 0 !important; /* Überschreibe allgemeine Icon-Margins */
             margin-bottom: 0 !important; /* Überschreibe allgemeine Icon-Margins */
+        }
+        /* Gleiche Ausrichtung auch für Marker-Text-Icons anwenden */
+        .progress-container .target-marker-text .variable-icon {
+            vertical-align: text-bottom;
+            align-self: center;
+            display: inline-flex;
+            align-items: center;
+            transform: translateY(-1px);
+            font-size: 1em;
+            width: 1em;
+            height: 1em;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            margin-right: 4px; /* kleiner Abstand vor Label */
+        }
+        .progress-container .target-marker-text svg[class*="fa-"] {
+            width: 1em;
+            height: 1em;
         }
         
         /* Labels in Progress-Bars: Keine störenden Margins */
@@ -938,6 +1007,14 @@
                     }, 5000);
                 }
             }
+
+            // Nach Text-Änderungen Kollisionen neu prüfen und Marker ggf. wieder einblenden
+            try {
+                const progressContainer = progressTextContainer.closest('.progress-container');
+                if (progressContainer) {
+                    updateTargetMarkerDisplay(progressContainer, variable);
+                }
+            } catch (_) {}
         }
         
         // Hilfsfunktion zur Bestimmung der Textfarbe
@@ -1556,7 +1633,24 @@
                                     variable.secondVariable.formattedValue = value;
                                 }
 
-                                // For progress bars, only the text needs updating (width is based on main rawValue)
+                                // Wenn Marker aus SecondVariable verwendet wird, spiegle minimal Updates in progressTarget
+                                try {
+                                    if (variable.displayType === 'progress' && variable.useSecondVariableAsTarget) {
+                                        variable.progressTarget = variable.progressTarget || {};
+                                        if (parameter.endsWith('_second_value')) {
+                                            variable.progressTarget.rawValue = value;
+                                        } else if (!parameter.endsWith('_second_icon')) {
+                                            // formatted text update
+                                            variable.progressTarget.formattedValue = value;
+                                        }
+                                        // label aus secondVariable übernehmen, falls vorhanden
+                                        if (variable.secondVariable && variable.secondVariable.label) {
+                                            variable.progressTarget.label = variable.secondVariable.label;
+                                        }
+                                    }
+                                } catch(_) {}
+
+                                // For progress bars, update text and marker immediately (first update), width is based on main rawValue
                                 if (variable.displayType === 'progress') {
                                     const progressContainer = document.querySelector(`.progress-container[data-variable-id="${targetVariableId}"]`);
                                     if (progressContainer) {
@@ -1564,11 +1658,14 @@
                                         if (progressTextContainer) {
                                             updateProgressText(progressTextContainer, variable);
                                         }
+                                        // Also refresh marker so changes are visible on first update
+                                        updateTargetMarkerDisplay(progressContainer, variable);
                                     }
                                 }
                             }
                             break; // handled in this branch
                         }
+                        
                         // Prüfe auf Variable-Updates (Parameter endet mit '_value')
                         if (parameter.endsWith('_value')) {
                             // Extrahiere Variable-ID aus Parameter (z.B. 'var_3_value' -> 'var_3')
@@ -1909,6 +2006,8 @@
             if (progressTextContainer) {
                 updateProgressText(progressTextContainer, variable);
             }
+            // Aktualisiere Target Marker (falls vorhanden)
+            updateTargetMarkerDisplay(progressContainer, variable);
         }
         
         // Hilfsfunktion für Progress-Text-Update
@@ -1944,7 +2043,7 @@
                 progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.formattedValue}</span>`);
             }
             
-            const progressText = progressTextParts.join(' ');
+            const progressText = progressTextParts.join('');
             
             // Aktualisiere den Haupt-Text
             const mainText = progressTextContainer.querySelector('.progress-main-text');
@@ -1980,15 +2079,182 @@
                     if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
                         secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
                     }
-                    
-                    if (secondVariableParts.length > 0) {
-                        secondVariableSpan.innerHTML = secondVariableParts.join(' ');
-                    }
                 }
             }
         }
-        
 
+        // Update or create the target marker overlay for a progress bar
+        function updateTargetMarkerDisplay(progressContainer, variable) {
+            try {
+                const tgt = variable && variable.progressTarget ? variable.progressTarget : null;
+                const hasTarget = !!(tgt && (typeof tgt.rawValue !== 'undefined' || typeof tgt.formattedValue !== 'undefined'));
+                if (!hasTarget) {
+                    const oldMarker = progressContainer.querySelector('.target-marker');
+                    const oldText = progressContainer.querySelector('.target-marker-text');
+                    if (oldMarker) oldMarker.remove();
+                    if (oldText) oldText.remove();
+                    progressContainer.style.removeProperty('--target-percent');
+                    return;
+                }
+                const minValue = parseFloat(variable.progressMin) || 0;
+                const maxValue = parseFloat(variable.progressMax) || 100;
+                const raw = parseFloat(tgt.rawValue);
+                let percent = 0;
+                const range = maxValue - minValue;
+                if (range > 0 && !isNaN(raw)) {
+                    percent = Math.max(0, Math.min(100, ((raw - minValue) / range) * 100));
+                }
+                progressContainer.style.setProperty('--target-percent', percent + '%');
+
+                let marker = progressContainer.querySelector('.target-marker');
+                if (!marker) {
+                    marker = document.createElement('div');
+                    marker.className = 'target-marker';
+                    marker.innerHTML = '<div class="soc-triangle soc-triangle-top"></div><div class="soc-triangle soc-triangle-bottom"></div>';
+                    progressContainer.appendChild(marker);
+                }
+                let textEl = progressContainer.querySelector('.target-marker-text');
+                const label = (tgt.label && String(tgt.label).trim() !== '') ? String(tgt.label) : 'Target SOC';
+                const displayVal = (typeof tgt.formattedValue !== 'undefined') ? String(tgt.formattedValue) : (isNaN(raw) ? '' : raw.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' %');
+                if (!textEl) {
+                    textEl = document.createElement('span');
+                    textEl.className = 'target-marker-text';
+                    progressContainer.appendChild(textEl);
+                }
+                // Synchronisiere Marker-Schriftgröße mit Progress-Text
+                try {
+                    // 1) CSS-Variable für globale Konsistenz
+                    if (typeof variable.fontSize === 'number' && variable.fontSize !== -1) {
+                        progressContainer.style.setProperty('--balkenschriftgroesse', variable.fontSize + 'px');
+                    } else {
+                        // Ermittele tatsächliche Schriftgröße aus dem Progress-Text
+                        const ref = progressContainer.querySelector('.progress-text .progress-main-text') || progressContainer.querySelector('.progress-text') || progressContainer;
+                        const cs = window.getComputedStyle(ref);
+                        if (cs && cs.fontSize) {
+                            progressContainer.style.setProperty('--balkenschriftgroesse', cs.fontSize);
+                            textEl.style.fontSize = cs.fontSize; // 2) Direkt setzen, falls CSS-Var überschrieben wird
+                        }
+                    }
+                } catch (_) {}
+                // Marker-Text basierend auf SecondVariable-Show-Flags zusammenstellen (falls aktiviert)
+                const inactiveOpacity = variable.progressbarInactive ? 'opacity: 0.5;' : '';
+                let markerHtml = '';
+                if (variable.useSecondVariableAsTarget && variable.secondVariable) {
+                    const parts = [];
+                    // Icon
+                    if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
+                        const iconClass = prepareIconForDisplay(variable.secondVariable.icon);
+                        if (iconClass) {
+                            parts.push(`<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
+                        }
+                    }
+                    // Label
+                    if (variable.secondVariable.showLabel && label) {
+                        const colon = variable.secondVariable.showValue ? ':&nbsp;' : '';
+                        parts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${label}${colon}</span>`);
+                    }
+                    // Value
+                    if (variable.secondVariable.showValue) {
+                        parts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayVal}</span>`);
+                    }
+                    // Fallback: wenn nichts angezeigt werden soll, dann nur Wert
+                    if (parts.length === 0) {
+                        parts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayVal}</span>`);
+                    }
+                    markerHtml = parts.join('');
+                } else {
+                    // Standard: Label: Wert
+                    markerHtml = `<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${label}:&nbsp;</span>` +
+                                 `<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayVal}</span>`;
+                }
+                textEl.innerHTML = markerHtml;
+                textEl.classList.remove('position-before-bar');
+                // Always reset to visible before re-evaluating collision
+                textEl.style.visibility = 'visible';
+                requestAnimationFrame(() => {
+                    try {
+                        const containerRect = progressContainer.getBoundingClientRect();
+                        const firstRect = textEl.getBoundingClientRect();
+                        const overflowsRight = firstRect.right > (containerRect.right - 2);
+                        let positionChanged = false;
+                        if (overflowsRight) {
+                            textEl.classList.add('position-before-bar');
+                            const markerX = containerRect.left + (containerRect.width * (percent / 100));
+                            const maxLeftWidth = Math.max(0, Math.floor(markerX - containerRect.left - 6));
+                            if (maxLeftWidth > 0) {
+                                textEl.style.maxWidth = maxLeftWidth + 'px';
+                            }
+                            positionChanged = true;
+                        } else {
+                            textEl.style.maxWidth = '';
+                        }
+                        const doOverlapCheck = () => {
+                            const textRect = textEl.getBoundingClientRect();
+                            const progressText = progressContainer.querySelector('.progress-text');
+                            const mainTextEl = progressContainer.querySelector('.progress-text .progress-main-text');
+                            // Wenn Progress-Text unsichtbar ist, nie verstecken
+                            if (!progressText) {
+                                textEl.style.visibility = 'visible';
+                                return;
+                            }
+                            const ptStyle = window.getComputedStyle(progressText);
+                            const ptRect = progressText.getBoundingClientRect();
+                            const progressTextHidden = (ptStyle.display === 'none') || (ptRect.width === 0 || ptRect.height === 0);
+                            if (progressTextHidden) {
+                                textEl.style.visibility = 'visible';
+                                return;
+                            }
+                            if (mainTextEl) {
+                                const mainRect = mainTextEl.getBoundingClientRect();
+                                const containerRect2 = progressContainer.getBoundingClientRect();
+                                const margin = 2; // px tolerance to avoid flicker
+                                // Rechte Sichtgrenze: bis zum linken Rand der SecondVariable (falls vorhanden)
+                                let rightBound = containerRect2.right;
+                                const secondEl = progressContainer.querySelector('.progress-text .progress-second-variable');
+                                if (secondEl) {
+                                    const secondRect = secondEl.getBoundingClientRect();
+                                    rightBound = Math.max(mainRect.left, secondRect.left - 8);
+                                }
+                                
+                                // WICHTIG: Prüfe gegen die tatsächlichen Kind-Elemente (SVG, spans), 
+                                // NICHT gegen mainTextEl selbst (der hat flex:1 und geht über volle Breite)
+                                const childNodes = Array.from(mainTextEl.querySelectorAll('svg, i, span, b, strong'));
+                                let contentLeft = Infinity;
+                                let contentRight = -Infinity;
+                                
+                                childNodes.forEach(node => {
+                                    const r = node.getBoundingClientRect();
+                                    if (r.width > 0 && r.height > 0) {
+                                        contentLeft = Math.min(contentLeft, r.left);
+                                        contentRight = Math.max(contentRight, r.right);
+                                    }
+                                });
+                                
+                                // Wenn keine sichtbaren Kinder gefunden: kein Text → keine Kollision
+                                if (contentLeft === Infinity || contentRight === -Infinity) {
+                                    textEl.style.visibility = 'visible';
+                                    return;
+                                }
+                                
+                                // Begrenze auf rightBound (für SecondVariable)
+                                contentRight = Math.min(contentRight, rightBound);
+                                const overlapsHorizontally = !(
+                                    (textRect.right <= (contentLeft + margin)) ||
+                                    (textRect.left >= (contentRight - margin))
+                                );
+                                textEl.style.visibility = overlapsHorizontally ? 'hidden' : 'visible';
+                            } else {
+                                textEl.style.visibility = 'visible';
+                            }
+                        };
+                        // Always one more rAF to let layout settle (after class/size changes)
+                        requestAnimationFrame(doOverlapCheck);
+                    } catch (_) {}
+                });
+            } catch (e) {
+                // ignore
+            }
+        }
 
         function renderStatus(data) {
             // Speichere den letzten Status-Payload für spätere Re-Renders (z.B. bei Asset-/Medien-Updates)
@@ -2543,6 +2809,18 @@
             updateImageVisibility();
             
             container.innerHTML = content;
+            try {
+                const allProgressContainers = container.querySelectorAll('.progress-container');
+                allProgressContainers.forEach(pc => {
+                    const varId = pc.getAttribute('data-variable-id');
+                    const v = window.variableDataCache?.[varId];
+                    if (v && v.displayType === 'progress') {
+                        updateTargetMarkerDisplay(pc, v);
+                    }
+                });
+            } catch (_) {}
+            
+            
             
             // Trigger Progress-Bar-Animation nach DOM-Update
             setTimeout(() => {
@@ -2652,11 +2930,11 @@
                         progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayValue}</span>`);
                     }
                     
-                    const progressText = progressTextParts.join(' ');
+                    const progressText = progressTextParts.join('');
                     
                     // Zweite Variable für rechte Seite vorbereiten
                     let secondVariableText = '';
-                    if (variable.secondVariable) {
+                    if (variable.secondVariable && !variable.useSecondVariableAsTarget) {
                         let secondVariableParts = [];
                         
                         // Icon für zweite Variable
@@ -2683,7 +2961,7 @@
                         }
                         
                         if (secondVariableParts.length > 0) {
-                            secondVariableText = `<span class="progress-second-variable">${secondVariableParts.join(' ')}</span>`;
+                            secondVariableText = `<span class="progress-second-variable">${secondVariableParts.join('')}</span>`;
                         }
                     }
                     
@@ -2731,10 +3009,73 @@
                         window.previousProgressWidths[variable.id] = progressValue;
                     }
                     
+                    // Target marker percent based on optional progressTarget
+                    let targetPercent = null;
+                    if (variable.progressTarget && (typeof variable.progressTarget.rawValue !== 'undefined')) {
+                        const tRaw = parseFloat(variable.progressTarget.rawValue);
+                        const tMin = parseFloat(variable.progressMin) || 0;
+                        const tMax = parseFloat(variable.progressMax) || 100;
+                        const tRange = tMax - tMin;
+                        if (tRange > 0 && !isNaN(tRaw)) {
+                            targetPercent = Math.max(0, Math.min(100, ((tRaw - tMin) / tRange) * 100));
+                        } else {
+                            targetPercent = 0;
+                        }
+                    }
+
+                    // Build optional target marker HTML
+                    let targetMarkerHtml = '';
+                    if (targetPercent !== null) {
+                        const inactiveOpacity = variable.progressbarInactive ? 'opacity: 0.5;' : '';
+                        const posClass = (targetPercent <= 50) ? 'position-before-bar' : '';
+                        const tgtLabel = (variable.progressTarget.label && String(variable.progressTarget.label).trim() !== '') ? String(variable.progressTarget.label) : 'Target SOC';
+                        const tgtText = (typeof variable.progressTarget.formattedValue !== 'undefined') ? String(variable.progressTarget.formattedValue) : '';
+                        let markerTextParts = [];
+                        if (variable.useSecondVariableAsTarget && variable.secondVariable) {
+                            // Icon
+                            if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
+                                const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
+                                if (secondIconClass) {
+                                    markerTextParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
+                                }
+                            }
+                            // Label
+                            if (variable.secondVariable.showLabel && tgtLabel) {
+                                const colon = variable.secondVariable.showValue ? ':&nbsp;' : '';
+                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${tgtLabel}${colon}</span>`);
+                            }
+                            // Value
+                            if (variable.secondVariable.showValue) {
+                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${tgtText}</span>`);
+                            }
+                            if (markerTextParts.length === 0) {
+                                // Fallback: nur Wert
+                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${tgtText}</span>`);
+                            }
+                        } else {
+                            // Fallback: Standarddarstellung Label: Value
+                            markerTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${tgtLabel}:&nbsp;</span>`);
+                            markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${tgtText}</span>`);
+                        }
+                        const markerTextHtml = markerTextParts.join('');
+                        targetMarkerHtml = `
+                            <div class="target-marker">
+                                <div class="soc-triangle soc-triangle-top"></div>
+                                <div class="soc-triangle soc-triangle-bottom"></div>
+                            </div>
+                            <span class="target-marker-text ${posClass}">${markerTextHtml}</span>
+                        `;
+                    }
+
+                    const targetPercentStyle = (targetPercent !== null) ? ` --target-percent: ${targetPercent}%;` : '';
+                    // Sync marker font-size with variable font-size via CSS var
+                    const markerFontSizeVar = (typeof variable.fontSize === 'number' && variable.fontSize !== -1) ? ` --balkenschriftgroesse: ${variable.fontSize}px;` : '';
+
                     content += `
                         <div class="variable-progress">
-                            <div class="progress-container" data-variable-id="${variable.id}" data-new-width="${progressValue}" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; --progress-bar-text-padding: ${individualPadding}px;">
+                            <div class="progress-container" data-variable-id="${variable.id}" data-new-width="${progressValue}" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; --progress-bar-text-padding: ${individualPadding}px;${targetPercentStyle}${markerFontSizeVar}">
                                 <div class="progress-bar" style="width: ${widthForDOM}%;"></div>
+                                ${targetMarkerHtml}
                                 <div class="progress-text">
                                     <span class="progress-main-text">${progressText}</span>
                                     ${secondVariableText}

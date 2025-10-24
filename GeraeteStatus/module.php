@@ -196,6 +196,8 @@ class UniversalDeviceTile extends IPSModule
         }
         return [];
     }
+
+    
     
 
     /**
@@ -303,6 +305,7 @@ class UniversalDeviceTile extends IPSModule
             $technicalGroup = $variable['Group'] ?? 'keine Gruppe';
             $displayName = $this->getGroupDisplayName($technicalGroup, $groupNames);
             $variable['GroupName'] = $displayName;
+            $variable['ObjectDisplay'] = $this->getObjectDisplayForVariableRow($variable);
         }
         
         // Finde und aktualisiere die VariablesList direkt im Form-Array
@@ -365,6 +368,43 @@ class UniversalDeviceTile extends IPSModule
         return $technicalGroup;
     }
     
+    private function getObjectDisplayForVariableRow($row)
+    {
+        $displayType = $row['DisplayType'] ?? 'text';
+        if ($displayType === 'image') {
+            $mid = intval($row['ImageMedia'] ?? 0);
+            if ($mid > 0 && IPS_MediaExists($mid)) {
+                $obj = IPS_GetObject($mid);
+                $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
+                $parentName = '';
+                if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
+                    $parent = IPS_GetObject($obj['ParentID']);
+                    $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
+                }
+                if ($name !== '' && $parentName !== '') {
+                    return $name . ' (' . $parentName . ')';
+                }
+                return $name;
+            }
+            return '';
+        }
+        $vid = intval($row['Variable'] ?? 0);
+        if ($vid > 0 && IPS_VariableExists($vid)) {
+            $obj = IPS_GetObject($vid);
+            $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
+            $parentName = '';
+            if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
+                $parent = IPS_GetObject($obj['ParentID']);
+                $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
+            }
+            if ($name !== '' && $parentName !== '') {
+                return $name . ' (' . $parentName . ')';
+            }
+            return $name;
+        }
+        return '';
+    }
+    
     public function ApplyChanges()
     {
         parent::ApplyChanges();
@@ -375,10 +415,11 @@ class UniversalDeviceTile extends IPSModule
 
         // WebHook für Bildauslieferung registrieren
         $this->RegisterUDTImageHook('/hook/udtimages/' . $this->InstanceID);
-        
+
         // Dynamische Referenzen und Nachrichten für konfigurierte Variablen
         $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         
+
         // Sammle alle Variablen-IDs
         $ids = [$this->ReadPropertyInteger('bgImage')];
         // Sammle relevante Medienobjekte für Referenzen & Nachrichten (Default + Custom Images + Hintergrund)
@@ -587,38 +628,6 @@ class UniversalDeviceTile extends IPSModule
             return;
         }
         $whId = $ids[0];
-
-        $scriptId = $this->ensureUDTImageHookScript();
-
-        $hooks = @json_decode(IPS_GetProperty($whId, 'Hooks'), true);
-        if (!is_array($hooks)) {
-            $hooks = [];
-        }
-        $found = false;
-        foreach ($hooks as &$h) {
-            if (isset($h['Hook']) && $h['Hook'] === $hookPath) {
-                $h['TargetID'] = $scriptId;
-                $found = true;
-                break;
-            }
-        }
-        if (!$found) {
-            $hooks[] = [
-                'Hook' => $hookPath,
-                'TargetID' => $scriptId
-            ];
-        }
-        IPS_SetProperty($whId, 'Hooks', json_encode($hooks));
-        IPS_ApplyChanges($whId);
-    }
-
-    private function ensureUDTImageHookScript(): int
-    {
-        $ident = 'UDTImageHookScript';
-        $sid = @IPS_GetObjectIDByIdent($ident, $this->InstanceID);
-        $assetsDir = __DIR__ . '/assets';
-        $placeholder = __DIR__ . '/../imgs/transparent.webp';
-
         $instToken = $this->ReadAttributeString('HookToken');
         if ($instToken === '') {
             try {
@@ -629,217 +638,29 @@ class UniversalDeviceTile extends IPSModule
             $this->WriteAttributeString('HookToken', $instToken);
         }
 
-        $code = sprintf(<<<'PHP'
-<?php
-if (isset($_IPS['SENDER']) && $_IPS['SENDER'] === 'WebHook') {
-    $assetsDir = '%s';
-    $placeholder = '%s';
-    $instT = '%s';
-
-    $token = isset($_GET['token']) ? (string)$_GET['token'] : '';
-    if (!is_string($token) || $token === '' || !hash_equals($instT, $token)) {
-        http_response_code(403);
-        exit;
+        $hooks = @json_decode(IPS_GetProperty($whId, 'Hooks'), true);
+        if (!is_array($hooks)) {
+            $hooks = [];
+        }
+        $found = false;
+        foreach ($hooks as &$h) {
+            if (isset($h['Hook']) && $h['Hook'] === $hookPath) {
+                $h['TargetID'] = $this->InstanceID;
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            $hooks[] = [
+                'Hook' => $hookPath,
+                'TargetID' => $this->InstanceID
+            ];
+        }
+        IPS_SetProperty($whId, 'Hooks', json_encode($hooks));
+        IPS_ApplyChanges($whId);
     }
 
-    if (function_exists('ob_get_level')) {
-        while (ob_get_level() > 0) { ob_end_clean(); }
-    }
-    header('X-Accel-Buffering: no');
-    if (function_exists('ignore_user_abort')) { ignore_user_abort(true); }
-    if (function_exists('set_time_limit')) { @set_time_limit(0); }
-
-    $MAX_SIZE = 5 * 1024 * 1024; // 5MB
-
-    $detectMime = function(string $bin) {
-        $hdr = substr($bin, 0, 12);
-        if (strncmp($hdr, "\xFF\xD8\xFF", 3) === 0) return 'image/jpeg';
-        if (strncmp($hdr, "\x89PNG\x0D\x0A\x1A\x0A", 8) === 0) return 'image/png';
-        if (strncmp($hdr, 'GIF87a', 6) === 0 || strncmp($hdr, 'GIF89a', 6) === 0) return 'image/gif';
-        if (substr($hdr, 0, 4) === 'RIFF' && substr($hdr, 8, 4) === 'WEBP') return 'image/webp';
-        if (strncmp($hdr, 'BM', 2) === 0) return 'image/bmp';
-        return 'application/octet-stream';
-    };
-
-    $sendNotModified = function(string $etag = '', int $lastMod = 0) {
-        $ifNoneMatch = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim($_SERVER['HTTP_IF_NONE_MATCH']) : '';
-        $ifModifiedSince = isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']) : 0;
-        if ($etag !== '' && $ifNoneMatch === $etag) {
-            header('ETag: ' . $etag);
-            http_response_code(304);
-            exit;
-        }
-        if ($lastMod > 0 && $ifModifiedSince && $ifModifiedSince >= $lastMod) {
-            header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $lastMod) . ' GMT');
-            http_response_code(304);
-            exit;
-        }
-    };
-
-    $streamFile = function(string $file, string $mime, bool $longCache = false) use ($MAX_SIZE, $sendNotModified) {
-        if (!is_file($file) || !is_readable($file)) {
-            http_response_code(404);
-            IPS_LogMessage('UDTImagesHook', 'File not found or unreadable: ' . $file);
-            exit;
-        }
-        $size = filesize($file);
-        if ($size === false) {
-            http_response_code(500);
-            IPS_LogMessage('UDTImagesHook', 'filesize failed: ' . $file);
-            exit;
-        }
-        if ($size > $MAX_SIZE) {
-            http_response_code(413);
-            IPS_LogMessage('UDTImagesHook', 'File too large: ' . $size);
-            exit;
-        }
-        $mtime = filemtime($file) ?: time();
-        $etag = 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
-        if ($longCache) {
-            header('Cache-Control: public, max-age=31536000, immutable');
-        } else {
-            header('Cache-Control: public, max-age=0, must-revalidate');
-        }
-        header('ETag: ' . $etag);
-        header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
-        $sendNotModified($etag, $mtime);
-        header('Content-Type: ' . $mime);
-        header('Content-Length: ' . $size);
-        $fh = fopen($file, 'rb');
-        if ($fh === false) {
-            http_response_code(500);
-            IPS_LogMessage('UDTImagesHook', 'fopen failed: ' . $file);
-            exit;
-        }
-        $chunk = 65536;
-        while (!feof($fh)) {
-            $buf = fread($fh, $chunk);
-            if ($buf === false) { break; }
-            echo $buf;
-            flush();
-        }
-        fclose($fh);
-        exit;
-    };
-
-    // Symcon Media (Bild) per ID
-    $mid = isset($_GET['mid']) ? (int)$_GET['mid'] : 0;
-    if ($mid > 0 && IPS_MediaExists($mid)) {
-        $m = IPS_GetMedia($mid);
-        if ($m['MediaType'] === MEDIATYPE_IMAGE) {
-            // Stream from file if available
-            if (!empty($m['MediaFile']) && is_file($m['MediaFile'])) {
-                $fh = fopen($m['MediaFile'], 'rb');
-                if ($fh !== false) {
-                    $hdr = fread($fh, 12);
-                    fclose($fh);
-                    $mime = $detectMime($hdr ?: '');
-                    $streamFile($m['MediaFile'], $mime, false);
-                }
-            }
-
-            // Fallback: Base64 content streaming with decode filter (chunked)
-            $b64 = IPS_GetMediaContent($mid);
-            if (!is_string($b64) || $b64 === '') {
-                http_response_code(404);
-                IPS_LogMessage('UDTImagesHook', 'Empty media content mid=' . $mid);
-                exit;
-            }
-            $prefixSample = base64_decode(substr($b64, 0, 24), true);
-            $mime = $detectMime($prefixSample ?: '');
-            $len = strlen($b64);
-            $padding = 0;
-            if ($len >= 2 && substr($b64, -2) === '==') { $padding = 2; }
-            elseif ($len >= 1 && substr($b64, -1) === '=') { $padding = 1; }
-            $decodedLen = (int)floor($len / 4) * 3 - $padding;
-            if ($decodedLen > $MAX_SIZE) {
-                http_response_code(413);
-                IPS_LogMessage('UDTImagesHook', 'Media too large mid=' . $mid . ' size=' . $decodedLen);
-                exit;
-            }
-            header('Cache-Control: no-store');
-            header('Content-Type: ' . $mime);
-            header('Content-Length: ' . max(0, $decodedLen));
-            $out = fopen('php://output', 'wb');
-            if ($out === false) {
-                http_response_code(500);
-                IPS_LogMessage('UDTImagesHook', 'open php://output failed');
-                exit;
-            }
-            $filter = stream_filter_append($out, 'convert.base64-decode', STREAM_FILTER_WRITE);
-            $buffer = '';
-            $chunkSize = 65536;
-            for ($i = 0; $i < $len; $i += $chunkSize) {
-                $chunk = substr($b64, $i, $chunkSize);
-                $buffer .= $chunk;
-                $toWrite = strlen($buffer) - (strlen($buffer) %% 4);
-                if ($toWrite > 0) {
-                    fwrite($out, substr($buffer, 0, $toWrite));
-                    $buffer = substr($buffer, $toWrite);
-                    flush();
-                }
-            }
-            if ($buffer !== '') {
-                fwrite($out, $buffer);
-            }
-            if (is_resource($filter)) { stream_filter_remove($filter); }
-            fclose($out);
-            exit;
-        }
-    }
-
-    // Asset aus Modul-Ordner ausliefern
-    $asset = isset($_GET['asset']) ? preg_replace('/[^a-z0-9_\-]/i', '', (string)$_GET['asset']) : '';
-    if ($asset !== '') {
-        $candidates = [
-            $assetsDir . '/' . $asset . '.webp',
-            $assetsDir . '/' . $asset . '.png',
-            $assetsDir . '/' . $asset . '.jpg',
-            $assetsDir . '/' . $asset . '.jpeg',
-            $assetsDir . '/' . $asset . '.gif',
-        ];
-        foreach ($candidates as $file) {
-            if (is_file($file)) {
-                $fh = fopen($file, 'rb');
-                if ($fh === false) { continue; }
-                $hdr = fread($fh, 12);
-                fclose($fh);
-                $mime = $detectMime($hdr ?: '');
-                $streamFile($file, $mime, true);
-            }
-        }
-    }
-
-    // Placeholder
-    if (isset($_GET['placeholder']) && is_file($placeholder)) {
-        $fh = fopen($placeholder, 'rb');
-        if ($fh !== false) { $hdr = fread($fh, 12); fclose($fh); }
-        $mime = $detectMime(isset($hdr) ? $hdr : '');
-        $streamFile($placeholder, $mime, true);
-    }
-
-    http_response_code(404);
-    IPS_LogMessage('UDTImagesHook', 'Not found');
-    exit;
-}
-PHP,
-        addslashes($assetsDir),
-        addslashes($placeholder),
-        addslashes($instToken)
-        );
-
-        if ($sid && @IPS_ObjectExists($sid)) {
-            IPS_SetScriptContent($sid, $code);
-            return $sid;
-        }
-        $sid = IPS_CreateScript(0);
-        IPS_SetName($sid, 'UDT Images WebHook');
-        IPS_SetParent($sid, $this->InstanceID);
-        IPS_SetIdent($sid, $ident);
-        IPS_SetHidden($sid, true);
-        IPS_SetScriptContent($sid, $code);
-        return $sid;
-    }
+    
 
     private function BuildImageHookUrl(int $mediaId): string
     {
@@ -868,12 +689,185 @@ PHP,
         return $base . '?' . $q;
     }
 
+    protected function ProcessHookData()
+    {
+        $assetsDir = __DIR__ . '/assets';
+        $placeholder = __DIR__ . '/../imgs/transparent.webp';
+        $instT = $this->ReadAttributeString('HookToken');
+        $token = isset($_GET['token']) ? (string)$_GET['token'] : '';
+        if (!is_string($token) || $token === '' || $instT === '' || !hash_equals($instT, $token)) {
+            http_response_code(403);
+            return;
+        }
+        if (function_exists('ob_get_level')) {
+            while (ob_get_level() > 0) { ob_end_clean(); }
+        }
+        header('X-Accel-Buffering: no');
+        if (function_exists('ignore_user_abort')) { ignore_user_abort(true); }
+        if (function_exists('set_time_limit')) { @set_time_limit(0); }
+        $MAX_SIZE = 5 * 1024 * 1024;
+        $detectMime = function(string $bin) {
+            $hdr = substr($bin, 0, 12);
+            if (strncmp($hdr, "\xFF\xD8\xFF", 3) === 0) return 'image/jpeg';
+            if (strncmp($hdr, "\x89PNG\x0D\x0A\x1A\x0A", 8) === 0) return 'image/png';
+            if (strncmp($hdr, 'GIF87a', 6) === 0 || strncmp($hdr, 'GIF89a', 6) === 0) return 'image/gif';
+            if (substr($hdr, 0, 4) === 'RIFF' && substr($hdr, 8, 4) === 'WEBP') return 'image/webp';
+            if (strncmp($hdr, 'BM', 2) === 0) return 'image/bmp';
+            return 'application/octet-stream';
+        };
+        $sendNotModified = function(string $etag = '', int $lastMod = 0) {
+            $ifNoneMatch = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim($_SERVER['HTTP_IF_NONE_MATCH']) : '';
+            $ifModifiedSince = isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']) : 0;
+            if ($etag !== '' && $ifNoneMatch === $etag) {
+                header('ETag: ' . $etag);
+                http_response_code(304);
+                exit;
+            }
+            if ($lastMod > 0 && $ifModifiedSince && $ifModifiedSince >= $lastMod) {
+                header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $lastMod) . ' GMT');
+                http_response_code(304);
+                exit;
+            }
+        };
+        $streamFile = function(string $file, string $mime, bool $longCache = false) use ($MAX_SIZE, $sendNotModified) {
+            if (!is_file($file) || !is_readable($file)) {
+                http_response_code(404);
+                IPS_LogMessage('UDTImagesHook', 'File not found or unreadable: ' . $file);
+                exit;
+            }
+            $size = filesize($file);
+            if ($size === false) {
+                http_response_code(500);
+                IPS_LogMessage('UDTImagesHook', 'filesize failed: ' . $file);
+                exit;
+            }
+            if ($size > $MAX_SIZE) {
+                http_response_code(413);
+                IPS_LogMessage('UDTImagesHook', 'File too large: ' . $size);
+                exit;
+            }
+            $mtime = filemtime($file) ?: time();
+            $etag = 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
+            if ($longCache) {
+                header('Cache-Control: public, max-age=31536000, immutable');
+            } else {
+                header('Cache-Control: public, max-age=0, must-revalidate');
+            }
+            header('ETag: ' . $etag);
+            header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
+            $sendNotModified($etag, $mtime);
+            header('Content-Type: ' . $mime);
+            header('Content-Length: ' . $size);
+            $fh = fopen($file, 'rb');
+            if ($fh === false) {
+                http_response_code(500);
+                IPS_LogMessage('UDTImagesHook', 'fopen failed: ' . $file);
+                exit;
+            }
+            $chunk = 65536;
+            while (!feof($fh)) {
+                $buf = fread($fh, $chunk);
+                if ($buf === false) { break; }
+                echo $buf;
+                flush();
+            }
+            fclose($fh);
+            exit;
+        };
+        $mid = isset($_GET['mid']) ? (int)$_GET['mid'] : 0;
+        if ($mid > 0 && IPS_MediaExists($mid)) {
+            $m = IPS_GetMedia($mid);
+            if ($m['MediaType'] === MEDIATYPE_IMAGE) {
+                if (!empty($m['MediaFile']) && is_file($m['MediaFile'])) {
+                    $fh = fopen($m['MediaFile'], 'rb');
+                    if ($fh !== false) {
+                        $hdr = fread($fh, 12);
+                        fclose($fh);
+                        $mime = $detectMime($hdr ?: '');
+                        $streamFile($m['MediaFile'], $mime, false);
+                    }
+                }
+                $b64 = IPS_GetMediaContent($mid);
+                if (!is_string($b64) || $b64 === '') {
+                    http_response_code(404);
+                    IPS_LogMessage('UDTImagesHook', 'Empty media content mid=' . $mid);
+                    return;
+                }
+                $prefixSample = base64_decode(substr($b64, 0, 24), true);
+                $mime = $detectMime($prefixSample ?: '');
+                $len = strlen($b64);
+                $padding = 0;
+                if ($len >= 2 && substr($b64, -2) === '==') { $padding = 2; }
+                elseif ($len >= 1 && substr($b64, -1) === '=') { $padding = 1; }
+                $decodedLen = (int)floor($len / 4) * 3 - $padding;
+                if ($decodedLen > $MAX_SIZE) {
+                    http_response_code(413);
+                    IPS_LogMessage('UDTImagesHook', 'Media too large mid=' . $mid . ' size=' . $decodedLen);
+                    return;
+                }
+                header('Cache-Control: no-store');
+                header('Content-Type: ' . $mime);
+                header('Content-Length: ' . max(0, $decodedLen));
+                $out = fopen('php://output', 'wb');
+                if ($out === false) {
+                    http_response_code(500);
+                    IPS_LogMessage('UDTImagesHook', 'open php://output failed');
+                    return;
+                }
+                $filter = stream_filter_append($out, 'convert.base64-decode', STREAM_FILTER_WRITE);
+                $buffer = '';
+                $chunkSize = 65536;
+                for ($i = 0; $i < $len; $i += $chunkSize) {
+                    $chunk = substr($b64, $i, $chunkSize);
+                    $buffer .= $chunk;
+                    $toWrite = strlen($buffer) - (strlen($buffer) % 4);
+                    if ($toWrite > 0) {
+                        fwrite($out, substr($buffer, 0, $toWrite));
+                        $buffer = substr($buffer, $toWrite);
+                        flush();
+                    }
+                }
+                if ($buffer !== '') {
+                    fwrite($out, $buffer);
+                }
+                if (is_resource($filter)) { stream_filter_remove($filter); }
+                fclose($out);
+                return;
+            }
+        }
+        $asset = isset($_GET['asset']) ? preg_replace('/[^a-z0-9_\-]/i', '', (string)$_GET['asset']) : '';
+        if ($asset !== '') {
+            $candidates = [
+                $assetsDir . '/' . $asset . '.webp',
+                $assetsDir . '/' . $asset . '.png',
+                $assetsDir . '/' . $asset . '.jpg',
+                $assetsDir . '/' . $asset . '.jpeg',
+                $assetsDir . '/' . $asset . '.gif',
+            ];
+            foreach ($candidates as $file) {
+                if (is_file($file)) {
+                    $fh = fopen($file, 'rb');
+                    if ($fh === false) { continue; }
+                    $hdr = fread($fh, 12);
+                    fclose($fh);
+                    $mime = $detectMime($hdr ?: '');
+                    $streamFile($file, $mime, true);
+                }
+            }
+        }
+        if (isset($_GET['placeholder']) && is_file($placeholder)) {
+            $fh = fopen($placeholder, 'rb');
+            if ($fh !== false) { $hdr = fread($fh, 12); fclose($fh); }
+            $mime = $detectMime(isset($hdr) ? $hdr : '');
+            $streamFile($placeholder, $mime, true);
+        }
+        http_response_code(404);
+        IPS_LogMessage('UDTImagesHook', 'Not found');
+    }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
-        
-        
-        // Verarbeitung der Status-Variable
+        // ...
         $statusId = $this->ReadPropertyInteger('Status');
         if ($statusId > 0 && $SenderID === $statusId) {
             switch ($Message) {
@@ -955,6 +949,7 @@ PHP,
                             break;
                     }
                 }
+                
             }
         }
 
@@ -1572,6 +1567,7 @@ PHP,
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
                         'progressbarInactive' => !$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress', // 50% Transparenz Flag
+                        'useSecondVariableAsTarget' => (bool)($variable['UseSecondVariableAsTarget'] ?? false),
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
                         'scriptId' => intval($variable['ScriptID'] ?? 0),
                     ];
@@ -1586,6 +1582,10 @@ PHP,
                         $variableData['imageBorderRadius'] = intval($variable['ImageBorderRadius'] ?? 6);
                     }
                     
+                    // Vorbereitung für SecondVariable als Marker
+                    $useSecondAsTarget = !empty($variable['UseSecondVariableAsTarget']);
+                    $secondPresent = false; $secondId = 0; $secondLabel = ''; $secondFinalRawValue = 0; $secondFinalFormattedValue = '';
+
                     // Zweite Variable für Progress-Bars hinzufügen
                     if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0 && IPS_VariableExists($variable['SecondVariable'])) {
                         // Icon für zweite Variable ermitteln
@@ -1625,8 +1625,23 @@ PHP,
                             'showLabel' => $variable['SecondVariableShowLabel'] ?? true,
                             'showValue' => $variable['SecondVariableShowValue'] ?? true
                         ];
+
+                        // Für Marker-Nutzung merken
+                        $secondPresent = true;
+                        $secondId = (int)$variable['SecondVariable'];
+                        // Werte bereits in $secondFinal* enthalten
                     }
-                    
+                    // Marker nur aus SecondVariable, wenn konfiguriert
+                    if (($variable['DisplayType'] ?? 'text') === 'progress') {
+                        if ($useSecondAsTarget && $secondPresent) {
+                            $variableData['progressTarget'] = [
+                                'id' => $secondId,
+                                'label' => $secondLabel,
+                                'formattedValue' => $secondFinalFormattedValue,
+                                'rawValue' => $secondFinalRawValue
+                            ];
+                        }
+                    }
                     // Spezielle Behandlung für Zeitwerte entfernt (nicht verwendet)
                     
                     $variables[] = $variableData;
@@ -1928,6 +1943,8 @@ PHP,
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
                 // Button-Felder ausblenden
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
                 $this->UpdateFormField('boolButtonColor', 'visible', false);
@@ -1963,6 +1980,8 @@ PHP,
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
 
                 // Button-Felder ausblenden
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
@@ -1999,6 +2018,8 @@ PHP,
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', true);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', true);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', true);
+                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', true);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', true);
                 // Button-Felder ausblenden
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
                 $this->UpdateFormField('boolButtonColor', 'visible', false);
@@ -2038,6 +2059,7 @@ PHP,
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
 
                 // Image-Felder ausblenden
                 $this->UpdateFormField('ImageMedia', 'visible', false);
@@ -2065,6 +2087,7 @@ PHP,
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
                 $this->UpdateFormField('boolButtonColor', 'visible', false);
                 $this->UpdateFormField('ImageMedia', 'visible', false);
