@@ -837,21 +837,32 @@ class UniversalDeviceTile extends IPSModule
         }
         $asset = isset($_GET['asset']) ? preg_replace('/[^a-z0-9_\-]/i', '', (string)$_GET['asset']) : '';
         if ($asset !== '') {
-            $candidates = [
-                $assetsDir . '/' . $asset . '.webp',
-                $assetsDir . '/' . $asset . '.png',
-                $assetsDir . '/' . $asset . '.jpg',
-                $assetsDir . '/' . $asset . '.jpeg',
-                $assetsDir . '/' . $asset . '.gif',
-            ];
-            foreach ($candidates as $file) {
-                if (is_file($file)) {
-                    $fh = fopen($file, 'rb');
-                    if ($fh === false) { continue; }
-                    $hdr = fread($fh, 12);
-                    fclose($fh);
-                    $mime = $detectMime($hdr ?: '');
-                    $streamFile($file, $mime, true);
+            // Support aliasing for legacy/localized filenames
+            // dryer_on  -> trockner_an
+            // dryer_off -> trockner_aus
+            $namesToTry = [$asset];
+            if ($asset === 'dryer_on') {
+                $namesToTry[] = 'trockner_an';
+            } elseif ($asset === 'dryer_off') {
+                $namesToTry[] = 'trockner_aus';
+            }
+            foreach ($namesToTry as $name) {
+                $candidates = [
+                    $assetsDir . '/' . $name . '.webp',
+                    $assetsDir . '/' . $name . '.png',
+                    $assetsDir . '/' . $name . '.jpg',
+                    $assetsDir . '/' . $name . '.jpeg',
+                    $assetsDir . '/' . $name . '.gif',
+                ];
+                foreach ($candidates as $file) {
+                    if (is_file($file)) {
+                        $fh = fopen($file, 'rb');
+                        if ($fh === false) { continue; }
+                        $hdr = fread($fh, 12);
+                        fclose($fh);
+                        $mime = $detectMime($hdr ?: '');
+                        $streamFile($file, $mime, true);
+                    }
                 }
             }
         }
