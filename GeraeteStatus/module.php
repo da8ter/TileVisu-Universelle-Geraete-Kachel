@@ -2969,6 +2969,18 @@ class UniversalDeviceTile extends IPSModule
             $customPresentation = $variable['VariablePresentation'];
         }
         
+        // Sonderfall: VARIABLE_PRESENTATION_LEGACY -> Profil verwenden, Präsentation ignorieren
+        // GUID: {4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C}
+        if (is_array($customPresentation) && isset($customPresentation['PRESENTATION'])) {
+            $legacyGuid = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
+            $presentGuidRaw = (string)$customPresentation['PRESENTATION'];
+            $presentGuidTrim = trim($presentGuidRaw, "{} ");
+            if (strcasecmp($presentGuidTrim, $legacyGuid) === 0) {
+                // Präsentation als nicht vorhanden behandeln, damit Profil greift
+                $customPresentation = [];
+            }
+        }
+        
         // Bestimme den Gruppennamen für FALL 4 basierend auf Variablentyp
         $groupName = ($expectedVariableType === VARIABLETYPE_INTEGER) ? 'Numeric' : 
                      (($expectedVariableType === VARIABLETYPE_BOOLEAN) ? 'Boolean' : 'String');
