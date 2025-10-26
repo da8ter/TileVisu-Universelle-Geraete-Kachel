@@ -2961,13 +2961,22 @@ class UniversalDeviceTile extends IPSModule
             return null;
         }
         
+        // Präsentation früh bestimmen (Custom bevorzugt, sonst Standard)
+        $customPresentation = [];
+        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
+            $customPresentation = $variable['VariableCustomPresentation'];
+        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
+            $customPresentation = $variable['VariablePresentation'];
+        }
+        
         // Bestimme den Gruppennamen für FALL 4 basierend auf Variablentyp
         $groupName = ($expectedVariableType === VARIABLETYPE_INTEGER) ? 'Numeric' : 
                      (($expectedVariableType === VARIABLETYPE_BOOLEAN) ? 'Boolean' : 'String');
         
         // **FALL 1: Alte Variablenprofile**
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-        if (!empty($profile) && IPS_VariableProfileExists($profile)) {
+        // Wenn sowohl Profil als auch Präsentation vorhanden sind, bevorzugen wir die Präsentation
+        if (!empty($profile) && IPS_VariableProfileExists($profile) && empty($customPresentation)) {
             $profileData = IPS_GetVariableProfile($profile);
             
             if (isset($profileData['Associations']) && is_array($profileData['Associations'])) {
@@ -3047,7 +3056,7 @@ class UniversalDeviceTile extends IPSModule
             $params = null;
             
             // Prüfe zuerst auf direktes VariableProfile
-            if (isset($variable['VariableProfile']) && !empty($variable['VariableProfile'])) {
+            if (empty($customPresentation) && isset($variable['VariableProfile']) && !empty($variable['VariableProfile'])) {
                 $profileName = $variable['VariableProfile'];
                 $profile = @IPS_GetVariableProfile($profileName);
                 if ($profile !== false && isset($profile['Associations'])) {
