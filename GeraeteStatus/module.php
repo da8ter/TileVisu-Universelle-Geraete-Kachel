@@ -2121,8 +2121,22 @@ class UniversalDeviceTile extends IPSModule
             return 'Transparent'; // Fallback bei Fehler
         }
         
+        // Prüfe auf Legacy-Präsentation (GUID) und merke Flag
+        $legacyGuid = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
+        $isLegacyPresentation = false;
+        $presentationArr = [];
+        if (!empty($variable['VariableCustomPresentation'])) {
+            $presentationArr = $variable['VariableCustomPresentation'];
+        } elseif (!empty($variable['VariablePresentation'])) {
+            $presentationArr = $variable['VariablePresentation'];
+        }
+        if (is_array($presentationArr) && isset($presentationArr['PRESENTATION'])) {
+            $presentGuidTrim = trim((string)$presentationArr['PRESENTATION'], '{} ');
+            $isLegacyPresentation = (strcasecmp($presentGuidTrim, $legacyGuid) === 0);
+        }
+        
         // Prüfe VariableCustomPresentation für Icon
-        if ($icon == "" && !empty($variable['VariableCustomPresentation'])) {
+        if ($icon == "" && !empty($variable['VariableCustomPresentation']) && !$isLegacyPresentation) {
             $customPresentation = $variable['VariableCustomPresentation'];
             
             // Zuerst nach direktem Icon suchen (Standard-Icon)
@@ -2406,7 +2420,7 @@ class UniversalDeviceTile extends IPSModule
         // Schließe VariableCustomPresentation if-Block (Zeile 1110)
         
         // Wenn noch kein Icon gefunden wurde, prüfe Darstellung/Visualisierung und Profile
-        if ($icon == "") {
+        if ($icon == "" && !$isLegacyPresentation) {
             // Zuerst prüfen ob die Variable eine neue Darstellung/Visualisierung hat
             if (function_exists('IPS_GetVariableVisualization')) {
                 try {
@@ -2546,6 +2560,35 @@ class UniversalDeviceTile extends IPSModule
             }
         }
         
+        // Letzter, allgemeiner Fallback auf klassische Profile – auch wenn zuvor "Transparent" gesetzt wurde
+        // Unterstützt zusätzlich das Profil aus PRESENTATION ([PROFILE]) falls VariableProfile leer ist
+        if ($icon === '' || $icon === 'Transparent') {
+            $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+            if (empty($profile)) {
+                $pres1 = (isset($variable['VariableCustomPresentation']) && is_array($variable['VariableCustomPresentation'])) ? $variable['VariableCustomPresentation'] : [];
+                $pres2 = (isset($variable['VariablePresentation']) && is_array($variable['VariablePresentation'])) ? $variable['VariablePresentation'] : [];
+                if (isset($pres1['PROFILE']) && !empty($pres1['PROFILE'])) {
+                    $profile = $pres1['PROFILE'];
+                } elseif (isset($pres2['PROFILE']) && !empty($pres2['PROFILE'])) {
+                    $profile = $pres2['PROFILE'];
+                }
+            }
+            if (!empty($profile) && IPS_VariableProfileExists($profile)) {
+                $p = IPS_GetVariableProfile($profile);
+                if (isset($p['Associations']) && is_array($p['Associations'])) {
+                    foreach ($p['Associations'] as $association) {
+                        if (isset($association['Value']) && isset($association['Icon']) && $association['Icon'] !== '' && $association['Value'] == $Value) {
+                            $icon = $association['Icon'];
+                            break;
+                        }
+                    }
+                }
+                if (($icon === '' || $icon === 'Transparent') && isset($p['Icon']) && $p['Icon'] !== '') {
+                    $icon = $p['Icon'];
+                }
+            }
+        }
+
         // Icon-Mapping zu FontAwesome durchführen
         $mappedIcon = $this->MapIconToFontAwesome($icon);
         
