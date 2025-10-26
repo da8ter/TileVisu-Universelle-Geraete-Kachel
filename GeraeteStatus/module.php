@@ -100,6 +100,8 @@ class UniversalDeviceTile extends IPSModule
 
         // Visualisierungstyp auf 1 setzen, da wir HTML anbieten möchten
         $this->SetVisualizationType(1);
+
+        $this->RegisterAttributeString('HookToken', '');
         
         // Lade das Icon-Mapping
         $this->LoadIconMapping();
@@ -194,6 +196,8 @@ class UniversalDeviceTile extends IPSModule
         }
         return [];
     }
+
+    
     
 
     /**
@@ -301,6 +305,7 @@ class UniversalDeviceTile extends IPSModule
             $technicalGroup = $variable['Group'] ?? 'keine Gruppe';
             $displayName = $this->getGroupDisplayName($technicalGroup, $groupNames);
             $variable['GroupName'] = $displayName;
+            $variable['ObjectDisplay'] = $this->getObjectDisplayForVariableRow($variable);
         }
         
         // Finde und aktualisiere die VariablesList direkt im Form-Array
@@ -363,6 +368,43 @@ class UniversalDeviceTile extends IPSModule
         return $technicalGroup;
     }
     
+    private function getObjectDisplayForVariableRow($row)
+    {
+        $displayType = $row['DisplayType'] ?? 'text';
+        if ($displayType === 'image') {
+            $mid = intval($row['ImageMedia'] ?? 0);
+            if ($mid > 0 && IPS_MediaExists($mid)) {
+                $obj = IPS_GetObject($mid);
+                $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
+                $parentName = '';
+                if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
+                    $parent = IPS_GetObject($obj['ParentID']);
+                    $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
+                }
+                if ($name !== '' && $parentName !== '') {
+                    return $name . ' (' . $parentName . ')';
+                }
+                return $name;
+            }
+            return '';
+        }
+        $vid = intval($row['Variable'] ?? 0);
+        if ($vid > 0 && IPS_VariableExists($vid)) {
+            $obj = IPS_GetObject($vid);
+            $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
+            $parentName = '';
+            if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
+                $parent = IPS_GetObject($obj['ParentID']);
+                $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
+            }
+            if ($name !== '' && $parentName !== '') {
+                return $name . ' (' . $parentName . ')';
+            }
+            return $name;
+        }
+        return '';
+    }
+    
     public function ApplyChanges()
     {
         parent::ApplyChanges();
@@ -370,10 +412,14 @@ class UniversalDeviceTile extends IPSModule
         
         // Stelle sicher, dass das Icon-Mapping geladen ist
         $this->LoadIconMapping();
-        
+
+        // WebHook für Bildauslieferung registrieren
+        $this->RegisterUDTImageHook('/hook/udtimages/' . $this->InstanceID);
+
         // Dynamische Referenzen und Nachrichten für konfigurierte Variablen
         $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
         
+
         // Sammle alle Variablen-IDs
         $ids = [$this->ReadPropertyInteger('bgImage')];
         // Sammle relevante Medienobjekte für Referenzen & Nachrichten (Default + Custom Images + Hintergrund)
@@ -411,33 +457,6 @@ class UniversalDeviceTile extends IPSModule
             $mediaIds[] = $defaultImageId;
         }
 
-        // Custom Images aus ProfilAssoziazionen einsammeln
-        $profilAssoziazionen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-        $neededAssets = [];
-        
-        if (is_array($profilAssoziazionen)) {
-            foreach ($profilAssoziazionen as $assoziation) {
-                $bildauswahl = $assoziation['Bildauswahl'] ?? 'none';
-                
-                if ($bildauswahl === 'custom' && !empty($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
-                    // Custom Images
-                    $mediaId = $assoziation['EigenesBild'];
-                    if (IPS_MediaExists($mediaId)) {
-                        $media = IPS_GetMedia($mediaId);
-                        if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                            $imageFile = explode('.', $media['MediaFile']);
-                            $imageContent = $this->GetImageDataUri(end($imageFile));
-                            if ($imageContent) {
-                                $neededAssets['img_custom_' . $mediaId] = $imageContent . IPS_GetMediaContent($mediaId);
-                            }
-                        }
-                    }
-                } elseif (in_array($bildauswahl, ['wm_an', 'wm_aus', 'dryer_on', 'dryer_off'])) {
-                    // Sammle benötigte vorkonfigurierte Assets
-                    $neededAssets[$bildauswahl] = true;
-                }
-            }
-        }
         
         // Entferne alle alten Referenzen
         $refs = $this->GetReferenceList();
@@ -570,94 +589,296 @@ class UniversalDeviceTile extends IPSModule
         
         // Sammle alle benötigten Assets basierend auf ProfilAssoziazionen
         $profilAssoziazionen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-        $neededAssets = [];
-        
         if (is_array($profilAssoziazionen)) {
             foreach ($profilAssoziazionen as $assoziation) {
                 $bildauswahl = $assoziation['Bildauswahl'] ?? 'none';
                 
                 if ($bildauswahl === 'custom' && isset($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
-                    // Custom Images
-                    $mediaId = $assoziation['EigenesBild'];
-                    if (IPS_MediaExists($mediaId)) {
-                        $media = IPS_GetMedia($mediaId);
-                        if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                            $imageFile = explode('.', $media['MediaFile']);
-                            $imageContent = $this->GetImageDataUri(end($imageFile));
-                            if ($imageContent) {
-                                $assets['img_custom_' . $mediaId] = $imageContent . IPS_GetMediaContent($mediaId);
-                            }
-                        }
+                    $mediaId = (int)$assoziation['EigenesBild'];
+                    if ($mediaId > 0 && IPS_MediaExists($mediaId)) {
+                        $assets['img_custom_' . $mediaId] = $this->BuildImageHookUrl($mediaId);
                     }
                 } elseif (in_array($bildauswahl, ['wm_an', 'wm_aus', 'dryer_on', 'dryer_off'])) {
-                    // Sammle benötigte vorkonfigurierte Assets
-                    $neededAssets[$bildauswahl] = true;
+                    $assets['img_' . $bildauswahl] = $this->BuildAssetHookUrl($bildauswahl);
                 }
             }
         }
-        
-        // Lade die benötigten vorkonfigurierten Assets
-        foreach ($neededAssets as $assetName => $needed) {
-            switch ($assetName) {
-                case 'wm_an':
-                    $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp'));
-                    break;
-                case 'wm_aus':
-                    $assets['img_wm_aus'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp'));
-                    break;
-                case 'dryer_on':
-                    $assets['img_dryer_on'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_an.webp'));
-                    break;
-                case 'dryer_off':
-                    $assets['img_dryer_off'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_aus.webp'));
-                    break;
-            }
-        }
-        
-        // Standard-Bild laden wenn konfiguriert (für Fallback-Zwecke)
+        // Standard-Bild optional als Hook-URL mappen (nur für Konsistenz, Status nutzt ohnehin statusImageUrl)
         $defaultImageId = $this->ReadPropertyInteger('DefaultImage');
         if ($defaultImageId > 0 && IPS_MediaExists($defaultImageId)) {
-            $media = IPS_GetMedia($defaultImageId);
-            if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                $imageFile = explode('.', $media['MediaFile']);
-                $imageContent = $this->GetImageDataUri(end($imageFile));
-                if ($imageContent) {
-                    $assets['img_default_' . $defaultImageId] = $imageContent . IPS_GetMediaContent($defaultImageId);
-                }
-            }
+            $assets['img_default_' . $defaultImageId] = $this->BuildImageHookUrl($defaultImageId);
         }
-        
-        // Transparentes Platzhalter-Bild wird jetzt inline im Frontend als Data URI verwendet
-        
+
         // Fallback: Wenn keine Statusvariable konfiguriert ist und noch kein img_wm_an Asset vorhanden, 
-        // lade Standard-Waschmaschinen-Asset als Fallback
+        // mappe Standard-Waschmaschinen-Asset als Fallback (WebHook)
         if ($needsFallbackAssets && !isset($assets['img_wm_an'])) {
-            $assets['img_wm_an'] = 'data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp'));
+            $assets['img_wm_an'] = $this->BuildAssetHookUrl('wm_an');
         }
         
         
         return $assets;
     }
-    
-    // Hilfsmethode für Data URI basierend auf Dateierweiterung
-    private function GetImageDataUri($extension) {
-        switch (strtolower($extension)) {
-            case 'bmp': return 'data:image/bmp;base64,';
-            case 'jpg':
-            case 'jpeg': return 'data:image/jpeg;base64,';
-            case 'gif': return 'data:image/gif;base64,';
-            case 'png': return 'data:image/png;base64,';
-            case 'ico': return 'data:image/x-icon;base64,';
-            case 'webp': return 'data:image/webp;base64,';
-            default: return null;
+
+    private function RegisterUDTImageHook(string $hookPath): void
+    {
+        $webhookModuleId = '{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}';
+        $ids = @IPS_GetInstanceListByModuleID($webhookModuleId);
+        if (!is_array($ids) || count($ids) === 0) {
+            $this->LogMessage('WebHook Control not found. Skipping hook registration.', KL_WARNING);
+            return;
         }
+        $whId = $ids[0];
+        $instToken = $this->ReadAttributeString('HookToken');
+        if ($instToken === '') {
+            try {
+                $instToken = bin2hex(random_bytes(16));
+            } catch (Throwable $e) {
+                $instToken = substr(sha1(uniqid('', true)), 0, 32);
+            }
+            $this->WriteAttributeString('HookToken', $instToken);
+        }
+
+        $hooks = @json_decode(IPS_GetProperty($whId, 'Hooks'), true);
+        if (!is_array($hooks)) {
+            $hooks = [];
+        }
+        $found = false;
+        foreach ($hooks as &$h) {
+            if (isset($h['Hook']) && $h['Hook'] === $hookPath) {
+                $h['TargetID'] = $this->InstanceID;
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            $hooks[] = [
+                'Hook' => $hookPath,
+                'TargetID' => $this->InstanceID
+            ];
+        }
+        IPS_SetProperty($whId, 'Hooks', json_encode($hooks));
+        IPS_ApplyChanges($whId);
+    }
+
+    
+
+    private function BuildImageHookUrl(int $mediaId): string
+    {
+        $base = '/hook/udtimages/' . $this->InstanceID;
+        $token = $this->ReadAttributeString('HookToken');
+        if ($mediaId > 0) {
+            $q = 'mid=' . (int)$mediaId;
+        } else {
+            $q = 'placeholder=1&ts=' . time();
+        }
+        if ($token !== '') {
+            $q .= '&token=' . rawurlencode($token);
+        }
+        return $base . '?' . $q;
+    }
+
+    private function BuildAssetHookUrl(string $name): string
+    {
+        $safe = preg_replace('/[^a-z0-9_\-]/i', '', $name);
+        $token = $this->ReadAttributeString('HookToken');
+        $base = '/hook/udtimages/' . $this->InstanceID;
+        $q = 'asset=' . $safe;
+        if ($token !== '') {
+            $q .= '&token=' . rawurlencode($token);
+        }
+        return $base . '?' . $q;
+    }
+
+    protected function ProcessHookData()
+    {
+        $assetsDir = __DIR__ . '/assets';
+        $placeholder = __DIR__ . '/../imgs/transparent.webp';
+        $instT = $this->ReadAttributeString('HookToken');
+        $token = isset($_GET['token']) ? (string)$_GET['token'] : '';
+        if (!is_string($token) || $token === '' || $instT === '' || !hash_equals($instT, $token)) {
+            http_response_code(403);
+            return;
+        }
+        if (function_exists('ob_get_level')) {
+            while (ob_get_level() > 0) { ob_end_clean(); }
+        }
+        header('X-Accel-Buffering: no');
+        if (function_exists('ignore_user_abort')) { ignore_user_abort(true); }
+        if (function_exists('set_time_limit')) { @set_time_limit(0); }
+        $MAX_SIZE = 5 * 1024 * 1024;
+        $detectMime = function(string $bin) {
+            $hdr = substr($bin, 0, 12);
+            if (strncmp($hdr, "\xFF\xD8\xFF", 3) === 0) return 'image/jpeg';
+            if (strncmp($hdr, "\x89PNG\x0D\x0A\x1A\x0A", 8) === 0) return 'image/png';
+            if (strncmp($hdr, 'GIF87a', 6) === 0 || strncmp($hdr, 'GIF89a', 6) === 0) return 'image/gif';
+            if (substr($hdr, 0, 4) === 'RIFF' && substr($hdr, 8, 4) === 'WEBP') return 'image/webp';
+            if (strncmp($hdr, 'BM', 2) === 0) return 'image/bmp';
+            return 'application/octet-stream';
+        };
+        $sendNotModified = function(string $etag = '', int $lastMod = 0) {
+            $ifNoneMatch = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim($_SERVER['HTTP_IF_NONE_MATCH']) : '';
+            $ifModifiedSince = isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']) : 0;
+            if ($etag !== '' && $ifNoneMatch === $etag) {
+                header('ETag: ' . $etag);
+                http_response_code(304);
+                exit;
+            }
+            if ($lastMod > 0 && $ifModifiedSince && $ifModifiedSince >= $lastMod) {
+                header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $lastMod) . ' GMT');
+                http_response_code(304);
+                exit;
+            }
+        };
+        $streamFile = function(string $file, string $mime, bool $longCache = false) use ($MAX_SIZE, $sendNotModified) {
+            if (!is_file($file) || !is_readable($file)) {
+                http_response_code(404);
+                IPS_LogMessage('UDTImagesHook', 'File not found or unreadable: ' . $file);
+                exit;
+            }
+            $size = filesize($file);
+            if ($size === false) {
+                http_response_code(500);
+                IPS_LogMessage('UDTImagesHook', 'filesize failed: ' . $file);
+                exit;
+            }
+            if ($size > $MAX_SIZE) {
+                http_response_code(413);
+                IPS_LogMessage('UDTImagesHook', 'File too large: ' . $size);
+                exit;
+            }
+            $mtime = filemtime($file) ?: time();
+            $etag = 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
+            if ($longCache) {
+                header('Cache-Control: public, max-age=31536000, immutable');
+            } else {
+                header('Cache-Control: public, max-age=0, must-revalidate');
+            }
+            header('ETag: ' . $etag);
+            header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
+            $sendNotModified($etag, $mtime);
+            header('Content-Type: ' . $mime);
+            header('Content-Length: ' . $size);
+            $fh = fopen($file, 'rb');
+            if ($fh === false) {
+                http_response_code(500);
+                IPS_LogMessage('UDTImagesHook', 'fopen failed: ' . $file);
+                exit;
+            }
+            $chunk = 65536;
+            while (!feof($fh)) {
+                $buf = fread($fh, $chunk);
+                if ($buf === false) { break; }
+                echo $buf;
+                flush();
+            }
+            fclose($fh);
+            exit;
+        };
+        $mid = isset($_GET['mid']) ? (int)$_GET['mid'] : 0;
+        if ($mid > 0 && IPS_MediaExists($mid)) {
+            $m = IPS_GetMedia($mid);
+            if ($m['MediaType'] === MEDIATYPE_IMAGE) {
+                if (!empty($m['MediaFile']) && is_file($m['MediaFile'])) {
+                    $fh = fopen($m['MediaFile'], 'rb');
+                    if ($fh !== false) {
+                        $hdr = fread($fh, 12);
+                        fclose($fh);
+                        $mime = $detectMime($hdr ?: '');
+                        $streamFile($m['MediaFile'], $mime, false);
+                    }
+                }
+                $b64 = IPS_GetMediaContent($mid);
+                if (!is_string($b64) || $b64 === '') {
+                    http_response_code(404);
+                    IPS_LogMessage('UDTImagesHook', 'Empty media content mid=' . $mid);
+                    return;
+                }
+                $prefixSample = base64_decode(substr($b64, 0, 24), true);
+                $mime = $detectMime($prefixSample ?: '');
+                $len = strlen($b64);
+                $padding = 0;
+                if ($len >= 2 && substr($b64, -2) === '==') { $padding = 2; }
+                elseif ($len >= 1 && substr($b64, -1) === '=') { $padding = 1; }
+                $decodedLen = (int)floor($len / 4) * 3 - $padding;
+                if ($decodedLen > $MAX_SIZE) {
+                    http_response_code(413);
+                    IPS_LogMessage('UDTImagesHook', 'Media too large mid=' . $mid . ' size=' . $decodedLen);
+                    return;
+                }
+                header('Cache-Control: no-store');
+                header('Content-Type: ' . $mime);
+                header('Content-Length: ' . max(0, $decodedLen));
+                $out = fopen('php://output', 'wb');
+                if ($out === false) {
+                    http_response_code(500);
+                    IPS_LogMessage('UDTImagesHook', 'open php://output failed');
+                    return;
+                }
+                $filter = stream_filter_append($out, 'convert.base64-decode', STREAM_FILTER_WRITE);
+                $buffer = '';
+                $chunkSize = 65536;
+                for ($i = 0; $i < $len; $i += $chunkSize) {
+                    $chunk = substr($b64, $i, $chunkSize);
+                    $buffer .= $chunk;
+                    $toWrite = strlen($buffer) - (strlen($buffer) % 4);
+                    if ($toWrite > 0) {
+                        fwrite($out, substr($buffer, 0, $toWrite));
+                        $buffer = substr($buffer, $toWrite);
+                        flush();
+                    }
+                }
+                if ($buffer !== '') {
+                    fwrite($out, $buffer);
+                }
+                if (is_resource($filter)) { stream_filter_remove($filter); }
+                fclose($out);
+                return;
+            }
+        }
+        $asset = isset($_GET['asset']) ? preg_replace('/[^a-z0-9_\-]/i', '', (string)$_GET['asset']) : '';
+        if ($asset !== '') {
+            // Support aliasing for legacy/localized filenames
+            // dryer_on  -> trockner_an
+            // dryer_off -> trockner_aus
+            $namesToTry = [$asset];
+            if ($asset === 'dryer_on') {
+                $namesToTry[] = 'trockner_an';
+            } elseif ($asset === 'dryer_off') {
+                $namesToTry[] = 'trockner_aus';
+            }
+            foreach ($namesToTry as $name) {
+                $candidates = [
+                    $assetsDir . '/' . $name . '.webp',
+                    $assetsDir . '/' . $name . '.png',
+                    $assetsDir . '/' . $name . '.jpg',
+                    $assetsDir . '/' . $name . '.jpeg',
+                    $assetsDir . '/' . $name . '.gif',
+                ];
+                foreach ($candidates as $file) {
+                    if (is_file($file)) {
+                        $fh = fopen($file, 'rb');
+                        if ($fh === false) { continue; }
+                        $hdr = fread($fh, 12);
+                        fclose($fh);
+                        $mime = $detectMime($hdr ?: '');
+                        $streamFile($file, $mime, true);
+                    }
+                }
+            }
+        }
+        if (isset($_GET['placeholder']) && is_file($placeholder)) {
+            $fh = fopen($placeholder, 'rb');
+            if ($fh !== false) { $hdr = fread($fh, 12); fclose($fh); }
+            $mime = $detectMime(isset($hdr) ? $hdr : '');
+            $streamFile($placeholder, $mime, true);
+        }
+        http_response_code(404);
+        IPS_LogMessage('UDTImagesHook', 'Not found');
     }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
-        
-        
-        // Verarbeitung der Status-Variable
+        // ...
         $statusId = $this->ReadPropertyInteger('Status');
         if ($statusId > 0 && $SenderID === $statusId) {
             switch ($Message) {
@@ -668,6 +889,10 @@ class UniversalDeviceTile extends IPSModule
                 $minimal = $this->buildMinimalStatusUpdate($fullArray);
                 if (!empty($minimal)) {
                     $this->UpdateVisualizationValue(json_encode($minimal));
+                    // WICHTIG: Variablen neu schicken, damit progressbarActive/Inaktiv sofort wirkt
+                    if (isset($fullArray['variables']) && is_array($fullArray['variables'])) {
+                        $this->UpdateVisualizationValue(json_encode(['variables' => $fullArray['variables']]));
+                    }
                 } else {
                     // Fallback: vollständige Nachricht
                     $this->UpdateVisualizationValue($fullMessage);
@@ -735,6 +960,7 @@ class UniversalDeviceTile extends IPSModule
                             break;
                     }
                 }
+                
             }
         }
 
@@ -761,23 +987,6 @@ class UniversalDeviceTile extends IPSModule
                         if ((($variable['DisplayType'] ?? 'text') === 'image')) {
                             $imageId = intval($variable['ImageMedia'] ?? 0);
                             if ($imageId === $SenderID) {
-                                // Data-URI neu aufbauen
-                                $dataUri = '';
-                                if (IPS_MediaExists($imageId)) {
-                                    $media = IPS_GetMedia($imageId);
-                                    if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                                        $ext = '';
-                                        if (!empty($media['MediaFile'])) {
-                                            $parts = explode('.', $media['MediaFile']);
-                                            $ext = end($parts);
-                                        }
-                                        $prefix = $this->GetImageDataUri($ext ?: 'png');
-                                        if ($prefix) {
-                                            $dataUri = $prefix . IPS_GetMediaContent($imageId);
-                                        }
-                                    }
-                                }
-
                                 // Bestimme DOM-ID: mit Variable-ID falls vorhanden, sonst 'image_<index>'
                                 $domId = isset($variable['Variable']) && $variable['Variable'] > 0
                                     ? strval($variable['Variable'])
@@ -785,7 +994,7 @@ class UniversalDeviceTile extends IPSModule
 
                                 $imageVarUpdates[] = [
                                     'id' => $domId,
-                                    'imageDataUri' => $dataUri
+                                    'imageUrl' => $this->BuildImageHookUrl($imageId)
                                 ];
                             }
                         }
@@ -800,44 +1009,12 @@ class UniversalDeviceTile extends IPSModule
                 // ignore
             }
 
-            // Falls das Hintergrundbild betroffen ist: Aktualisiere image1 separat
+            // Falls das Hintergrundbild betroffen ist: Aktualisiere image1Url separat
             $bgImageId = $this->ReadPropertyInteger('bgImage');
             if ($SenderID === $bgImageId && $bgImageId > 0 && IPS_MediaExists($bgImageId)) {
                 $image = IPS_GetMedia($bgImageId);
                 if ($image['MediaType'] === MEDIATYPE_IMAGE) {
-                    $imageFile = explode('.', $image['MediaFile']);
-                    $imageContent = '';
-                    switch (end($imageFile)) {
-                        case 'bmp':
-                            $imageContent = 'data:image/bmp;base64,';
-                            break;
-
-                        case 'jpg':
-                        case 'jpeg':
-                            $imageContent = 'data:image/jpeg;base64,';
-                            break;
-
-                        case 'gif':
-                            $imageContent = 'data:image/gif;base64,';
-                            break;
-
-                        case 'png':
-                            $imageContent = 'data:image/png;base64,';
-                            break;
-
-                        case 'ico':
-                            $imageContent = 'data:image/x-icon;base64,';
-                            break;
-
-                        case 'webp':
-                            $imageContent = 'data:image/webp;base64,';
-                            break;
-                    }
-
-                    if ($imageContent) {
-                        $imageContent .= IPS_GetMediaContent($bgImageId);
-                        $this->UpdateVisualizationValue(json_encode(['image1' => $imageContent]));
-                    }
+                    $this->UpdateVisualizationValue(json_encode(['image1Url' => $this->BuildImageHookUrl($bgImageId)]));
                 }
             }
             return; // nichts weiter zu tun
@@ -1150,9 +1327,16 @@ class UniversalDeviceTile extends IPSModule
                             if (isset($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
                                 // Asset-Name für Custom Image (wird in GenerateAssets() als base64 geladen)
                                 $result['statusBildauswahl'] = 'img_custom_' . $assoziation['EigenesBild'];
+                                $result['statusImageUrl'] = $this->BuildImageHookUrl((int)$assoziation['EigenesBild']);
                             } else {
                                 // Fallback: Verwende Standard-Bild wenn konfiguriert, sonst 'none'
                                 $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
+                                if ($result['statusBildauswahl'] !== 'none' && strpos($result['statusBildauswahl'], 'img_default_') === 0) {
+                                    $mid = (int)substr($result['statusBildauswahl'], strlen('img_default_'));
+                                    $result['statusImageUrl'] = $this->BuildImageHookUrl($mid);
+                                } else {
+                                    $result['statusImageUrl'] = $this->BuildImageHookUrl(0);
+                                }
                             }
                         } elseif ($bildauswahl === 'symcon_icon') {
                             // Verwende Symcon Icon aus SelectIcon-Feld
@@ -1178,11 +1362,18 @@ class UniversalDeviceTile extends IPSModule
                         } elseif ($bildauswahl === 'none') {
                             // Fallback: Verwende Standard-Bild wenn konfiguriert, sonst wirklich 'none'
                             $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
+                            if ($result['statusBildauswahl'] !== 'none' && strpos($result['statusBildauswahl'], 'img_default_') === 0) {
+                                $mid = (int)substr($result['statusBildauswahl'], strlen('img_default_'));
+                                $result['statusImageUrl'] = $this->BuildImageHookUrl($mid);
+                            } else {
+                                $result['statusImageUrl'] = $this->BuildImageHookUrl(0);
+                            }
                             $result['statusIconColor'] = '';
                             $result['isStatusIconColorTransparent'] = true;
                         } else {
                             // Verwende vorkonfigurierte Bilder (wm_an, wm_aus, dryer_on, dryer_off, etc.)
                             $result['statusBildauswahl'] = $bildauswahl;
+                            $result['statusImageUrl'] = $this->BuildAssetHookUrl($bildauswahl);
                             $result['statusIconColor'] = '';
                             $result['isStatusIconColorTransparent'] = true;
                         }
@@ -1198,7 +1389,13 @@ class UniversalDeviceTile extends IPSModule
             
             // Ensure statusBildauswahl is set if we have a status variable
             if (!$statusBildauswahlSet) {
-                $result['statusBildauswahl'] = $this->getDefaultImageOrNone(); // Fallback auf Standard-Bild oder 'none'
+                $result['statusBildauswahl'] = $this->getDefaultImageOrNone();
+                if ($result['statusBildauswahl'] !== 'none' && strpos($result['statusBildauswahl'], 'img_default_') === 0) {
+                    $mid = (int)substr($result['statusBildauswahl'], strlen('img_default_'));
+                    $result['statusImageUrl'] = $this->BuildImageHookUrl($mid);
+                } else {
+                    $result['statusImageUrl'] = $this->BuildImageHookUrl(0);
+                }
             }
         } else {
             // Fallback: Wenn keine Statusvariable konfiguriert ist
@@ -1293,18 +1490,8 @@ class UniversalDeviceTile extends IPSModule
                         } elseif ($variableInfo['VariableType'] === VARIABLETYPE_STRING) {
                             $variableAssociations = $this->GetStringAssociations($variable['Variable']);
                         } elseif ($variableInfo['VariableType'] === VARIABLETYPE_BOOLEAN) {
-                            // SPECIAL: Nur für Boolean-Variablen mit PRESENTATION GUID, nicht für Standard-Profile
-                            $variable_data = IPS_GetVariable($variable['Variable']);
-                            if (isset($variable_data['VariableCustomPresentation']) && !empty($variable_data['VariableCustomPresentation'])) {
-                                $customPresentation = $variable_data['VariableCustomPresentation'];
-                                if (isset($customPresentation['PRESENTATION']) || isset($customPresentation['ICON_TRUE']) || isset($customPresentation['ICON_FALSE'])) {
-                                    $variableAssociations = $this->GetBooleanAssociations($variable['Variable']);
-                                } else {
-                                    $variableAssociations = null;
-                                }
-                            } else {
-                                $variableAssociations = null;
-                            }
+                            // Für Boolean: immer Associations aus Profil/Presentation ermitteln (Fallback intern geregelt)
+                            $variableAssociations = $this->GetBooleanAssociations($variable['Variable']);
                         } else {
                             $variableAssociations = null;
                         }
@@ -1381,6 +1568,7 @@ class UniversalDeviceTile extends IPSModule
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
                         'progressbarInactive' => !$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress', // 50% Transparenz Flag
+                        'useSecondVariableAsTarget' => (bool)($variable['UseSecondVariableAsTarget'] ?? false),
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
                         'scriptId' => intval($variable['ScriptID'] ?? 0),
                     ];
@@ -1388,27 +1576,17 @@ class UniversalDeviceTile extends IPSModule
                     // Bild (Symcon Medienobjekt) als eigene Darstellungsart
                     if (($variable['DisplayType'] ?? 'text') === 'image') {
                         $imageId = intval($variable['ImageMedia'] ?? 0);
-                        $dataUri = '';
-                        if ($imageId > 0 && IPS_MediaExists($imageId)) {
-                            $media = IPS_GetMedia($imageId);
-                            if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                                $ext = '';
-                                if (!empty($media['MediaFile'])) {
-                                    $parts = explode('.', $media['MediaFile']);
-                                    $ext = end($parts);
-                                }
-                                $prefix = $this->GetImageDataUri($ext ?: 'png');
-                                if ($prefix) {
-                                    $dataUri = $prefix . IPS_GetMediaContent($imageId);
-                                }
-                            }
-                        }
-                        $variableData['imageDataUri'] = $dataUri;
+                        $variableData['imageMediaId'] = $imageId;
+                        $variableData['imageUrl'] = $this->BuildImageHookUrl($imageId);
                         // Image width now in percent (1-100), default 40
                         $variableData['imageWidth'] = max(1, min(100, intval($variable['ImageWidth'] ?? 40)));
                         $variableData['imageBorderRadius'] = intval($variable['ImageBorderRadius'] ?? 6);
                     }
                     
+                    // Vorbereitung für SecondVariable als Marker
+                    $useSecondAsTarget = !empty($variable['UseSecondVariableAsTarget']);
+                    $secondPresent = false; $secondId = 0; $secondLabel = ''; $secondFinalRawValue = 0; $secondFinalFormattedValue = '';
+
                     // Zweite Variable für Progress-Bars hinzufügen
                     if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0 && IPS_VariableExists($variable['SecondVariable'])) {
                         // Icon für zweite Variable ermitteln
@@ -1448,29 +1626,29 @@ class UniversalDeviceTile extends IPSModule
                             'showLabel' => $variable['SecondVariableShowLabel'] ?? true,
                             'showValue' => $variable['SecondVariableShowValue'] ?? true
                         ];
+
+                        // Für Marker-Nutzung merken
+                        $secondPresent = true;
+                        $secondId = (int)$variable['SecondVariable'];
+                        // Werte bereits in $secondFinal* enthalten
                     }
-                    
+                    // Marker nur aus SecondVariable, wenn konfiguriert
+                    if (($variable['DisplayType'] ?? 'text') === 'progress') {
+                        if ($useSecondAsTarget && $secondPresent) {
+                            $variableData['progressTarget'] = [
+                                'id' => $secondId,
+                                'label' => $secondLabel,
+                                'formattedValue' => $secondFinalFormattedValue,
+                                'rawValue' => $secondFinalRawValue
+                            ];
+                        }
+                    }
                     // Spezielle Behandlung für Zeitwerte entfernt (nicht verwendet)
                     
                     $variables[] = $variableData;
                 } else if ((($variable['DisplayType'] ?? 'text') === 'image')) {
                     // SUPPORT IMAGE ROWS WITHOUT A VARIABLE ID
                     $imageId = intval($variable['ImageMedia'] ?? 0);
-                    $dataUri = '';
-                    if ($imageId > 0 && IPS_MediaExists($imageId)) {
-                        $media = IPS_GetMedia($imageId);
-                        if ($media['MediaType'] === MEDIATYPE_IMAGE) {
-                            $ext = '';
-                            if (!empty($media['MediaFile'])) {
-                                $parts = explode('.', $media['MediaFile']);
-                                $ext = end($parts);
-                            }
-                            $prefix = $this->GetImageDataUri($ext ?: 'png');
-                            if ($prefix) {
-                                $dataUri = $prefix . IPS_GetMediaContent($imageId);
-                            }
-                        }
-                    }
                     // Label-Fallback
                     $label = $variable['Label'] ?? '';
                     // Alignment/Textfarbe
@@ -1489,7 +1667,8 @@ class UniversalDeviceTile extends IPSModule
                         'textColor' => $textColor,
                         'isTextColorTransparent' => $isTextColorTransparent,
                         'alignment' => $variable['VerticalAlignment'] ?? 'left',
-                        'imageDataUri' => $dataUri,
+                        'imageMediaId' => $imageId,
+                        'imageUrl' => $this->BuildImageHookUrl($imageId),
                         // Image width now in percent (1-100), default 40
                         'imageWidth' => max(1, min(100, intval($variable['ImageWidth'] ?? 40))),
                         'imageBorderRadius' => intval($variable['ImageBorderRadius'] ?? 6),
@@ -1632,9 +1811,9 @@ class UniversalDeviceTile extends IPSModule
 
                 // Nur fortfahren, falls Inhalt gesetzt wurde. Ansonsten ist das Bild kein unterstützter Dateityp
                 if ($imageContent) {
-                    // Hänge base64-codierten Inhalt des Bildes an
                     $imageContent .= IPS_GetMediaContent($imageID);
                     $result['image1'] = $imageContent;
+                    $result['image1Url'] = $this->BuildImageHookUrl($imageID);
                 }
             }
         }
@@ -1765,6 +1944,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
                 // Button-Felder ausblenden
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
                 $this->UpdateFormField('boolButtonColor', 'visible', false);
@@ -1800,6 +1981,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
 
                 // Button-Felder ausblenden
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
@@ -1836,6 +2019,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', true);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', true);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', true);
+                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', true);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', true);
                 // Button-Felder ausblenden
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
                 $this->UpdateFormField('boolButtonColor', 'visible', false);
@@ -1853,7 +2038,7 @@ class UniversalDeviceTile extends IPSModule
                 // Grundfelder
                 $this->UpdateFormField('ShowIcon', 'visible', true);
                 $this->UpdateFormField('ShowLabel', 'visible', true);
-                $this->UpdateFormField('ShowValue', 'visible', false);
+                $this->UpdateFormField('ShowValue', 'visible', true);
                 // Variable sichtbar
                 $this->UpdateFormField('Variable', 'visible', true);
                 // ScriptID sichtbar (optional, ermöglicht Script-Buttons ohne Variable)
@@ -1863,7 +2048,7 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ButtonWidth', 'visible', true);
                 $this->UpdateFormField('VerticalAlignment', 'visible', true);
                 // Generelle Text-Einstellungen sichtbar
-                $this->UpdateFormField('Label', 'visible', true);
+                $this->UpdateFormField('Label', 'visible', false);
                 $this->UpdateFormField('FontSize', 'visible', true);
                 $this->UpdateFormField('TextColor', 'visible', true);
 
@@ -1875,6 +2060,7 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
 
                 // Image-Felder ausblenden
                 $this->UpdateFormField('ImageMedia', 'visible', false);
@@ -1902,6 +2088,7 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
                 $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
                 $this->UpdateFormField('ButtonWidth', 'visible', false);
                 $this->UpdateFormField('boolButtonColor', 'visible', false);
                 $this->UpdateFormField('ImageMedia', 'visible', false);
@@ -1910,6 +2097,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('VerticalAlignment', 'visible', false);
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 $this->UpdateFormField('ScriptID', 'visible', false);
+                $this->UpdateFormField('Label', 'visible', false);
+
                 break;
         }
     }
@@ -1934,8 +2123,22 @@ class UniversalDeviceTile extends IPSModule
             return 'Transparent'; // Fallback bei Fehler
         }
         
+        // Prüfe auf Legacy-Präsentation (GUID) und merke Flag
+        $legacyGuid = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
+        $isLegacyPresentation = false;
+        $presentationArr = [];
+        if (!empty($variable['VariableCustomPresentation'])) {
+            $presentationArr = $variable['VariableCustomPresentation'];
+        } elseif (!empty($variable['VariablePresentation'])) {
+            $presentationArr = $variable['VariablePresentation'];
+        }
+        if (is_array($presentationArr) && isset($presentationArr['PRESENTATION'])) {
+            $presentGuidTrim = trim((string)$presentationArr['PRESENTATION'], '{} ');
+            $isLegacyPresentation = (strcasecmp($presentGuidTrim, $legacyGuid) === 0);
+        }
+        
         // Prüfe VariableCustomPresentation für Icon
-        if ($icon == "" && !empty($variable['VariableCustomPresentation'])) {
+        if ($icon == "" && !empty($variable['VariableCustomPresentation']) && !$isLegacyPresentation) {
             $customPresentation = $variable['VariableCustomPresentation'];
             
             // Zuerst nach direktem Icon suchen (Standard-Icon)
@@ -2219,7 +2422,7 @@ class UniversalDeviceTile extends IPSModule
         // Schließe VariableCustomPresentation if-Block (Zeile 1110)
         
         // Wenn noch kein Icon gefunden wurde, prüfe Darstellung/Visualisierung und Profile
-        if ($icon == "") {
+        if ($icon == "" && !$isLegacyPresentation) {
             // Zuerst prüfen ob die Variable eine neue Darstellung/Visualisierung hat
             if (function_exists('IPS_GetVariableVisualization')) {
                 try {
@@ -2336,12 +2539,58 @@ class UniversalDeviceTile extends IPSModule
                 }
             }
             
+            // Fallback zu klassischen Variablenprofilen wenn kein Icon über Darstellung gefunden (Standard-Profile)
+            if ($icon == "") {
+                $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+                if ($profile && IPS_VariableProfileExists($profile)) {
+                    $p = IPS_GetVariableProfile($profile);
+                    foreach ($p['Associations'] as $association) {
+                        if (isset($association['Value']) && $association['Icon'] != "" && $association['Value'] == $Value) {
+                            $icon = $association['Icon'];
+                            break;
+                        }
+                    }
+                    if ($icon == "" && isset($p['Icon']) && $p['Icon'] != "") {
+                        $icon = $p['Icon'];
+                    }
+                }
+            }
+            
             // Finaler Fallback wenn nichts gefunden wurde
             if ($icon == "") {
                 $icon = "Transparent";
             }
         }
         
+        // Letzter, allgemeiner Fallback auf klassische Profile – auch wenn zuvor "Transparent" gesetzt wurde
+        // Unterstützt zusätzlich das Profil aus PRESENTATION ([PROFILE]) falls VariableProfile leer ist
+        if ($icon === '' || $icon === 'Transparent') {
+            $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+            if (empty($profile)) {
+                $pres1 = (isset($variable['VariableCustomPresentation']) && is_array($variable['VariableCustomPresentation'])) ? $variable['VariableCustomPresentation'] : [];
+                $pres2 = (isset($variable['VariablePresentation']) && is_array($variable['VariablePresentation'])) ? $variable['VariablePresentation'] : [];
+                if (isset($pres1['PROFILE']) && !empty($pres1['PROFILE'])) {
+                    $profile = $pres1['PROFILE'];
+                } elseif (isset($pres2['PROFILE']) && !empty($pres2['PROFILE'])) {
+                    $profile = $pres2['PROFILE'];
+                }
+            }
+            if (!empty($profile) && IPS_VariableProfileExists($profile)) {
+                $p = IPS_GetVariableProfile($profile);
+                if (isset($p['Associations']) && is_array($p['Associations'])) {
+                    foreach ($p['Associations'] as $association) {
+                        if (isset($association['Value']) && isset($association['Icon']) && $association['Icon'] !== '' && $association['Value'] == $Value) {
+                            $icon = $association['Icon'];
+                            break;
+                        }
+                    }
+                }
+                if (($icon === '' || $icon === 'Transparent') && isset($p['Icon']) && $p['Icon'] !== '') {
+                    $icon = $p['Icon'];
+                }
+            }
+        }
+
         // Icon-Mapping zu FontAwesome durchführen
         $mappedIcon = $this->MapIconToFontAwesome($icon);
         
@@ -2757,13 +3006,34 @@ class UniversalDeviceTile extends IPSModule
             return null;
         }
         
+        // Präsentation früh bestimmen (Custom bevorzugt, sonst Standard)
+        $customPresentation = [];
+        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
+            $customPresentation = $variable['VariableCustomPresentation'];
+        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
+            $customPresentation = $variable['VariablePresentation'];
+        }
+        
+        // Sonderfall: VARIABLE_PRESENTATION_LEGACY -> Profil verwenden, Präsentation ignorieren
+        // GUID: {4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C}
+        if (is_array($customPresentation) && isset($customPresentation['PRESENTATION'])) {
+            $legacyGuid = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
+            $presentGuidRaw = (string)$customPresentation['PRESENTATION'];
+            $presentGuidTrim = trim($presentGuidRaw, "{} ");
+            if (strcasecmp($presentGuidTrim, $legacyGuid) === 0) {
+                // Präsentation als nicht vorhanden behandeln, damit Profil greift
+                $customPresentation = [];
+            }
+        }
+        
         // Bestimme den Gruppennamen für FALL 4 basierend auf Variablentyp
         $groupName = ($expectedVariableType === VARIABLETYPE_INTEGER) ? 'Numeric' : 
                      (($expectedVariableType === VARIABLETYPE_BOOLEAN) ? 'Boolean' : 'String');
         
         // **FALL 1: Alte Variablenprofile**
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-        if (!empty($profile) && IPS_VariableProfileExists($profile)) {
+        // Wenn sowohl Profil als auch Präsentation vorhanden sind, bevorzugen wir die Präsentation
+        if (!empty($profile) && IPS_VariableProfileExists($profile) && empty($customPresentation)) {
             $profileData = IPS_GetVariableProfile($profile);
             
             if (isset($profileData['Associations']) && is_array($profileData['Associations'])) {
@@ -2785,7 +3055,8 @@ class UniversalDeviceTile extends IPSModule
                             'value' => $normalizedValue, // Normalisierte Werte für Boolean-Variablen
                             'name' => $association['Name'],
                             'color' => isset($association['Color']) && $association['Color'] !== -1 ? '#' . sprintf('%06X', $association['Color']) : null,
-                            'icon' => isset($association['Icon']) ? $association['Icon'] : null
+                            // Mappe Icon-Namen (z. B. "Climate" -> "arrows-spin") bevor das Frontend rendert
+                            'icon' => (isset($association['Icon']) && $association['Icon'] !== '') ? $this->MapIconToFontAwesome($association['Icon']) : null
                         ];
                     }
                 }
@@ -2843,7 +3114,7 @@ class UniversalDeviceTile extends IPSModule
             $params = null;
             
             // Prüfe zuerst auf direktes VariableProfile
-            if (isset($variable['VariableProfile']) && !empty($variable['VariableProfile'])) {
+            if (empty($customPresentation) && isset($variable['VariableProfile']) && !empty($variable['VariableProfile'])) {
                 $profileName = $variable['VariableProfile'];
                 $profile = @IPS_GetVariableProfile($profileName);
                 if ($profile !== false && isset($profile['Associations'])) {
@@ -2881,7 +3152,8 @@ class UniversalDeviceTile extends IPSModule
                             'value' => $option['Value'], // Kann Integer oder String sein
                             'name' => $option['Caption'],
                             'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
-                            'icon' => isset($option['IconValue']) && !empty($option['IconValue']) ? $option['IconValue'] : null
+                            // Mappe IconValue über die zentrale Mapping-Funktion
+                            'icon' => (isset($option['IconValue']) && !empty($option['IconValue'])) ? $this->MapIconToFontAwesome($option['IconValue']) : null
                         ];
                     }
                 }
@@ -2905,7 +3177,8 @@ class UniversalDeviceTile extends IPSModule
                                         'value' => $option['Value'], // Kann Integer oder String sein
                                         'name' => $option['Caption'],
                                         'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
-                                        'icon' => isset($option['IconValue']) && !empty($option['IconValue']) ? $option['IconValue'] : null
+                                        // Mappe IconValue aus Template-Optionen
+                                        'icon' => (isset($option['IconValue']) && !empty($option['IconValue'])) ? $this->MapIconToFontAwesome($option['IconValue']) : null
                                     ];
                                 }
                             }
@@ -2958,7 +3231,8 @@ class UniversalDeviceTile extends IPSModule
                                                     'value' => $option['Value'], // Kann Integer oder String sein
                                                     'name' => $option['Caption'],
                                                     'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
-                                                    'icon' => isset($option['IconValue']) && !empty($option['IconValue']) ? $option['IconValue'] : null
+                                                    // Mappe IconValue aus Presentation-Optionen
+                                                    'icon' => (isset($option['IconValue']) && !empty($option['IconValue'])) ? $this->MapIconToFontAwesome($option['IconValue']) : null
                                                 ];
                                             }
                                         }

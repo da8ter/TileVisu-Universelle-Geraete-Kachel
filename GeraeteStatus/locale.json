@@ -147,7 +147,10 @@
         "Group 9": "Gruppe 9",
         "Group 10": "Gruppe 10",
         "Group Icon": "Gruppen Icon",
-        "Hide status variable": "Statusvariable ausblenden"
+        "Hide status variable": "Statusvariable ausblenden",
+        "Use 2nd variable as marker": "2. Variable als Marker verwenden",
+        "Display types for the second variable in the progress bar:": "Darstellungsarten für die zweite Variable im Fortschrittsbalken:",
+        "Using the checkbox “Use 2nd variable as marker,” you can switch between the standard display and the marker display. This allows you to show thresholds or target values, such as the charging target of a wallbox.": "Über die Checkbox 2. Variable als Marker verwenden kann zwischen der Standard-Darstellung und der Darstellung als Markierung umgeschaltet werden. So können z. B. Schwellenwerte oder Zielwerte wie das Ladeziel bei einer Wallbox angezeigt werden."
 
         }
     }
