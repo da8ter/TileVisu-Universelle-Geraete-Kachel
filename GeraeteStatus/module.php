@@ -1490,18 +1490,8 @@ class UniversalDeviceTile extends IPSModule
                         } elseif ($variableInfo['VariableType'] === VARIABLETYPE_STRING) {
                             $variableAssociations = $this->GetStringAssociations($variable['Variable']);
                         } elseif ($variableInfo['VariableType'] === VARIABLETYPE_BOOLEAN) {
-                            // SPECIAL: Nur für Boolean-Variablen mit PRESENTATION GUID, nicht für Standard-Profile
-                            $variable_data = IPS_GetVariable($variable['Variable']);
-                            if (isset($variable_data['VariableCustomPresentation']) && !empty($variable_data['VariableCustomPresentation'])) {
-                                $customPresentation = $variable_data['VariableCustomPresentation'];
-                                if (isset($customPresentation['PRESENTATION']) || isset($customPresentation['ICON_TRUE']) || isset($customPresentation['ICON_FALSE'])) {
-                                    $variableAssociations = $this->GetBooleanAssociations($variable['Variable']);
-                                } else {
-                                    $variableAssociations = null;
-                                }
-                            } else {
-                                $variableAssociations = null;
-                            }
+                            // Für Boolean: immer Associations aus Profil/Presentation ermitteln (Fallback intern geregelt)
+                            $variableAssociations = $this->GetBooleanAssociations($variable['Variable']);
                         } else {
                             $variableAssociations = null;
                         }
@@ -2529,6 +2519,23 @@ class UniversalDeviceTile extends IPSModule
                         }
                         if ($icon == "") {
                         }
+                    }
+                }
+            }
+            
+            // Fallback zu klassischen Variablenprofilen wenn kein Icon über Darstellung gefunden (Standard-Profile)
+            if ($icon == "") {
+                $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+                if ($profile && IPS_VariableProfileExists($profile)) {
+                    $p = IPS_GetVariableProfile($profile);
+                    foreach ($p['Associations'] as $association) {
+                        if (isset($association['Value']) && $association['Icon'] != "" && $association['Value'] == $Value) {
+                            $icon = $association['Icon'];
+                            break;
+                        }
+                    }
+                    if ($icon == "" && isset($p['Icon']) && $p['Icon'] != "") {
+                        $icon = $p['Icon'];
                     }
                 }
             }
