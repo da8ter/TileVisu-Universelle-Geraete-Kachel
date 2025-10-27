@@ -102,6 +102,7 @@ class UniversalDeviceTile extends IPSModule
         $this->SetVisualizationType(1);
 
         $this->RegisterAttributeString('HookToken', '');
+        $this->RegisterAttributeString('LastVarValues', '{}');
         
         // Lade das Icon-Mapping
         $this->LoadIconMapping();
@@ -883,6 +884,13 @@ class UniversalDeviceTile extends IPSModule
         if ($statusId > 0 && $SenderID === $statusId) {
             switch ($Message) {
             case VM_UPDATE:
+                $last = json_decode($this->ReadAttributeString('LastVarValues'), true);
+                if (!is_array($last)) { $last = []; }
+                $cur = GetValue($SenderID);
+                $k = strval($SenderID);
+                if (array_key_exists($k, $last) && $last[$k] === $cur) { break; }
+                $last[$k] = $cur;
+                $this->WriteAttributeString('LastVarValues', json_encode($last));
                 // Status-Änderung: Sende minimalen Status-Update-Payload
                 $fullMessage = $this->GetFullUpdateMessage();
                 $fullArray = json_decode($fullMessage, true);
@@ -910,6 +918,13 @@ class UniversalDeviceTile extends IPSModule
                 if (isset($variable['Variable']) && $SenderID === $variable['Variable']) {
                     switch ($Message) {
                         case VM_UPDATE:
+                            $last = json_decode($this->ReadAttributeString('LastVarValues'), true);
+                            if (!is_array($last)) { $last = []; }
+                            $cur = GetValue($SenderID);
+                            $k = strval($SenderID);
+                            if (array_key_exists($k, $last) && $last[$k] === $cur) { break; }
+                            $last[$k] = $cur;
+                            $this->WriteAttributeString('LastVarValues', json_encode($last));
                             // Variable-Änderung: Sende minimalen var_<index> und var_<index>_value Payload
                             $fullMessage = $this->GetFullUpdateMessage();
                             $fullArray = json_decode($fullMessage, true);
@@ -937,6 +952,13 @@ class UniversalDeviceTile extends IPSModule
                 elseif (isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable']) {
                     switch ($Message) {
                         case VM_UPDATE:
+                            $last = json_decode($this->ReadAttributeString('LastVarValues'), true);
+                            if (!is_array($last)) { $last = []; }
+                            $cur = GetValue($SenderID);
+                            $k = strval($SenderID);
+                            if (array_key_exists($k, $last) && $last[$k] === $cur) { break; }
+                            $last[$k] = $cur;
+                            $this->WriteAttributeString('LastVarValues', json_encode($last));
                             // SecondVariable-Änderung: Sende minimalen Update-Payload für die zugehörige Progress-Variable
                             $fullMessage = $this->GetFullUpdateMessage();
                             $fullArray = json_decode($fullMessage, true);
