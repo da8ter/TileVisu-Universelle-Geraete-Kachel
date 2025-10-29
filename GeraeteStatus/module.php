@@ -2070,7 +2070,7 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ButtonWidth', 'visible', true);
                 $this->UpdateFormField('VerticalAlignment', 'visible', true);
                 // Generelle Text-Einstellungen sichtbar
-                $this->UpdateFormField('Label', 'visible', false);
+                $this->UpdateFormField('Label', 'visible', true);
                 $this->UpdateFormField('FontSize', 'visible', true);
                 $this->UpdateFormField('TextColor', 'visible', true);
 
