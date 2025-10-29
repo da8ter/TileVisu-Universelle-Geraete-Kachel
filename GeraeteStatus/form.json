@@ -830,7 +830,7 @@
     "    [ 'caption' => 'Show Label', 'name' => 'ShowLabel', 'type' => 'CheckBox', 'save' => true, 'visible' => ($displayType !== 'image'), 'add' => true ],",
     "    [ 'caption' => 'Show Value', 'name' => 'ShowValue', 'type' => 'CheckBox', 'save' => true, 'visible' => ($displayType !== 'image'), 'add' => true ]",
     "  ] ];",
-    "$form[] = [ 'caption' => 'Label (Overrides the variable name)', 'name' => 'Label', 'width' => '100%', 'type' => 'ValidationTextBox', 'save' => true, 'add' => '', 'visible' => ($displayType === 'text' || $displayType === 'progress') ];",
+    "$form[] = [ 'caption' => 'Label (Overrides the variable name)', 'name' => 'Label', 'width' => '100%', 'type' => 'ValidationTextBox', 'save' => true, 'add' => '', 'visible' => ($displayType === 'text' || $displayType === 'progress' || $displayType === 'button') ];",
     "$form[] = [ 'type' => 'RowLayout', 'items' => [",
     "    [ 'caption' => 'Group (All elements in a group are displayed in a single row.)', 'name' => 'Group', 'type' => 'Select', 'width' => '600px',",
     "      'options' => [",
