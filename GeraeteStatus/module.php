@@ -1091,6 +1091,31 @@ class UniversalDeviceTile extends IPSModule
         $currentValue = GetValue($variableID);
         
         RequestAction($variableID, $newValue);
+    } else if ($variableType === VARIABLETYPE_FLOAT) {
+        $newValue = floatval($value);
+        $bounds = $this->GetProgressMinMax($variableID);
+        $minV = isset($bounds['min']) ? floatval($bounds['min']) : 0.0;
+        $maxV = isset($bounds['max']) ? floatval($bounds['max']) : 100.0;
+        if ($maxV < $minV) { $tmp = $minV; $minV = $maxV; $maxV = $tmp; }
+        $cfg = $this->GetSliderStepAndDigits($variableID);
+        $step = isset($cfg['step']) ? floatval($cfg['step']) : 0.0;
+        $digits = isset($cfg['digits']) ? intval($cfg['digits']) : 0;
+        $range = $maxV - $minV;
+        if ($range <= 0) { $minV = 0.0; $maxV = 100.0; $range = 100.0; }
+        if ($step <= 0) {
+            if ($digits > 0) {
+                $step = pow(10, -$digits);
+            } else {
+                $step = $range / 100.0;
+            }
+        }
+        $ratio = ($newValue - $minV) / $step;
+        $rounded = round($ratio);
+        $newValue = $minV + ($rounded * $step);
+        if ($digits >= 0) { $newValue = floatval(number_format($newValue, $digits, '.', '')); }
+        if ($newValue < $minV) $newValue = $minV;
+        if ($newValue > $maxV) $newValue = $maxV;
+        RequestAction($variableID, $newValue);
     } else if ($variableType === VARIABLETYPE_STRING) {
         // String-Variable: Verwende den übergebenen String-Wert direkt (für Multi-Button-Interface)
         $newValue = strval($value);
@@ -1558,7 +1583,7 @@ class UniversalDeviceTile extends IPSModule
                     $finalFormattedValue = GetValueFormatted($variable['Variable']);
                     $finalRawValue = GetValue($variable['Variable']);
                     
-                    if (!$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress') {
+                    if (!$progressbarActive && in_array(($variable['DisplayType'] ?? 'text'), ['progress','slider'])) {
                         // Progressbar deaktiviert: Zeige "-" für alle Werte und mache Text/Icon 50% transparent
                         $finalRawValue = 0;
                         $finalFormattedValue = '-';
@@ -1589,7 +1614,7 @@ class UniversalDeviceTile extends IPSModule
                         'rawValue' => $finalRawValue, // Backend-überschriebener Wert
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
-                        'progressbarInactive' => !$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress', // 50% Transparenz Flag
+                        'progressbarInactive' => !$progressbarActive && in_array(($variable['DisplayType'] ?? 'text'), ['progress','slider']), // 50% Transparenz Flag
                         'useSecondVariableAsTarget' => (bool)($variable['UseSecondVariableAsTarget'] ?? false),
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
                         'scriptId' => intval($variable['ScriptID'] ?? 0),
@@ -1603,6 +1628,12 @@ class UniversalDeviceTile extends IPSModule
                         // Image width now in percent (1-100), default 40
                         $variableData['imageWidth'] = max(1, min(100, intval($variable['ImageWidth'] ?? 40)));
                         $variableData['imageBorderRadius'] = intval($variable['ImageBorderRadius'] ?? 6);
+                    }
+                    // Slider Zusatzdaten
+                    if (($variable['DisplayType'] ?? 'text') === 'slider') {
+                        $sd = $this->GetSliderStepAndDigits($variable['Variable']);
+                        $variableData['sliderStep'] = isset($sd['step']) ? $sd['step'] : null;
+                        $variableData['sliderDigits'] = isset($sd['digits']) ? $sd['digits'] : null;
                     }
                     
                     // Vorbereitung für SecondVariable als Marker
@@ -2053,6 +2084,42 @@ class UniversalDeviceTile extends IPSModule
                 // Text-Felder ausblenden
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 // Ausrichtung bei Progress ausblenden
+                $this->UpdateFormField('VerticalAlignment', 'visible', false);
+                break;
+            case 'slider':
+                // Slider: ähnlich Progress, aber ohne SecondVariable-Block
+                $this->UpdateFormField('ShowIcon', 'visible', true);
+                $this->UpdateFormField('ShowLabel', 'visible', true);
+                $this->UpdateFormField('ShowValue', 'visible', true);
+                // Variable benötigt
+                $this->UpdateFormField('Variable', 'visible', true);
+                // ScriptID ausblenden
+                $this->UpdateFormField('ScriptID', 'visible', false);
+                // Generelle Text-Einstellungen sichtbar
+                $this->UpdateFormField('Label', 'visible', true);
+                $this->UpdateFormField('FontSize', 'visible', true);
+                $this->UpdateFormField('TextColor', 'visible', true);
+                // Progress-/Slider-Farben sichtbar
+                $this->UpdateFormField('ProgressColor1', 'visible', true);
+                $this->UpdateFormField('ProgressColor2', 'visible', true);
+                // SecondVariable-Block ausblenden (Slider nutzt keinen Marker)
+                $this->UpdateFormField('SecondVariable', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
+                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
+                // Button-Felder ausblenden
+                $this->UpdateFormField('ButtonWidth', 'visible', false);
+                $this->UpdateFormField('boolButtonColor', 'visible', false);
+                // Image-Felder ausblenden
+                $this->UpdateFormField('ImageMedia', 'visible', false);
+                $this->UpdateFormField('ImageWidth', 'visible', false);
+                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
+                // Text-Felder ausblenden
+                $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                // Ausrichtung bei Slider ausblenden (feste horizontale Ausrichtung)
                 $this->UpdateFormField('VerticalAlignment', 'visible', false);
                 break;
             case 'button':
@@ -2986,6 +3053,33 @@ class UniversalDeviceTile extends IPSModule
         
         // **LETZTER FALLBACK: Standard Min/Max verwenden**
         return $defaultMinMax;
+    }
+
+    private function GetSliderStepAndDigits($variableId) {
+        $res = ['step' => null, 'digits' => 0];
+        if (!IPS_VariableExists($variableId)) {
+            return $res;
+        }
+        $variable = IPS_GetVariable($variableId);
+        $profileName = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+        if (!empty($profileName) && IPS_VariableProfileExists($profileName)) {
+            $profileData = IPS_GetVariableProfile($profileName);
+            if (isset($profileData['Digits'])) {
+                $res['digits'] = (int)$profileData['Digits'];
+            }
+            if (isset($profileData['StepSize'])) {
+                $res['step'] = (float)$profileData['StepSize'];
+            }
+        }
+        if ($res['step'] === null) {
+            $digits = max(0, (int)$res['digits']);
+            if ($variable['VariableType'] === VARIABLETYPE_INTEGER) {
+                $res['step'] = 1;
+            } else {
+                $res['step'] = ($digits > 0) ? pow(10, -$digits) : 0.0;
+            }
+        }
+        return $res;
     }
     
     /**

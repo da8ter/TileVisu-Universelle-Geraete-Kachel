@@ -372,6 +372,56 @@
             min-height: var(--progress-bar-height, 20px);
         }
 
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .slider-track {
+            position: relative;
+            flex: 1 1 auto;
+            height: var(--progress-bar-height, 20px);
+            background-color: var(--progress-bar-bg-color, rgba(135, 135, 135, 0.3));
+            border-radius: var(--progress-bar-border-radius, 10px);
+            overflow: hidden;
+            touch-action: none;
+        }
+        .slider-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            background: linear-gradient(to right, var(--progress-color1), var(--progress-color2));
+            background: linear-gradient(to right in oklch, var(--progress-color1), var(--progress-color2));
+        }
+        .slider-thumb {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 14px;
+            height: 22px;
+            background: color-mix(in srgb, var(--accent-color) 80%, #000 0%);
+            border-radius: 4px;
+            box-shadow: 0 0 0 1px color-mix(in srgb, #000 20%, transparent);
+            pointer-events: none;
+        }
+        .slider-value {
+            flex: 0 0 auto;
+            min-width: 48px;
+            text-align: right;
+        }
+        .slider-step-btn {
+            flex: 0 0 auto;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: none;
+            background: var(--accent-color);
+            color: var(--content-color);
+        }
+
         .progress-text {
             position: absolute;
             top: 1px;
@@ -1436,7 +1486,7 @@
                                     
                                     if (valueChanged || formattedValueChanged) {
                                         // Check display type and determine if minimal update is possible
-                                        if (displayType === 'progress' || displayType === 'button' || displayType === 'text') {
+                                        if (displayType === 'progress' || displayType === 'button' || displayType === 'text' || displayType === 'slider') {
                                             hasMinimalUpdates = true;
                                             minimalUpdates.push({ variableId: actualVariableId, type: displayType, variable: newVariable });
                                         } else {
@@ -1486,6 +1536,9 @@
                                             break;
                                         case 'text':
                                             updateTextValue(variableId, variable);
+                                            break;
+                                        case 'slider':
+                                            updateSliderValue(variableId, variable.rawValue);
                                             break;
                                     }
                                 });
@@ -1678,9 +1731,13 @@
                                     window.variableDataCache[targetVariableId].rawValue = value;
                                     // MINIMAL UPDATE: Nur Progress Bar updaten, nicht komplettes Re-Render
                                     const variable = window.variableDataCache[targetVariableId];
-                                    if (variable && variable.displayType === 'progress') {
+                                    if (variable.displayType === 'progress') {
                                         updateProgressBarValue(targetVariableId, value);
                                         return; // Skip full re-render für Progress Bar Updates
+                                    }
+                                    if (variable.displayType === 'slider') {
+                                        updateSliderValue(targetVariableId, value);
+                                        return; // Skip full re-render für Slider Updates
                                     }
                                 }
                             }
@@ -1960,6 +2017,130 @@
         }
         
         // Hilfsfunktion für Progress-Bar-Update
+
+        function clampAndRound(val, min, max, step, digits) {
+            let v = Number(val);
+            if (!Number.isFinite(v)) v = min;
+            if (max < min) { const t = min; min = max; max = t; }
+            if (!Number.isFinite(step) || step <= 0) {
+                const range = (max - min);
+                step = range > 0 ? (range / 100) : 1;
+            }
+            const ratio = (v - min) / step;
+            const rounded = Math.round(ratio);
+            v = min + (rounded * step);
+            if (v < min) v = min;
+            if (v > max) v = max;
+            if (Number.isFinite(digits) && digits >= 0) {
+                v = Number(v.toFixed(digits));
+            }
+            return v;
+        }
+
+        function updateSliderUI(sc, percent, displayText) {
+            const fill = sc.querySelector('.slider-fill');
+            const thumb = sc.querySelector('.slider-thumb');
+            if (fill) fill.style.width = `${percent}%`;
+            if (thumb) thumb.style.left = `${percent}%`;
+            const valEl = sc.querySelector('.slider-value');
+            if (valEl && typeof displayText !== 'undefined') {
+                valEl.textContent = String(displayText);
+            }
+        }
+
+        function attachSliderEvents(sc) {
+            const track = sc.querySelector('.slider-track');
+            const minusBtn = sc.querySelector('.slider-step-btn[data-dir="-1"]');
+            const plusBtn = sc.querySelector('.slider-step-btn[data-dir="1"]');
+            if (!track) return;
+            const id = sc.getAttribute('data-variable-id');
+            const min = Number(sc.getAttribute('data-min')) || 0;
+            const max = Number(sc.getAttribute('data-max')) || 100;
+            const digits = Number(sc.getAttribute('data-digits')) || 0;
+            const stepAttr = sc.getAttribute('data-step');
+            const step = (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) ? Number(stepAttr) : NaN;
+
+            const getPercentFromClientX = (clientX) => {
+                const rect = track.getBoundingClientRect();
+                const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+                return rect.width > 0 ? (x / rect.width) * 100 : 0;
+            };
+            const percentToValue = (p) => {
+                const range = max - min;
+                const raw = min + (range * (p / 100));
+                return clampAndRound(raw, min, max, step, digits);
+            };
+            const valueToPercent = (v) => {
+                const range = max - min;
+                if (range <= 0) return 0;
+                return Math.max(0, Math.min(100, ((v - min) / range) * 100));
+            };
+
+            let dragging = false;
+            let dragValue = null;
+            const onPointerMove = (ev) => {
+                if (!dragging) return;
+                const p = getPercentFromClientX(ev.clientX);
+                const v = percentToValue(p);
+                dragValue = v;
+                const percent = valueToPercent(v);
+                updateSliderUI(sc, percent, v);
+            };
+            const endDrag = () => {
+                if (!dragging) return;
+                dragging = false;
+                try { window.removeEventListener('pointermove', onPointerMove); } catch (_) {}
+                try { window.removeEventListener('pointerup', endDrag, true); } catch (_) {}
+                if (dragValue !== null && typeof requestAction === 'function') {
+                    requestAction(id, dragValue);
+                }
+                dragValue = null;
+            };
+            track.addEventListener('pointerdown', (ev) => {
+                if (sc.style.pointerEvents === 'none') return;
+                dragging = true;
+                const p = getPercentFromClientX(ev.clientX);
+                const v = percentToValue(p);
+                dragValue = v;
+                const percent = valueToPercent(v);
+                updateSliderUI(sc, percent, v);
+                try { track.setPointerCapture(ev.pointerId); } catch (_) {}
+                window.addEventListener('pointermove', onPointerMove);
+                window.addEventListener('pointerup', endDrag, true);
+            });
+
+            const stepClick = (dir) => {
+                const vc = window.variableDataCache?.[id];
+                const curRaw = Number(vc?.rawValue);
+                const base = Number.isFinite(curRaw) ? curRaw : min;
+                const s = Number.isFinite(step) && step > 0 ? step : ((max - min) > 0 ? (max - min) / 100 : 1);
+                const next = clampAndRound(base + dir * s, min, max, s, digits);
+                if (typeof requestAction === 'function') {
+                    requestAction(id, next);
+                }
+            };
+            if (minusBtn) minusBtn.addEventListener('click', () => stepClick(-1));
+            if (plusBtn) plusBtn.addEventListener('click', () => stepClick(1));
+        }
+
+        function updateSliderValue(variableId, newValue) {
+            const sc = document.querySelector(`.slider-container[data-variable-id="${CSS.escape(String(variableId))}"]`);
+            if (!sc) return;
+            const min = Number(sc.getAttribute('data-min')) || 0;
+            const max = Number(sc.getAttribute('data-max')) || 100;
+            const digits = Number(sc.getAttribute('data-digits')) || 0;
+            const v = clampAndRound(Number(newValue), min, max, NaN, digits);
+            const range = max - min;
+            const percent = range > 0 ? Math.max(0, Math.min(100, ((v - min) / range) * 100)) : 0;
+            let display = v;
+            try {
+                const vc = window.variableDataCache?.[variableId];
+                if (vc && typeof vc.formattedValue !== 'undefined' && vc.formattedValue !== null) {
+                    display = vc.formattedValue;
+                }
+            } catch (_) {}
+            updateSliderUI(sc, percent, display);
+        }
         function updateProgressDisplay(targetVariableId, variable) {
 
             
@@ -2773,14 +2954,13 @@
                         `;
                         
                         // Wachstum an Progress binden: wenn Progress vorhanden, wächst er; sonst kein Wachstum
-                        const progressIndex = groupVariables.findIndex(v => v.displayType === 'progress');
-                        const growIndex = (progressIndex !== -1) ? progressIndex : -1;
+                        const growIndex = groupVariables.findIndex(v => v.displayType === 'progress' || v.displayType === 'slider');
 
                         groupVariables.forEach((groupVar, groupIndex) => {
                             const widthPercent = (groupVar.displayType === 'image' && Number.isFinite(Number(groupVar.imageWidth)))
                                 ? Number(groupVar.imageWidth)
                                 : null;
-                            const growStyle = (groupIndex === growIndex && groupVar.displayType === 'progress')
+                            const growStyle = (groupIndex === growIndex && (groupVar.displayType === 'progress' || groupVar.displayType === 'slider'))
                                 ? 'flex: 1 1 0; min-width: 0;'
                                 : '';
                             const itemStyle = (widthPercent !== null || growStyle)
@@ -2825,6 +3005,8 @@
                         updateTargetMarkerDisplay(pc, v);
                     }
                 });
+                const allSliderContainers = container.querySelectorAll('.slider-container');
+                allSliderContainers.forEach(sc => { attachSliderEvents(sc); });
             } catch (_) {}
             
             
@@ -2842,7 +3024,7 @@
             let content = '';
             
             // Bestimme Darstellungstyp für Gruppenlayout
-            const isProgressBar = variable.displayType === 'progress';
+            const isProgressBar = variable.displayType === 'progress' || variable.displayType === 'slider';
             
             // Wrapper-Stil je nach Kontext - Progress-Balken unterstützen jetzt auch Gruppen
             let wrapperStyle;
@@ -2867,7 +3049,7 @@
                 }
             } else {
                 // Ungrouped: Standard-Layout mit horizontaler Ausrichtung für Text/Button/Image
-                if (variable.displayType === 'text' || variable.displayType === 'button' || variable.displayType === 'image') {
+                if (variable.displayType === 'text' || variable.displayType === 'button' || variable.displayType === 'image' || variable.displayType === 'slider') {
                     wrapperStyle = `display: flex; align-items: center; justify-content: ${justifyMap}; width: 100%; ${fontSizeStyle} color: ${getTextColor(variable)};`;
                 } else {
                     wrapperStyle = `${fontSizeStyle} color: ${getTextColor(variable)};`;
@@ -2880,6 +3062,8 @@
                 cssClasses += ' text-variable';
             } else if (variable.displayType === 'progress') {
                 cssClasses += ' progress-variable';
+            } else if (variable.displayType === 'slider') {
+                cssClasses += ' slider-variable';
             }
             // Füge border-line Klasse hinzu wenn konfiguriert UND NICHT gruppiert
             // Bei gruppierten Variablen zeigt nur die Gruppe die Linie, nicht die einzelnen Variablen
@@ -3088,6 +3272,30 @@
                                     ${secondVariableText}
                                 </div>
                             </div>
+                        </div>
+                    `;
+                } else if (variable.displayType === 'slider') {
+                    const inactiveStyle = variable.progressbarInactive ? 'opacity: 0.5; pointer-events: none;' : '';
+                    const min = parseFloat(variable.progressMin) || 0;
+                    const max = parseFloat(variable.progressMax) || 100;
+                    const range = Math.max(0.000001, max - min);
+                    const cur = parseFloat(variable.rawValue) || 0;
+                    const percent = Math.max(0, Math.min(100, ((cur - min) / range) * 100));
+                    const step = Number.isFinite(Number(variable.sliderStep)) ? Number(variable.sliderStep) : null;
+                    const digits = Number.isFinite(Number(variable.sliderDigits)) ? Number(variable.sliderDigits) : 0;
+                    const iconHtml = (variable.showIcon && variable.icon && variable.icon !== 'Transparent') ? (()=>{ const c = prepareIconForDisplay(variable.icon); return c ? `<i class="${c} variable-icon" style="color: ${getTextColor(variable)};"></i>` : ''; })() : '';
+                    const labelHtml = (variable.showLabel && variable.label) ? `<span class="variable-label" style="font-weight: 700;">${variable.label}:&nbsp;</span>` : '';
+                    const valueHtml = (variable.showValue && typeof variable.formattedValue !== 'undefined') ? `<span class="slider-value">${variable.formattedValue}</span>` : `<span class="slider-value"></span>`;
+                    const individualPadding = 0;
+                    content += `
+                        <div class="slider-container" data-variable-id="${variable.id}" data-min="${min}" data-max="${max}" data-step="${step !== null ? step : ''}" data-digits="${digits}" style="${inactiveStyle}">
+                            <button class="slider-step-btn" data-dir="-1">−</button>
+                            <div class="slider-track" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; --progress-bar-text-padding: ${individualPadding}px;">
+                                <div class="slider-fill" style="width: ${percent}%;"></div>
+                                <div class="slider-thumb" style="left: ${percent}%;"></div>
+                            </div>
+                            ${valueHtml}
+                            <button class="slider-step-btn" data-dir="1">+</button>
                         </div>
                     `;
                 } else if (variable.displayType === 'image') {
