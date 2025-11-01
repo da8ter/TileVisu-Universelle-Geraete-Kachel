@@ -1230,7 +1230,7 @@
                             }
                         }
                         break;
-                    case 'image1Url':
+                    case 'image1url':
                         // Hintergrundbild direkt per WebHook-URL setzen (Browser-Caching aktiv)
                         try {
                             if (typeof value === 'string' && value) {
@@ -1240,6 +1240,17 @@
                             }
                         } catch (_) {}
                         break;
+                    case 'image1':
+                        try {
+                            if (typeof value === 'string' && value) {
+                                const mainDiv = document.querySelector('body');
+                                if (!window._bgImageFromUrl) {
+                                    mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
+                                }
+                            }
+                        } catch (_) {}
+                        break;
+
                     case 'imagealignment':
                         // Speichere Alignment global und wende sofort an
                         window.currentImageAlignment = value;
