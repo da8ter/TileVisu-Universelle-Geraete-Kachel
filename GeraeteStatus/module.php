@@ -3061,6 +3061,8 @@ class UniversalDeviceTile extends IPSModule
             return $res;
         }
         $variable = IPS_GetVariable($variableId);
+        $debug = ($variableId == 49382); // Debug für Problem-Variable
+        // 1) Profil-Werte (falls vorhanden)
         $profileName = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
         if (!empty($profileName) && IPS_VariableProfileExists($profileName)) {
             $profileData = IPS_GetVariableProfile($profileName);
@@ -3069,16 +3071,106 @@ class UniversalDeviceTile extends IPSModule
             }
             if (isset($profileData['StepSize'])) {
                 $res['step'] = (float)$profileData['StepSize'];
+                if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Profil StepSize = {$res['step']}");
             }
         }
-        if ($res['step'] === null) {
+
+        // Helper: extrahiere Step/Digits rekursiv aus beliebigen Präsentations-Strukturen
+        $extractStepDigits = function ($arr) use (&$res, &$extractStepDigits) {
+            if (!is_array($arr)) return;
+            $keysStep = [
+                'step','stepsize','STEP','Step','StepSize','STEP_SIZE','stepSize',
+                'INCREMENT','Increment','increment','StepValue','STEPVALUE','step_value','StepWidth',
+                // Häufige Varianten in Präsentationen
+                'smallestStep','SmallestStep','SMALLESTSTEP','SMALLEST_STEP','smallStep','SmallStep','small_step'
+            ];
+            $keysDigits = ['digits','DIGITS','Digits'];
+            foreach ($keysStep as $k) {
+                if (isset($arr[$k]) && is_numeric($arr[$k])) { $res['step'] = (float)$arr[$k]; break; }
+            }
+            foreach ($keysDigits as $k) {
+                if (isset($arr[$k]) && is_numeric($arr[$k])) { $res['digits'] = (int)$arr[$k]; break; }
+            }
+            // Rekursiv in alle Unterstrukturen (PARAMETERS, Values, OPTIONS, usw.)
+            foreach ($arr as $k => $v) {
+                if (is_array($v)) {
+                    $extractStepDigits($v);
+                } elseif (is_string($v)) {
+                    $decoded = @json_decode($v, true);
+                    if (is_array($decoded)) $extractStepDigits($decoded);
+                }
+            }
+        };
+
+        // 2) Präsentation direkt aus Variable lesen (Custom bevorzugt) – JSON-String sicher dekodieren
+        $presentation = [];
+        $presentationRaw = null;
+        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
+            $presentationRaw = $variable['VariableCustomPresentation'];
+        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
+            $presentationRaw = $variable['VariablePresentation'];
+        }
+        if (!empty($presentationRaw)) {
+            if (is_string($presentationRaw)) {
+                $decodedTop = @json_decode($presentationRaw, true);
+                if (is_array($decodedTop)) {
+                    $presentation = $decodedTop;
+                }
+            } elseif (is_array($presentationRaw)) {
+                $presentation = $presentationRaw;
+            }
+        }
+        
+        // WICHTIG: Wenn Präsentation nur GUID-Referenz enthält, hole vollständige Daten über IPS_GetVariablePresentation
+        if (!empty($presentation) && isset($presentation['PRESENTATION']) && count($presentation) <= 2) {
+            // Präsentation enthält nur GUID (+ evtl. 1-2 andere Keys) -> vollständige Daten laden
+            if (function_exists('IPS_GetVariablePresentation')) {
+                try {
+                    $fullPresentation = @IPS_GetVariablePresentation($variableId);
+                    if (is_array($fullPresentation) && !empty($fullPresentation)) {
+                        if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Aufgelöste Präsentation via IPS_GetVariablePresentation = " . json_encode($fullPresentation));
+                        $presentation = $fullPresentation;
+                    }
+                } catch (Exception $e) { /* ignore */ }
+            }
+        }
+        if (!empty($presentation)) {
+            if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Presentation (Top-Level) = " . json_encode($presentation));
+            $extractStepDigits($presentation);
+            if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Nach Top-Level Extraktion: step={$res['step']}, digits={$res['digits']}");
+            // GUID-gestützte Präsentation
+            if (isset($presentation['PRESENTATION']) && !empty($presentation['PRESENTATION']) && function_exists('IPS_GetPresentation')) {
+                $guid = trim((string)$presentation['PRESENTATION'], "{} ");
+                if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Lade GUID-Präsentation: $guid");
+                try {
+                    $pdata = @IPS_GetPresentation($guid);
+                    if (is_array($pdata)) { 
+                        if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: GUID-Daten = " . json_encode($pdata));
+                        $extractStepDigits($pdata); 
+                        if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Nach GUID Extraktion: step={$res['step']}, digits={$res['digits']}");
+                    }
+                } catch (Exception $e) { /* ignore */ }
+            }
+            // TEMPLATE-basierte Struktur (liefert meist Values)
+            if (isset($presentation['TEMPLATE']) && function_exists('IPS_GetTemplate')) {
+                try {
+                    $tdata = @IPS_GetTemplate($presentation['TEMPLATE']);
+                    if (is_array($tdata)) { $extractStepDigits($tdata); }
+                } catch (Exception $e) { /* ignore */ }
+            }
+        }
+
+        // 3) Fallbacks falls Step nicht gefunden
+        if ($res['step'] === null || $res['step'] <= 0) {
             $digits = max(0, (int)$res['digits']);
             if ($variable['VariableType'] === VARIABLETYPE_INTEGER) {
                 $res['step'] = 1;
+                if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Fallback für Integer -> step=1");
             } else {
                 $res['step'] = ($digits > 0) ? pow(10, -$digits) : 0.0;
             }
         }
+        if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: FINAL step={$res['step']}, digits={$res['digits']}");
         return $res;
     }
     
