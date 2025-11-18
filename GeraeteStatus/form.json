@@ -519,6 +519,10 @@
                     "value": "progress"
                   },
                   {
+                    "caption": "Slider",
+                    "value": "slider"
+                  },
+                  {
                     "caption": "Button",
                     "value": "button"
                   },
@@ -821,6 +825,7 @@
     "$form[] = [ 'caption' => 'Display Type', 'name' => 'DisplayType', 'type' => 'Select', 'width' => '100%', 'options' => [",
     "    [ 'caption' => 'Text',         'value' => 'text'     ],",
     "    [ 'caption' => 'Progress Bar', 'value' => 'progress' ],",
+    "    [ 'caption' => 'Slider',       'value' => 'slider'   ],",
     "    [ 'caption' => 'Button',       'value' => 'button'   ],",
     "    [ 'caption' => 'Image',        'value' => 'image'    ]",
     "  ], 'save' => true, 'add' => 'text', 'onChange' => 'IPS_RequestAction($id, \"UpdateDisplayTypeFields\", $DisplayType);' ];",
@@ -830,7 +835,7 @@
     "    [ 'caption' => 'Show Label', 'name' => 'ShowLabel', 'type' => 'CheckBox', 'save' => true, 'visible' => ($displayType !== 'image'), 'add' => true ],",
     "    [ 'caption' => 'Show Value', 'name' => 'ShowValue', 'type' => 'CheckBox', 'save' => true, 'visible' => ($displayType !== 'image'), 'add' => true ]",
     "  ] ];",
-    "$form[] = [ 'caption' => 'Label (Overrides the variable name)', 'name' => 'Label', 'width' => '100%', 'type' => 'ValidationTextBox', 'save' => true, 'add' => '', 'visible' => ($displayType === 'text' || $displayType === 'progress' || $displayType === 'button') ];",
+    "$form[] = [ 'caption' => 'Label (Overrides the variable name)', 'name' => 'Label', 'width' => '100%', 'type' => 'ValidationTextBox', 'save' => true, 'add' => '', 'visible' => ($displayType === 'text' || $displayType === 'progress' || $displayType === 'button' || $displayType === 'slider') ];",
     "$form[] = [ 'type' => 'RowLayout', 'items' => [",
     "    [ 'caption' => 'Group (All elements in a group are displayed in a single row.)', 'name' => 'Group', 'type' => 'Select', 'width' => '600px',",
     "      'options' => [",
@@ -856,8 +861,8 @@
     "// ---------- DisplayType-abhängige Panels (vereinheitlicht via UpdateDisplayTypeVisibility) ----------",
     "// Progress-Felder (standardmäßig ausgeblendet)",
     "$form[] = [ 'type' => 'RowLayout', 'items' => [",
-    "    [ 'caption' => 'Progress bar color 1', 'name' => 'ProgressColor1', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 52650, 'value' => 52650, 'visible' => ($displayType === 'progress') ],",
-    "    [ 'caption' => 'Progress bar color 2', 'name' => 'ProgressColor2', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 30050, 'value' => 30050, 'visible' => ($displayType === 'progress') ]",
+    "    [ 'caption' => 'Progress bar color 1', 'name' => 'ProgressColor1', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 52650, 'value' => 52650, 'visible' => ($displayType === 'progress' || $displayType === 'slider') ],",
+    "    [ 'caption' => 'Progress bar color 2', 'name' => 'ProgressColor2', 'type' => 'SelectColor', 'allowTransparent' => true, 'save' => true, 'add' => 30050, 'value' => 30050, 'visible' => ($displayType === 'progress' || $displayType === 'slider') ]",
     "] ];",
     "$form[] = [ 'type' => 'Label', 'caption' => 'Additional information in the progress bar', 'underline' => false, 'width' => '100%', 'visible' => ($displayType === 'progress') ];",
     "$form[] = [ 'type' => 'RowLayout', 'items' => [",

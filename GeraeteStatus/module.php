@@ -1091,6 +1091,31 @@ class UniversalDeviceTile extends IPSModule
         $currentValue = GetValue($variableID);
         
         RequestAction($variableID, $newValue);
+    } else if ($variableType === VARIABLETYPE_FLOAT) {
+        $newValue = floatval($value);
+        $bounds = $this->GetProgressMinMax($variableID);
+        $minV = isset($bounds['min']) ? floatval($bounds['min']) : 0.0;
+        $maxV = isset($bounds['max']) ? floatval($bounds['max']) : 100.0;
+        if ($maxV < $minV) { $tmp = $minV; $minV = $maxV; $maxV = $tmp; }
+        $cfg = $this->GetSliderStepAndDigits($variableID);
+        $step = isset($cfg['step']) ? floatval($cfg['step']) : 0.0;
+        $digits = isset($cfg['digits']) ? intval($cfg['digits']) : 0;
+        $range = $maxV - $minV;
+        if ($range <= 0) { $minV = 0.0; $maxV = 100.0; $range = 100.0; }
+        if ($step <= 0) {
+            if ($digits > 0) {
+                $step = pow(10, -$digits);
+            } else {
+                $step = $range / 100.0;
+            }
+        }
+        $ratio = ($newValue - $minV) / $step;
+        $rounded = round($ratio);
+        $newValue = $minV + ($rounded * $step);
+        if ($digits >= 0) { $newValue = floatval(number_format($newValue, $digits, '.', '')); }
+        if ($newValue < $minV) $newValue = $minV;
+        if ($newValue > $maxV) $newValue = $maxV;
+        RequestAction($variableID, $newValue);
     } else if ($variableType === VARIABLETYPE_STRING) {
         // String-Variable: Verwende den übergebenen String-Wert direkt (für Multi-Button-Interface)
         $newValue = strval($value);
@@ -1558,7 +1583,7 @@ class UniversalDeviceTile extends IPSModule
                     $finalFormattedValue = GetValueFormatted($variable['Variable']);
                     $finalRawValue = GetValue($variable['Variable']);
                     
-                    if (!$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress') {
+                    if (!$progressbarActive && in_array(($variable['DisplayType'] ?? 'text'), ['progress','slider'])) {
                         // Progressbar deaktiviert: Zeige "-" für alle Werte und mache Text/Icon 50% transparent
                         $finalRawValue = 0;
                         $finalFormattedValue = '-';
@@ -1589,7 +1614,7 @@ class UniversalDeviceTile extends IPSModule
                         'rawValue' => $finalRawValue, // Backend-überschriebener Wert
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
-                        'progressbarInactive' => !$progressbarActive && ($variable['DisplayType'] ?? 'text') === 'progress', // 50% Transparenz Flag
+                        'progressbarInactive' => !$progressbarActive && in_array(($variable['DisplayType'] ?? 'text'), ['progress','slider']), // 50% Transparenz Flag
                         'useSecondVariableAsTarget' => (bool)($variable['UseSecondVariableAsTarget'] ?? false),
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
                         'scriptId' => intval($variable['ScriptID'] ?? 0),
@@ -1603,6 +1628,12 @@ class UniversalDeviceTile extends IPSModule
                         // Image width now in percent (1-100), default 40
                         $variableData['imageWidth'] = max(1, min(100, intval($variable['ImageWidth'] ?? 40)));
                         $variableData['imageBorderRadius'] = intval($variable['ImageBorderRadius'] ?? 6);
+                    }
+                    // Slider Zusatzdaten
+                    if (($variable['DisplayType'] ?? 'text') === 'slider') {
+                        $sd = $this->GetSliderStepAndDigits($variable['Variable']);
+                        $variableData['sliderStep'] = isset($sd['step']) ? $sd['step'] : null;
+                        $variableData['sliderDigits'] = isset($sd['digits']) ? $sd['digits'] : null;
                     }
                     
                     // Vorbereitung für SecondVariable als Marker
@@ -2053,6 +2084,42 @@ class UniversalDeviceTile extends IPSModule
                 // Text-Felder ausblenden
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 // Ausrichtung bei Progress ausblenden
+                $this->UpdateFormField('VerticalAlignment', 'visible', false);
+                break;
+            case 'slider':
+                // Slider: ähnlich Progress, aber ohne SecondVariable-Block
+                $this->UpdateFormField('ShowIcon', 'visible', true);
+                $this->UpdateFormField('ShowLabel', 'visible', true);
+                $this->UpdateFormField('ShowValue', 'visible', true);
+                // Variable benötigt
+                $this->UpdateFormField('Variable', 'visible', true);
+                // ScriptID ausblenden
+                $this->UpdateFormField('ScriptID', 'visible', false);
+                // Generelle Text-Einstellungen sichtbar
+                $this->UpdateFormField('Label', 'visible', true);
+                $this->UpdateFormField('FontSize', 'visible', true);
+                $this->UpdateFormField('TextColor', 'visible', true);
+                // Progress-/Slider-Farben sichtbar
+                $this->UpdateFormField('ProgressColor1', 'visible', true);
+                $this->UpdateFormField('ProgressColor2', 'visible', true);
+                // SecondVariable-Block ausblenden (Slider nutzt keinen Marker)
+                $this->UpdateFormField('SecondVariable', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
+                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
+                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
+                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', false);
+                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
+                // Button-Felder ausblenden
+                $this->UpdateFormField('ButtonWidth', 'visible', false);
+                $this->UpdateFormField('boolButtonColor', 'visible', false);
+                // Image-Felder ausblenden
+                $this->UpdateFormField('ImageMedia', 'visible', false);
+                $this->UpdateFormField('ImageWidth', 'visible', false);
+                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
+                // Text-Felder ausblenden
+                $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                // Ausrichtung bei Slider ausblenden (feste horizontale Ausrichtung)
                 $this->UpdateFormField('VerticalAlignment', 'visible', false);
                 break;
             case 'button':
@@ -2801,6 +2868,33 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // **PRESENTATION-HIERARCHIE wie bei Icons: Gleiche Taktik für konsistente Behandlung**
+
+        // Hilfsfunktion: Min/Max rekursiv aus beliebigen Strukturen extrahieren
+        $extractMinMax = function($arr) use (&$extractMinMax) {
+            if (!is_array($arr)) return null;
+            $minKeys = ['MinValue','MinimalerWert','Minimum','Min','minValue','min'];
+            $maxKeys = ['MaxValue','MaximalerWert','Maximum','Max','maxValue','max'];
+            $foundMin = null; $foundMax = null;
+            foreach ($minKeys as $k) { if (isset($arr[$k]) && is_numeric($arr[$k])) { $foundMin = (float)$arr[$k]; break; } }
+            foreach ($maxKeys as $k) { if (isset($arr[$k]) && is_numeric($arr[$k])) { $foundMax = (float)$arr[$k]; break; } }
+            if ($foundMin !== null && $foundMax !== null) {
+                return ['min' => $foundMin, 'max' => $foundMax];
+            }
+            // Rekursiv in Unterstrukturen suchen (einschließlich JSON-Strings)
+            foreach ($arr as $v) {
+                if (is_array($v)) {
+                    $res = $extractMinMax($v);
+                    if (is_array($res)) return $res;
+                } elseif (is_string($v)) {
+                    $decoded = @json_decode($v, true);
+                    if (is_array($decoded)) {
+                        $res = $extractMinMax($decoded);
+                        if (is_array($res)) return $res;
+                    }
+                }
+            }
+            return null;
+        };
         
         // **FALL 1: Alte Variablenprofile (höchste Priorität wie bei Icons)**
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
@@ -2829,95 +2923,96 @@ class UniversalDeviceTile extends IPSModule
         
         if (!empty($customPresentation)) {
             // Direkte MIN/MAX Parameter
-            if (isset($customPresentation['MIN']) && isset($customPresentation['MAX'])) {
-                if (is_numeric($customPresentation['MIN']) && is_numeric($customPresentation['MAX'])) {
-                    $minMax = [
-                        'min' => floatval($customPresentation['MIN']),
-                        'max' => floatval($customPresentation['MAX'])
-                    ];
-                    
-                    return $minMax;
+            $directMinMax = null;
+            if ((isset($customPresentation['MIN']) && isset($customPresentation['MAX'])) || (isset($customPresentation['Min']) && isset($customPresentation['Max']))) {
+                $minVal = isset($customPresentation['MIN']) ? $customPresentation['MIN'] : $customPresentation['Min'];
+                $maxVal = isset($customPresentation['MAX']) ? $customPresentation['MAX'] : $customPresentation['Max'];
+                if (is_numeric($minVal) && is_numeric($maxVal)) {
+                    $directMinMax = ['min' => (float)$minVal, 'max' => (float)$maxVal];
                 }
             }
+            if (!$directMinMax) {
+                $directMinMax = $extractMinMax($customPresentation);
+            }
+            if (is_array($directMinMax)) return $directMinMax;
             
             // **FALL 3: GUID-basierte Presentations (PRESENTATION)**
             if (isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
-                $presentationGuid = $customPresentation['PRESENTATION'];
-                
+                $presentationGuid = trim((string)$customPresentation['PRESENTATION'], "{} ");
                 try {
-                    // GUID VALIDATION: Prüfe ob GUID im System existiert
-                    if (@IPS_PresentationExists($presentationGuid)) {
+                    if (function_exists('IPS_PresentationExists') && @IPS_PresentationExists($presentationGuid)) {
                         $presentationData = IPS_GetPresentation($presentationGuid);
-                    } else {
-                        throw new Exception('GUID not registered in system');
-                    }
-                    
-                    if ($presentationData && is_string($presentationData)) {
-                        $presentationArray = json_decode($presentationData, true);
-                        
-                        if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
-                            $minMax = [
-                                'min' => floatval($presentationArray['MinValue']),
-                                'max' => floatval($presentationArray['MaxValue'])
-                            ];
-                            
-                            return $minMax;
+                        $presentationArray = is_string($presentationData) ? @json_decode($presentationData, true) : $presentationData;
+                        if (is_array($presentationArray)) {
+                            // Erst in presentationParameters schauen, dann global
+                            if (isset($presentationArray['presentationParameters']) && is_array($presentationArray['presentationParameters'])) {
+                                $mm = $extractMinMax($presentationArray['presentationParameters']);
+                                if (is_array($mm)) return $mm;
+                            }
+                            $mm = $extractMinMax($presentationArray);
+                            if (is_array($mm)) return $mm;
                         }
                     }
-                } catch (Exception $e) {
-                }
+                } catch (Exception $e) { }
             }
             
             // **FALL 4: OPTIONS-basierte Presentations**
             if (isset($customPresentation['OPTIONS']) && !empty($customPresentation['OPTIONS'])) {
-                $optionsGuid = $customPresentation['OPTIONS'];
-                
-                try {
-                    if (@IPS_PresentationExists($optionsGuid)) {
-                        $presentationData = IPS_GetPresentation($optionsGuid);
-                        
-                        if ($presentationData && is_string($presentationData)) {
-                            $presentationArray = json_decode($presentationData, true);
-                            
-                            if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
-                                $minMax = [
-                                    'min' => floatval($presentationArray['MinValue']),
-                                    'max' => floatval($presentationArray['MaxValue'])
-                                ];
-                                
-                                return $minMax;
+                $opt = $customPresentation['OPTIONS'];
+                // A) Direkte JSON-OPTIONS durchsuchen
+                if (is_string($opt)) {
+                    $decoded = @json_decode($opt, true);
+                    if (is_array($decoded)) {
+                        $mm = $extractMinMax($decoded);
+                        if (is_array($mm)) return $mm;
+                    }
+                } elseif (is_array($opt)) {
+                    $mm = $extractMinMax($opt);
+                    if (is_array($mm)) return $mm;
+                }
+                // B) OPTIONS als GUID interpretieren
+                $optionsGuid = is_string($opt) ? trim($opt, "{} ") : '';
+                if ($optionsGuid !== '') {
+                    try {
+                        if (function_exists('IPS_PresentationExists') && @IPS_PresentationExists($optionsGuid)) {
+                            $presentationData = IPS_GetPresentation($optionsGuid);
+                            $presentationArray = is_string($presentationData) ? @json_decode($presentationData, true) : $presentationData;
+                            if (is_array($presentationArray)) {
+                                $mm = $extractMinMax($presentationArray);
+                                if (is_array($mm)) return $mm;
                             }
                         }
-                    }
-                } catch (Exception $e) {
-                    
+                    } catch (Exception $e) { }
                 }
             }
             
             // **FALL 5: TEMPLATE-basierte Presentations**
             if (isset($customPresentation['TEMPLATE']) && !empty($customPresentation['TEMPLATE'])) {
-                $templateGuid = $customPresentation['TEMPLATE'];
-                
+                $templateGuid = trim((string)$customPresentation['TEMPLATE'], "{} ");
                 try {
-                    if (@IPS_PresentationExists($templateGuid)) {
-                        $presentationData = IPS_GetPresentation($templateGuid);
-                        
-                        if ($presentationData && is_string($presentationData)) {
-                            $presentationArray = json_decode($presentationData, true);
-                            
-                            if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
-                                $minMax = [
-                                    'min' => floatval($presentationArray['MinValue']),
-                                    'max' => floatval($presentationArray['MaxValue'])
-                                ];
-                                
-                                return $minMax;
+                    if (function_exists('IPS_GetTemplate')) {
+                        $templateData = @IPS_GetTemplate($templateGuid);
+                        // Erwartete Struktur: ['Values' => ...] aber wir scannen alles
+                        if (is_array($templateData)) {
+                            if (isset($templateData['Values']) && is_array($templateData['Values'])) {
+                                $mm = $extractMinMax($templateData['Values']);
+                                if (is_array($mm)) return $mm;
+                            }
+                            $mm = $extractMinMax($templateData);
+                            if (is_array($mm)) return $mm;
+                        }
+                    } else {
+                        // Fallback: manche Systeme liefern Template-Daten auch über IPS_GetPresentation
+                        if (function_exists('IPS_PresentationExists') && @IPS_PresentationExists($templateGuid)) {
+                            $presentationData = IPS_GetPresentation($templateGuid);
+                            $presentationArray = is_string($presentationData) ? @json_decode($presentationData, true) : $presentationData;
+                            if (is_array($presentationArray)) {
+                                $mm = $extractMinMax($presentationArray);
+                                if (is_array($mm)) return $mm;
                             }
                         }
                     }
-                } catch (Exception $e) {
-                    
-                }
+                } catch (Exception $e) { }
             }
         }
         
@@ -2986,6 +3081,125 @@ class UniversalDeviceTile extends IPSModule
         
         // **LETZTER FALLBACK: Standard Min/Max verwenden**
         return $defaultMinMax;
+    }
+
+    private function GetSliderStepAndDigits($variableId) {
+        $res = ['step' => null, 'digits' => 0];
+        if (!IPS_VariableExists($variableId)) {
+            return $res;
+        }
+        $variable = IPS_GetVariable($variableId);
+        $debug = ($variableId == 49382); // Debug für Problem-Variable
+        // 1) Profil-Werte (falls vorhanden)
+        $profileName = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+        if (!empty($profileName) && IPS_VariableProfileExists($profileName)) {
+            $profileData = IPS_GetVariableProfile($profileName);
+            if (isset($profileData['Digits'])) {
+                $res['digits'] = (int)$profileData['Digits'];
+            }
+            if (isset($profileData['StepSize'])) {
+                $res['step'] = (float)$profileData['StepSize'];
+                if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Profil StepSize = {$res['step']}");
+            }
+        }
+
+        // Helper: extrahiere Step/Digits rekursiv aus beliebigen Präsentations-Strukturen
+        $extractStepDigits = function ($arr) use (&$res, &$extractStepDigits) {
+            if (!is_array($arr)) return;
+            $keysStep = [
+                'step','stepsize','STEP','Step','StepSize','STEP_SIZE','stepSize',
+                'INCREMENT','Increment','increment','StepValue','STEPVALUE','step_value','StepWidth',
+                // Häufige Varianten in Präsentationen
+                'smallestStep','SmallestStep','SMALLESTSTEP','SMALLEST_STEP','smallStep','SmallStep','small_step'
+            ];
+            $keysDigits = ['digits','DIGITS','Digits'];
+            foreach ($keysStep as $k) {
+                if (isset($arr[$k]) && is_numeric($arr[$k])) { $res['step'] = (float)$arr[$k]; break; }
+            }
+            foreach ($keysDigits as $k) {
+                if (isset($arr[$k]) && is_numeric($arr[$k])) { $res['digits'] = (int)$arr[$k]; break; }
+            }
+            // Rekursiv in alle Unterstrukturen (PARAMETERS, Values, OPTIONS, usw.)
+            foreach ($arr as $k => $v) {
+                if (is_array($v)) {
+                    $extractStepDigits($v);
+                } elseif (is_string($v)) {
+                    $decoded = @json_decode($v, true);
+                    if (is_array($decoded)) $extractStepDigits($decoded);
+                }
+            }
+        };
+
+        // 2) Präsentation direkt aus Variable lesen (Custom bevorzugt) – JSON-String sicher dekodieren
+        $presentation = [];
+        $presentationRaw = null;
+        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
+            $presentationRaw = $variable['VariableCustomPresentation'];
+        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
+            $presentationRaw = $variable['VariablePresentation'];
+        }
+        if (!empty($presentationRaw)) {
+            if (is_string($presentationRaw)) {
+                $decodedTop = @json_decode($presentationRaw, true);
+                if (is_array($decodedTop)) {
+                    $presentation = $decodedTop;
+                }
+            } elseif (is_array($presentationRaw)) {
+                $presentation = $presentationRaw;
+            }
+        }
+        
+        // WICHTIG: Wenn Präsentation nur GUID-Referenz enthält, hole vollständige Daten über IPS_GetVariablePresentation
+        if (!empty($presentation) && isset($presentation['PRESENTATION']) && count($presentation) <= 2) {
+            // Präsentation enthält nur GUID (+ evtl. 1-2 andere Keys) -> vollständige Daten laden
+            if (function_exists('IPS_GetVariablePresentation')) {
+                try {
+                    $fullPresentation = @IPS_GetVariablePresentation($variableId);
+                    if (is_array($fullPresentation) && !empty($fullPresentation)) {
+                        if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Aufgelöste Präsentation via IPS_GetVariablePresentation = " . json_encode($fullPresentation));
+                        $presentation = $fullPresentation;
+                    }
+                } catch (Exception $e) { /* ignore */ }
+            }
+        }
+        if (!empty($presentation)) {
+            if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Presentation (Top-Level) = " . json_encode($presentation));
+            $extractStepDigits($presentation);
+            if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Nach Top-Level Extraktion: step={$res['step']}, digits={$res['digits']}");
+            // GUID-gestützte Präsentation
+            if (isset($presentation['PRESENTATION']) && !empty($presentation['PRESENTATION']) && function_exists('IPS_GetPresentation')) {
+                $guid = trim((string)$presentation['PRESENTATION'], "{} ");
+                if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Lade GUID-Präsentation: $guid");
+                try {
+                    $pdata = @IPS_GetPresentation($guid);
+                    if (is_array($pdata)) { 
+                        if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: GUID-Daten = " . json_encode($pdata));
+                        $extractStepDigits($pdata); 
+                        if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Nach GUID Extraktion: step={$res['step']}, digits={$res['digits']}");
+                    }
+                } catch (Exception $e) { /* ignore */ }
+            }
+            // TEMPLATE-basierte Struktur (liefert meist Values)
+            if (isset($presentation['TEMPLATE']) && function_exists('IPS_GetTemplate')) {
+                try {
+                    $tdata = @IPS_GetTemplate($presentation['TEMPLATE']);
+                    if (is_array($tdata)) { $extractStepDigits($tdata); }
+                } catch (Exception $e) { /* ignore */ }
+            }
+        }
+
+        // 3) Fallbacks falls Step nicht gefunden
+        if ($res['step'] === null || $res['step'] <= 0) {
+            $digits = max(0, (int)$res['digits']);
+            if ($variable['VariableType'] === VARIABLETYPE_INTEGER) {
+                $res['step'] = 1;
+                if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: Fallback für Integer -> step=1");
+            } else {
+                $res['step'] = ($digits > 0) ? pow(10, -$digits) : 0.0;
+            }
+        }
+        if ($debug) IPS_LogMessage('GetSliderStep', "ID $variableId: FINAL step={$res['step']}, digits={$res['digits']}");
+        return $res;
     }
     
     /**
