@@ -74,13 +74,3 @@ Die Konfiguration gliedert sich in mehrere Bereiche der Form:
 
 ## PHP-Befehle
 Das Modul stellt aktuell keine öffentlichen PHP-Befehle bereit. Die komplette Funktionalität erfolgt über die Instanz-Konfiguration.
-
-## Changelog
-- **1.0.3**
-  - Verbesserte Script-Button-Anzeige inklusive Spin-Status und Opacity-Handling.
-  - Korrekturen am Fallback-Icon und an der Icon-Wiederherstellung.
-  - README nach Symcon-Vorgaben ergänzt.
-- **1.0.2**
-  - Diverse Fehlerkorrekturen bei Default-Bildern und Progress-Anzeige.
-- **1.0.1**
-  - Initiale öffentliche Version.
