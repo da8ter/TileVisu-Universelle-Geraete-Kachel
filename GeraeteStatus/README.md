@@ -80,7 +80,7 @@ Das Modul stellt aktuell keine öffentlichen PHP-Befehle bereit. Die komplette F
 - **1.0.3**
   - Verbesserte Script-Button-Anzeige inklusive Spin-Status und Opacity-Handling.
   - Korrekturen am Fallback-Icon und an der Icon-Wiederherstellung.
-  - README nach Symcon-Vorgaben ergänzt.
+  - Gleichmäßige Breitenverteilung für mehrere Progress-Balken in Gruppen (alle Balken teilen den verfügbaren Platz nun 1:1:1 ...).
 - **1.0.2**
   - Diverse Fehlerkorrekturen bei Default-Bildern und Progress-Anzeige.
 - **1.0.1**

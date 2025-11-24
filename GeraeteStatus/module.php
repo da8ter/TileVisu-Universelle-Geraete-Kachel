@@ -389,6 +389,26 @@ class UniversalDeviceTile extends IPSModule
             }
             return '';
         }
+        // Script-Buttons ohne Variable: Script-Namen anzeigen
+        if (($displayType === 'button') && isset($row['ScriptID'])) {
+            $scriptId = intval($row['ScriptID']);
+            if ($scriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($scriptId)) {
+                $obj = IPS_GetObject($scriptId);
+                $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
+                $parentName = '';
+                if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
+                    $parent = IPS_GetObject($obj['ParentID']);
+                    $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
+                }
+                if (!empty($row['Label'])) {
+                    $name = $row['Label'];
+                }
+                if ($name !== '' && $parentName !== '') {
+                    return $name . ' (' . $parentName . ')';
+                }
+                return $name;
+            }
+        }
         $vid = intval($row['Variable'] ?? 0);
         if ($vid > 0 && IPS_VariableExists($vid)) {
             $obj = IPS_GetObject($vid);
@@ -2868,6 +2888,33 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // **PRESENTATION-HIERARCHIE wie bei Icons: Gleiche Taktik für konsistente Behandlung**
+
+        // Hilfsfunktion: Min/Max rekursiv aus beliebigen Strukturen extrahieren
+        $extractMinMax = function($arr) use (&$extractMinMax) {
+            if (!is_array($arr)) return null;
+            $minKeys = ['MinValue','MinimalerWert','Minimum','Min','minValue','min'];
+            $maxKeys = ['MaxValue','MaximalerWert','Maximum','Max','maxValue','max'];
+            $foundMin = null; $foundMax = null;
+            foreach ($minKeys as $k) { if (isset($arr[$k]) && is_numeric($arr[$k])) { $foundMin = (float)$arr[$k]; break; } }
+            foreach ($maxKeys as $k) { if (isset($arr[$k]) && is_numeric($arr[$k])) { $foundMax = (float)$arr[$k]; break; } }
+            if ($foundMin !== null && $foundMax !== null) {
+                return ['min' => $foundMin, 'max' => $foundMax];
+            }
+            // Rekursiv in Unterstrukturen suchen (einschließlich JSON-Strings)
+            foreach ($arr as $v) {
+                if (is_array($v)) {
+                    $res = $extractMinMax($v);
+                    if (is_array($res)) return $res;
+                } elseif (is_string($v)) {
+                    $decoded = @json_decode($v, true);
+                    if (is_array($decoded)) {
+                        $res = $extractMinMax($decoded);
+                        if (is_array($res)) return $res;
+                    }
+                }
+            }
+            return null;
+        };
         
         // **FALL 1: Alte Variablenprofile (höchste Priorität wie bei Icons)**
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
@@ -2896,95 +2943,96 @@ class UniversalDeviceTile extends IPSModule
         
         if (!empty($customPresentation)) {
             // Direkte MIN/MAX Parameter
-            if (isset($customPresentation['MIN']) && isset($customPresentation['MAX'])) {
-                if (is_numeric($customPresentation['MIN']) && is_numeric($customPresentation['MAX'])) {
-                    $minMax = [
-                        'min' => floatval($customPresentation['MIN']),
-                        'max' => floatval($customPresentation['MAX'])
-                    ];
-                    
-                    return $minMax;
+            $directMinMax = null;
+            if ((isset($customPresentation['MIN']) && isset($customPresentation['MAX'])) || (isset($customPresentation['Min']) && isset($customPresentation['Max']))) {
+                $minVal = isset($customPresentation['MIN']) ? $customPresentation['MIN'] : $customPresentation['Min'];
+                $maxVal = isset($customPresentation['MAX']) ? $customPresentation['MAX'] : $customPresentation['Max'];
+                if (is_numeric($minVal) && is_numeric($maxVal)) {
+                    $directMinMax = ['min' => (float)$minVal, 'max' => (float)$maxVal];
                 }
             }
+            if (!$directMinMax) {
+                $directMinMax = $extractMinMax($customPresentation);
+            }
+            if (is_array($directMinMax)) return $directMinMax;
             
             // **FALL 3: GUID-basierte Presentations (PRESENTATION)**
             if (isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
-                $presentationGuid = $customPresentation['PRESENTATION'];
-                
+                $presentationGuid = trim((string)$customPresentation['PRESENTATION'], "{} ");
                 try {
-                    // GUID VALIDATION: Prüfe ob GUID im System existiert
-                    if (@IPS_PresentationExists($presentationGuid)) {
+                    if (function_exists('IPS_PresentationExists') && @IPS_PresentationExists($presentationGuid)) {
                         $presentationData = IPS_GetPresentation($presentationGuid);
-                    } else {
-                        throw new Exception('GUID not registered in system');
-                    }
-                    
-                    if ($presentationData && is_string($presentationData)) {
-                        $presentationArray = json_decode($presentationData, true);
-                        
-                        if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
-                            $minMax = [
-                                'min' => floatval($presentationArray['MinValue']),
-                                'max' => floatval($presentationArray['MaxValue'])
-                            ];
-                            
-                            return $minMax;
+                        $presentationArray = is_string($presentationData) ? @json_decode($presentationData, true) : $presentationData;
+                        if (is_array($presentationArray)) {
+                            // Erst in presentationParameters schauen, dann global
+                            if (isset($presentationArray['presentationParameters']) && is_array($presentationArray['presentationParameters'])) {
+                                $mm = $extractMinMax($presentationArray['presentationParameters']);
+                                if (is_array($mm)) return $mm;
+                            }
+                            $mm = $extractMinMax($presentationArray);
+                            if (is_array($mm)) return $mm;
                         }
                     }
-                } catch (Exception $e) {
-                }
+                } catch (Exception $e) { }
             }
             
             // **FALL 4: OPTIONS-basierte Presentations**
             if (isset($customPresentation['OPTIONS']) && !empty($customPresentation['OPTIONS'])) {
-                $optionsGuid = $customPresentation['OPTIONS'];
-                
-                try {
-                    if (@IPS_PresentationExists($optionsGuid)) {
-                        $presentationData = IPS_GetPresentation($optionsGuid);
-                        
-                        if ($presentationData && is_string($presentationData)) {
-                            $presentationArray = json_decode($presentationData, true);
-                            
-                            if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
-                                $minMax = [
-                                    'min' => floatval($presentationArray['MinValue']),
-                                    'max' => floatval($presentationArray['MaxValue'])
-                                ];
-                                
-                                return $minMax;
+                $opt = $customPresentation['OPTIONS'];
+                // A) Direkte JSON-OPTIONS durchsuchen
+                if (is_string($opt)) {
+                    $decoded = @json_decode($opt, true);
+                    if (is_array($decoded)) {
+                        $mm = $extractMinMax($decoded);
+                        if (is_array($mm)) return $mm;
+                    }
+                } elseif (is_array($opt)) {
+                    $mm = $extractMinMax($opt);
+                    if (is_array($mm)) return $mm;
+                }
+                // B) OPTIONS als GUID interpretieren
+                $optionsGuid = is_string($opt) ? trim($opt, "{} ") : '';
+                if ($optionsGuid !== '') {
+                    try {
+                        if (function_exists('IPS_PresentationExists') && @IPS_PresentationExists($optionsGuid)) {
+                            $presentationData = IPS_GetPresentation($optionsGuid);
+                            $presentationArray = is_string($presentationData) ? @json_decode($presentationData, true) : $presentationData;
+                            if (is_array($presentationArray)) {
+                                $mm = $extractMinMax($presentationArray);
+                                if (is_array($mm)) return $mm;
                             }
                         }
-                    }
-                } catch (Exception $e) {
-                    
+                    } catch (Exception $e) { }
                 }
             }
             
             // **FALL 5: TEMPLATE-basierte Presentations**
             if (isset($customPresentation['TEMPLATE']) && !empty($customPresentation['TEMPLATE'])) {
-                $templateGuid = $customPresentation['TEMPLATE'];
-                
+                $templateGuid = trim((string)$customPresentation['TEMPLATE'], "{} ");
                 try {
-                    if (@IPS_PresentationExists($templateGuid)) {
-                        $presentationData = IPS_GetPresentation($templateGuid);
-                        
-                        if ($presentationData && is_string($presentationData)) {
-                            $presentationArray = json_decode($presentationData, true);
-                            
-                            if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
-                                $minMax = [
-                                    'min' => floatval($presentationArray['MinValue']),
-                                    'max' => floatval($presentationArray['MaxValue'])
-                                ];
-                                
-                                return $minMax;
+                    if (function_exists('IPS_GetTemplate')) {
+                        $templateData = @IPS_GetTemplate($templateGuid);
+                        // Erwartete Struktur: ['Values' => ...] aber wir scannen alles
+                        if (is_array($templateData)) {
+                            if (isset($templateData['Values']) && is_array($templateData['Values'])) {
+                                $mm = $extractMinMax($templateData['Values']);
+                                if (is_array($mm)) return $mm;
+                            }
+                            $mm = $extractMinMax($templateData);
+                            if (is_array($mm)) return $mm;
+                        }
+                    } else {
+                        // Fallback: manche Systeme liefern Template-Daten auch über IPS_GetPresentation
+                        if (function_exists('IPS_PresentationExists') && @IPS_PresentationExists($templateGuid)) {
+                            $presentationData = IPS_GetPresentation($templateGuid);
+                            $presentationArray = is_string($presentationData) ? @json_decode($presentationData, true) : $presentationData;
+                            if (is_array($presentationArray)) {
+                                $mm = $extractMinMax($presentationArray);
+                                if (is_array($mm)) return $mm;
                             }
                         }
                     }
-                } catch (Exception $e) {
-                    
-                }
+                } catch (Exception $e) { }
             }
         }
         

@@ -440,9 +440,11 @@
             z-index: 2; /* ensure thumb sits above fill */
         }
         .slider-value {
-            flex: 0 0 auto;
-            min-width: 48px;
+            flex: 0 0 var(--slider-value-width, 48px);
+            width: var(--slider-value-width, 48px);
             text-align: right;
+            display: inline-block;
+            white-space: nowrap;
         }
         .slider-value:empty { display: none; }
         .slider-step-btn {
@@ -629,7 +631,9 @@
             width: 100% !important;
             gap: 16px !important;
             flex-wrap: nowrap !important;
-            align-items: flex-start !important; /* Behält natürliche Höhen bei */
+            column-gap: 16px !important;
+            row-gap: calc(var(--element-spacing, 8px)) !important;
+            align-items: flex-start; /* Inline-Styles können Ausrichtung bei Bedarf überschreiben */
         }
         
         /* === REINE BOOL-GRUPPEN: Gleichmäßige Verteilung === */
@@ -1082,11 +1086,27 @@
 
         function handleButtonClick(buttonEl, ident, value) {
             const shouldSpin = (typeof ident === 'string' && ident.indexOf('script_') === 0);
-            try { if (shouldSpin) {
-                // 5 Sekunden Spin-Zustand merken (für Re-Renders)
-                const now = Date.now();
-                window.buttonSpinUntil = now + 5000;
-            } } catch (_) {}
+            if (shouldSpin) {
+                try {
+                    window._scriptButtonSpinUntil = window._scriptButtonSpinUntil || {};
+                    const spinUntil = Date.now() + 5000;
+                    window._scriptButtonSpinUntil[ident] = spinUntil;
+                    startButtonIconSpin(buttonEl);
+                    setTimeout(() => {
+                        try {
+                            if (!window._scriptButtonSpinUntil) {
+                                stopButtonIconSpin(buttonEl);
+                                return;
+                            }
+                            const current = window._scriptButtonSpinUntil[ident];
+                            if (!current || current <= Date.now()) {
+                                delete window._scriptButtonSpinUntil[ident];
+                                stopButtonIconSpin(buttonEl);
+                            }
+                        } catch (_) {}
+                    }, 5200);
+                } catch (_) {}
+            }
             try {
                 if (typeof requestAction === 'function') {
                     requestAction(ident, value);
@@ -2130,7 +2150,7 @@
                     const digits = Number(sc.getAttribute('data-digits')) || 0;
                     const numStr = Number(displayText).toFixed(Math.max(0, digits));
                     if (showVal) {
-                        valEl.textContent = `${numStr}${suffix}`;
+                        valEl.textContent = suffix ? `${numStr} ${suffix}` : numStr;
                     } else {
                         valEl.textContent = '';
                     }
@@ -2464,6 +2484,10 @@
                     if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
                         secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
                     }
+
+                    secondVariableSpan.innerHTML = secondVariableParts.join('');
+                } else if (secondVariableSpan) {
+                    secondVariableSpan.innerHTML = '';
                 }
             }
         }
@@ -3149,19 +3173,19 @@
                         content += `
                                 <div class="variable-group-items" style="display: flex; flex-wrap: nowrap; column-gap: 16px; row-gap: calc(var(--element-spacing, 8px)); align-items: center; flex: 1; justify-content: ${groupJustify}; width: 100%;">
                         `;
-                        
-                        // Wachstum an Progress binden: wenn Progress vorhanden, wächst er; sonst kein Wachstum
-                        const growIndex = groupVariables.findIndex(v => v.displayType === 'progress' || v.displayType === 'slider');
 
-                        groupVariables.forEach((groupVar, groupIndex) => {
+                        // Gleichmäßiges Wachstum für ALLE Progress/Slider in der Gruppe
+                        groupVariables.forEach((groupVar) => {
                             const widthPercent = (groupVar.displayType === 'image' && Number.isFinite(Number(groupVar.imageWidth)))
                                 ? Number(groupVar.imageWidth)
                                 : null;
-                            const growStyle = (groupIndex === growIndex && (groupVar.displayType === 'progress' || groupVar.displayType === 'slider'))
-                                ? 'flex: 1 1 0; min-width: 0;'
+                            const isProgressLike = (groupVar.displayType === 'progress' || groupVar.displayType === 'slider');
+                            const growStyle = isProgressLike ? 'flex: 1 1 0; min-width: 0;' : '';
+                            const widthStyle = (widthPercent !== null)
+                                ? ('flex: 0 0 ' + widthPercent + '%; max-width: ' + widthPercent + '%; min-width: ' + widthPercent + '%; box-sizing: border-box;')
                                 : '';
                             const itemStyle = (widthPercent !== null || growStyle)
-                                ? ` style="${widthPercent !== null ? `flex: 0 0 ${widthPercent}%; max-width: ${widthPercent}%; min-width: ${widthPercent}%; box-sizing: border-box;` : ''}${growStyle}"`
+                                ? (' style="' + widthStyle + growStyle + '"')
                                 : '';
                             content += `<div class="variable-group-item"${itemStyle}>`;
                             content += renderSingleVariable(groupVar, true); // true = isGrouped
@@ -3235,14 +3259,16 @@
             if (isGrouped) {
                 if (isProgressBar) {
                     // Progress-Balken in Gruppen: Inline-flex damit sie nebeneinander passen, aber mit voller verfügbarer Breite
-                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0 2px 0 0; ${fontSizeStyle} color: ${getTextColor(variable)}; flex: none;`;
+                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0; ${fontSizeStyle} color: ${getTextColor(variable)};`;
                 } else {
                     // Text/Button-Variablen in Gruppen: eigene Breite, Ausrichtung übernimmt die Gruppe
                     // SPEZIAL: Für Image in Gruppen flex-direction: column, daher align-items für horizontale Ausrichtung
                     const alignForGroupItem = (variable.displayType === 'image') ? `align-items: ${justifyMap};` : '';
                     // Für Bilder in Gruppen: Keine Breite am Wrapper setzen; Breite wird am .variable-group-item gesetzt
                     const noWrapForImage = (variable.displayType === 'image') ? '' : 'white-space: nowrap;';
-                    wrapperStyle = `display: inline-flex; align-items: center; ${alignForGroupItem} margin: 0; ${noWrapForImage} ${fontSizeStyle} color: ${getTextColor(variable)};`;
+                    const justifyForGroupItem = (variable.displayType === 'image') ? '' : `justify-content: ${justifyMap};`;
+                    const alignSelfForGroupItem = (alignment === 'center') ? 'align-self: center;' : '';
+                    wrapperStyle = `display: inline-flex; align-items: center; ${justifyForGroupItem} ${alignForGroupItem} ${alignSelfForGroupItem} margin: 0; ${noWrapForImage} ${fontSizeStyle} color: ${getTextColor(variable)};`;
                 }
             } else {
                 // Ungrouped: Standard-Layout mit horizontaler Ausrichtung für Text/Button/Image
@@ -3515,8 +3541,26 @@
                     const color1s = normalizeColorS(variable.progressColor1);
                     const color2s = normalizeColorS(variable.progressColor2);
                     try { console.log(`[Slider Colors] id=${variable.id}`, { raw1: variable.progressColor1, raw2: variable.progressColor2, color1: color1s, color2: color2s, dots: color1s }); } catch (_) {}
+
+                    const suffixGuess = (() => {
+                        if (typeof variable.formattedValue === 'string') {
+                            const m = variable.formattedValue.match(/^\s*[-+]?\d+(?:[\.,]\d+)?\s*(.*)$/);
+                            return m ? m[1] : '';
+                        }
+                        return '';
+                    })();
+                    const signChars = (min < 0 || max < 0) ? 1 : 0;
+                    const maxAbs = Math.max(Math.abs(min), Math.abs(max));
+                    let intDigits = 1;
+                    if (Number.isFinite(maxAbs) && maxAbs >= 1) {
+                        intDigits = Math.floor(Math.log10(maxAbs)) + 1;
+                    }
+                    const decimalChars = (digits > 0) ? (1 + digits) : 0; // Komma/Punkt + Nachkommastellen
+                    const valueWidthCh = Math.max(4, signChars + intDigits + decimalChars + (suffixGuess ? suffixGuess.length : 0));
+                    const suffixAttr = String(suffixGuess).replace(/"/g, '&quot;');
+
                     content += `
-                        <div class="slider-container" data-variable-id="${variable.id}" data-min="${min}" data-max="${max}" data-step="${step !== null ? step : ''}" data-digits="${digits}" data-show-value="${variable.showValue ? '1' : '0'}" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; ${inactiveStyle}">
+                        <div class="slider-container" data-variable-id="${variable.id}" data-min="${min}" data-max="${max}" data-step="${step !== null ? step : ''}" data-digits="${digits}" data-suffix="${suffixAttr}" data-show-value="${variable.showValue ? '1' : '0'}" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --slider-value-width: ${valueWidthCh}ch; ${inactiveStyle}">
                             ${iconHtml}${labelHtml}
                             <button class="slider-step-btn" data-dir="-1">−</button>
                             <div class="slider-track" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --progress-bar-text-padding: ${individualPadding}px;">
