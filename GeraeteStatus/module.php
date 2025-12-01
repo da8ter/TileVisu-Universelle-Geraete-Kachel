@@ -1638,6 +1638,7 @@ class UniversalDeviceTile extends IPSModule
                         'useSecondVariableAsTarget' => (bool)($variable['UseSecondVariableAsTarget'] ?? false),
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
                         'scriptId' => intval($variable['ScriptID'] ?? 0),
+                        'openObjectId' => intval($variable['OpenObjectId'] ?? 0),
                     ];
 
                     // Bild (Symcon Medienobjekt) als eigene Darstellungsart
@@ -1800,6 +1801,51 @@ class UniversalDeviceTile extends IPSModule
                         'progressbarActive' => true,
                         'progressbarInactive' => false,
                         'scriptId' => $scriptId,
+                        'openObjectId' => intval($variable['OpenObjectId'] ?? 0),
+                    ];
+                } else if ((($variable['DisplayType'] ?? 'text') === 'button') && intval($variable['OpenObjectId'] ?? 0) > 0) {
+                    // SUPPORT BUTTON ROWS WITHOUT VARIABLE OR SCRIPT: OpenObject-Button (stateless)
+                    $openObjectId = intval($variable['OpenObjectId']);
+                    $label = $variable['Label'] ?? '';
+                    $objectIcon = '';
+                    try {
+                        if (IPS_ObjectExists($openObjectId)) {
+                            $obj = IPS_GetObject($openObjectId);
+                            if ($label === '' && isset($obj['ObjectName'])) {
+                                $label = $obj['ObjectName'];
+                            }
+                            $objIcon = isset($obj['ObjectIcon']) ? trim($obj['ObjectIcon']) : '';
+                            if ($objIcon !== '') {
+                                $objectIcon = $this->MapIconToFontAwesome($objIcon);
+                            }
+                        }
+                    } catch (Exception $e) { /* ignore */ }
+                    $textColor = isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000';
+                    $isTextColorTransparent = isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215);
+                    $variables[] = [
+                        'id' => 'object_' . $openObjectId,
+                        'label' => $label,
+                        'displayType' => 'button',
+                        'variableType' => 0, // wie Bool-Button rendern
+                        'group' => $variable['Group'] ?? 'keine Gruppe',
+                        'showGroupName' => $variable['ShowGroupName'] ?? false,
+                        'showIcon' => $variable['ShowIcon'] ?? false,
+                        'showLabel' => $variable['ShowLabel'] ?? true,
+                        'showValue' => $variable['ShowValue'] ?? false,
+                        'fontSize' => $variable['FontSize'] ?? 12,
+                        'textColor' => $textColor,
+                        'isTextColorTransparent' => $isTextColorTransparent,
+                        'alignment' => $variable['VerticalAlignment'] ?? 'left',
+                        'formattedValue' => '',
+                        'rawValue' => 1,
+                        'icon' => $objectIcon,
+                        'boolButtonColor' => isset($variable['boolButtonColor']) ? '#' . sprintf('%06X', $variable['boolButtonColor']) : '#CCCCCC',
+                        'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
+                        'buttonWidth' => $variable['ButtonWidth'] ?? 120,
+                        'progressbarActive' => true,
+                        'progressbarInactive' => false,
+                        'scriptId' => 0,
+                        'openObjectId' => $openObjectId,
                     ];
                 }
                 
@@ -1994,6 +2040,7 @@ class UniversalDeviceTile extends IPSModule
     
     public function UpdateDisplayTypeVisibility(string $displayType, ?int $rowId = null)
     {
+        $supportsSelectObject = ((float)IPS_GetKernelVersion() > 8.1);
         // Basierend auf Display Type verschiedene Felder ein-/ausblenden
         switch ($displayType) {
             case 'text':
@@ -2025,6 +2072,8 @@ class UniversalDeviceTile extends IPSModule
                 // Text-spezifische Felder
                 $this->UpdateFormField('ShowBorderLine', 'visible', true);
                 $this->UpdateFormField('VerticalAlignment', 'visible', true);
+                // OpenObjectId bei Text ausblenden
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
                 // Image-Felder ausblenden
                 $this->UpdateFormField('ImageMedia', 'visible', false);
                 $this->UpdateFormField('ImageWidth', 'visible', false);
@@ -2069,6 +2118,8 @@ class UniversalDeviceTile extends IPSModule
                 // Alignment sichtbar, Borderline ausblenden
                 $this->UpdateFormField('VerticalAlignment', 'visible', true);
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                // OpenObjectId bei Image ausblenden
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
                 break;
             case 'progress':
                 // Progress: relevante Felder ein-/ausblenden
@@ -2105,6 +2156,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 // Ausrichtung bei Progress ausblenden
                 $this->UpdateFormField('VerticalAlignment', 'visible', false);
+                // OpenObjectId bei Progress ausblenden
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
                 break;
             case 'slider':
                 // Slider: ähnlich Progress, aber ohne SecondVariable-Block
@@ -2141,6 +2194,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 // Ausrichtung bei Slider ausblenden (feste horizontale Ausrichtung)
                 $this->UpdateFormField('VerticalAlignment', 'visible', false);
+                // OpenObjectId bei Slider ausblenden
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
                 break;
             case 'button':
                 // Button-Display: relevante Felder steuern
@@ -2152,6 +2207,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('Variable', 'visible', true);
                 // ScriptID sichtbar (optional, ermöglicht Script-Buttons ohne Variable)
                 $this->UpdateFormField('ScriptID', 'visible', true);
+                // OpenObjectId sichtbar (optional, ermöglicht Öffnen von Objekten)
+                $this->UpdateFormField('OpenObjectId', 'visible', $supportsSelectObject);
                 // Button-spezifische Felder sichtbar
                 $this->UpdateFormField('boolButtonColor', 'visible', true);
                 $this->UpdateFormField('ButtonWidth', 'visible', true);
@@ -2207,6 +2264,7 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 $this->UpdateFormField('ScriptID', 'visible', false);
                 $this->UpdateFormField('Label', 'visible', false);
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
 
                 break;
         }

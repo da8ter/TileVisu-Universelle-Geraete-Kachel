@@ -77,6 +77,12 @@ Die Konfiguration gliedert sich in mehrere Bereiche der Form:
 Das Modul stellt aktuell keine öffentlichen PHP-Befehle bereit. Die komplette Funktionalität erfolgt über die Instanz-Konfiguration.
 
 ## Changelog
+- **1.0.4**
+  - Bugfix: Wenn eine Variable mehrfach in der Kachel dargestellt wird (z. B. in Gruppen oder in mehreren Sektionen), werden nun alle Instanzen korrekt aktualisiert.
+    - Progress-Bar Mini-/Vollupdate aktualisiert jetzt alle `.progress-container` mit gleicher `data-variable-id`.
+    - Slider-Mini-Updates berücksichtigen alle `.slider-container`-Instanzen.
+    - Second-Variable-/Target-Marker-Updates (Progress) werden auf alle zutreffenden Container angewendet.
+  - Änderung: Script-Buttons werden optisch stets als aktiv dargestellt (keine Abdunkelung), inkl. Spin-Phase und danach.
 - **1.0.3**
   - Verbesserte Script-Button-Anzeige inklusive Spin-Status und Opacity-Handling.
   - Korrekturen am Fallback-Icon und an der Icon-Wiederherstellung.

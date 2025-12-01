@@ -757,6 +757,16 @@
             }
             ,
             {
+              "caption": "Open object",
+              "name": "OpenObjectId",
+              "width": "200px",
+              "save": true,
+              "add": "",
+              "visible": false,
+              "edit": { "type": "SelectObject" }
+            }
+            ,
+            {
               "caption": "Alignment",
               "name": "VerticalAlignment",
               "width": "140px",
@@ -815,6 +825,8 @@
     "$form[] = [ 'caption' => 'Variable', 'name' => 'Variable', 'width' => '100%', 'type' => 'SelectVariable', 'validVariableTypes' => [], 'save' => true, 'add' => 0, 'visible' => ($displayType !== 'image') ];",
     "// Script-Auswahl (optional, für Button-Display nutzbar) – direkt unter Variable",
     "$form[] = [ 'caption' => 'Script', 'name' => 'ScriptID', 'type' => 'SelectScript', 'width' => '100%', 'save' => true, 'add' => 0, 'visible' => ($displayType === 'button') ];",
+    "// Optionales OpenObject-Feld (nur Button-Display und Kernel > 8.1)",
+    "$form[] = [ 'caption' => 'Open object', 'name' => 'OpenObjectId', 'type' => 'SelectObject', 'width' => '100%', 'save' => true, 'add' => 0, 'visible' => ($displayType === 'button') && ((float)IPS_GetKernelVersion() > 8.1) ];",
     "// IMAGE-FELDER (immer vorhanden, standardmäßig ausgeblendet) – vor Display Type",
     "$form[] = [ 'type' => 'RowLayout', 'items' => [",
     "    [ 'caption' => 'Media object',    'name' => 'ImageMedia',        'type' => 'SelectMedia',   'save' => true, 'add' => 0,  'visible' => ($displayType === 'image') ],",

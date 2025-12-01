@@ -1052,13 +1052,12 @@
                     }
                 }
             } catch (_) {}
-            // Script-Buttons wieder abdunkeln sobald der Spin endet
+            // Script-Buttons sollen optisch IMMER aktiv bleiben
             if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
                 try {
-                    // Stelle inaktiv-Status wieder her
                     if (buttonEl.classList) {
-                        buttonEl.classList.add('inactive');
-                        buttonEl.classList.remove('active');
+                        buttonEl.classList.remove('inactive');
+                        buttonEl.classList.add('active');
                     }
                 } catch (_) {}
             }
@@ -1085,6 +1084,15 @@
         }
 
         function handleButtonClick(buttonEl, ident, value) {
+            try {
+                const openObjectIdAttr = buttonEl && buttonEl.dataset ? buttonEl.dataset.openObjectId : null;
+                const openObjectId = openObjectIdAttr ? parseInt(openObjectIdAttr, 10) : 0;
+                if (openObjectId > 0 && typeof openObject === 'function') {
+                    openObject(openObjectId);
+                    return;
+                }
+            } catch (_) {}
+
             const shouldSpin = (typeof ident === 'string' && ident.indexOf('script_') === 0);
             if (shouldSpin) {
                 try {
@@ -1781,15 +1789,14 @@
 
                                 // For progress bars, update text and marker immediately (first update), width is based on main rawValue
                                 if (variable.displayType === 'progress') {
-                                    const progressContainer = document.querySelector(`.progress-container[data-variable-id="${targetVariableId}"]`);
-                                    if (progressContainer) {
+                                    const progressContainers = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`);
+                                    progressContainers.forEach((progressContainer) => {
                                         const progressTextContainer = progressContainer.querySelector('.progress-text');
                                         if (progressTextContainer) {
                                             updateProgressText(progressTextContainer, variable);
                                         }
-                                        // Also refresh marker so changes are visible on first update
                                         updateTargetMarkerDisplay(progressContainer, variable);
-                                    }
+                                    });
                                 }
                             }
                             break; // handled in this branch
@@ -1803,18 +1810,23 @@
                             // Aktualisiere rawValue im Cache
                             if (window.variableDataCache) {
                                 const targetVariableId = window.varKeyToIdMapping[varKey];
-                                if (targetVariableId && window.variableDataCache[targetVariableId]) {
-                                    window.variableDataCache[targetVariableId].rawValue = value;
-                                    // MINIMAL UPDATE: Nur Progress Bar updaten, nicht komplettes Re-Render
-                                    const variable = window.variableDataCache[targetVariableId];
-                                    if (variable.displayType === 'progress') {
-                                        updateProgressBarValue(targetVariableId, value);
-                                        return; // Skip full re-render für Progress Bar Updates
+                                if (targetVariableId) {
+                                    if (window.variableDataCache[targetVariableId]) {
+                                        window.variableDataCache[targetVariableId].rawValue = value;
                                     }
-                                    if (variable.displayType === 'slider') {
-                                        updateSliderValue(targetVariableId, value);
-                                        return; // Skip full re-render für Slider Updates
-                                    }
+                                    // Direkt-Updates nach DOM-Präsenz, nicht nach Cache-DisplayType
+                                    try {
+                                        const hasProgress = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`).length > 0;
+                                        if (hasProgress) {
+                                            updateProgressBarValue(targetVariableId, value);
+                                        }
+                                    } catch (_) {}
+                                    try {
+                                        const hasSlider = document.querySelectorAll(`.slider-container[data-variable-id="${CSS.escape(String(targetVariableId))}"]`).length > 0;
+                                        if (hasSlider) {
+                                            updateSliderValue(targetVariableId, value);
+                                        }
+                                    } catch (_) {}
                                 }
                             }
                             
@@ -1847,7 +1859,7 @@
             }
         }
 
-        // Universelle Variable-Update-Funktion für gruppierte und einzelne Variablen
+        // Universelle Variable-Update-Funktion: aktualisiert ALLE Darstellungen (Text, Button, Progress, Slider) für die Variable
         function updateVariable(varKey, newValue, updateType) {
             // Find target variable ID using mapping
             if (!window.varKeyToIdMapping || !window.varKeyToIdMapping[varKey]) {
@@ -1870,22 +1882,34 @@
                 variable.formattedValue = newValue;
             }
             
-            // Finde das DOM-Element für diese Variable
-            const variableElement = document.querySelector(`[data-variable-id="${targetVariableId}"]`);
-            
-            if (variable.displayType === 'button') {
-                // Button-Update: auf alle passenden Button-Instanzen anwenden
-                updateButtonValue(targetVariableId, variable);
-            } else if (variable.displayType === 'progress') {
-                // Progress: aktualisiere ausschließlich den Progress-Container (Text + ggf. width)
-                updateProgressDisplay(targetVariableId, variable);
-            } else if (variable.displayType === 'slider') {
-                // Slider: Füllstand und Thumb-Position aktualisieren
-                updateSliderValue(targetVariableId, variable.rawValue);
-            } else {
-                // Text-Variable-Update (auch in Gruppen)
-                updateTextValue(targetVariableId, variable);
-            }
+            // Aktualisiere ALLE vorhandenen Darstellungen im DOM unabhängig vom gecachten displayType
+            try { updateTextValue(targetVariableId, variable); } catch (_) {}
+            try { updateButtonValue(targetVariableId, variable); } catch (_) {}
+            try {
+                const pc = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`);
+                if (pc && pc.length > 0) {
+                    // Text & Marker aktualisieren
+                    updateProgressDisplay(targetVariableId, variable);
+                    // Breite auch bei formatierten Updates anpassen, falls möglich
+                    if (updateType === 'formattedValue') {
+                        let numeric = NaN;
+                        try {
+                            const s = String(newValue);
+                            const m = s.match(/[-+]?\d+(?:[\.,]\d+)?/);
+                            if (m) numeric = parseFloat(m[0].replace(',', '.'));
+                        } catch (_) {}
+                        if (!Number.isNaN(numeric)) {
+                            updateProgressBarValue(targetVariableId, numeric);
+                        }
+                    }
+                }
+            } catch (_) {}
+            try {
+                const sc = document.querySelectorAll(`.slider-container[data-variable-id="${CSS.escape(String(targetVariableId))}"]`);
+                if (sc && sc.length > 0) {
+                    updateSliderValue(targetVariableId, variable.rawValue);
+                }
+            } catch (_) {}
         }
         
         // Hilfsfunktion für Button-Display-Update
@@ -1978,8 +2002,8 @@
 
             } else {
                 // Boolean variable: Single button update
-                const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
-                const currentBoolValue = isActive; // Use actual boolean value for Association-Matching
+                let isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+                let currentBoolValue = isActive; // Use actual boolean value for Association-Matching
                 
                 // Bool-Buttons: Farbe
                 // Wenn im Formular die Buttonfarbe transparent gewählt ist, nutze (falls vorhanden)
@@ -2027,6 +2051,13 @@
                 if (!targetButton) {
                     return; // cannot safely update
                 }
+                // Script-Buttons: Immer aktiv darstellen
+                try {
+                    if (targetButton.dataset && targetButton.dataset.scriptButton === '1') {
+                        isActive = true;
+                        currentBoolValue = true;
+                    }
+                } catch (_) {}
 
                 // Aktualisiere Button-Style
                 targetButton.style.backgroundColor = buttonColor;
@@ -2339,80 +2370,64 @@
         }
 
         function updateSliderValue(variableId, newValue) {
-            const sc = document.querySelector(`.slider-container[data-variable-id="${CSS.escape(String(variableId))}"]`);
-            if (!sc) return;
-            const min = Number(sc.getAttribute('data-min')) || 0;
-            const max = Number(sc.getAttribute('data-max')) || 100;
-            const digits = Number(sc.getAttribute('data-digits')) || 0;
-            const stepAttr = sc.getAttribute('data-step');
-            const step = (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) ? Number(stepAttr) : NaN;
-            const v = clampAndRound(Number(newValue), min, max, step, digits);
-            const range = max - min;
-            const percent = range > 0 ? Math.max(0, Math.min(100, ((v - min) / range) * 100)) : 0;
-            let display = v;
-            try {
-                const vc = window.variableDataCache?.[variableId];
-                if (vc && typeof vc.formattedValue !== 'undefined' && vc.formattedValue !== null) {
-                    display = vc.formattedValue;
-                }
-            } catch (_) {}
-            updateSliderUI(sc, percent, display);
+            const scNodes = document.querySelectorAll(`.slider-container[data-variable-id="${CSS.escape(String(variableId))}"]`);
+            if (!scNodes || scNodes.length === 0) return;
+            scNodes.forEach((sc) => {
+                const min = Number(sc.getAttribute('data-min')) || 0;
+                const max = Number(sc.getAttribute('data-max')) || 100;
+                const digits = Number(sc.getAttribute('data-digits')) || 0;
+                const stepAttr = sc.getAttribute('data-step');
+                const step = (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) ? Number(stepAttr) : NaN;
+                const v = clampAndRound(Number(newValue), min, max, step, digits);
+                const range = max - min;
+                const percent = range > 0 ? Math.max(0, Math.min(100, ((v - min) / range) * 100)) : 0;
+                let display = v;
+                try {
+                    const vc = window.variableDataCache?.[variableId];
+                    if (vc && typeof vc.formattedValue !== 'undefined' && vc.formattedValue !== null) {
+                        display = vc.formattedValue;
+                    }
+                } catch (_) {}
+                updateSliderUI(sc, percent, display);
+            });
         }
         function updateProgressDisplay(targetVariableId, variable) {
 
             
-            // Finde Progress-Container mit der entsprechenden Variable-ID
-            const progressContainer = document.querySelector(`[data-variable-id="${targetVariableId}"].progress-container`);
-            
-            if (!progressContainer) {
+            // Finde alle Progress-Container mit der entsprechenden Variable-ID
+            const progressContainers = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`);
+            if (!progressContainers || progressContainers.length === 0) {
                 return;
             }
-            
-            // Aktualisiere Progress-Bar-Breite
-            const progressBar = progressContainer.querySelector('.progress-bar');
-            if (progressBar) {
-                // Berechne Prozentsatz basierend auf Min/Max-Werten
-                const rawValue = parseFloat(variable.rawValue) || 0;
-                const minValue = parseFloat(variable.progressMin) || 0;
-                const maxValue = parseFloat(variable.progressMax) || 100;
-                
-                let progressPercent = 0;
-                const range = maxValue - minValue;
-                if (range > 0) {
-                    progressPercent = ((rawValue - minValue) / range) * 100;
-                }
-                
-                // Animation Logic: Lese aktuelle Breite und animiere zur neuen Breite
-                const currentWidth = progressBar.style.width || '0%';
-                const newWidth = progressPercent + '%';
-                
-                if (currentWidth !== newWidth) {
-                    // Entferne temporär die CSS transition
-                    progressBar.style.transition = 'none';
-                    
-                    // Setze die aktuelle Breite falls noch nicht gesetzt
-                    if (!progressBar.style.width) {
-                        progressBar.style.width = currentWidth;
+            progressContainers.forEach((progressContainer) => {
+                const progressBar = progressContainer.querySelector('.progress-bar');
+                if (progressBar) {
+                    const rawValue = parseFloat(variable.rawValue) || 0;
+                    const minValue = parseFloat(variable.progressMin) || 0;
+                    const maxValue = parseFloat(variable.progressMax) || 100;
+                    let progressPercent = 0;
+                    const range = maxValue - minValue;
+                    if (range > 0) {
+                        progressPercent = ((rawValue - minValue) / range) * 100;
                     }
-                    
-                    // Force Reflow um sicherzustellen dass die aktuelle Breite angewendet ist
-                    progressBar.offsetWidth;
-                    
-                    // Aktiviere die CSS transition wieder
-                    progressBar.style.transition = 'width 3s ease-in-out';
-                    
-                    // Setze die neue Breite - das triggert die Animation
-                    progressBar.style.width = newWidth;
+                    const currentWidth = progressBar.style.width || '0%';
+                    const newWidth = progressPercent + '%';
+                    if (currentWidth !== newWidth) {
+                        progressBar.style.transition = 'none';
+                        if (!progressBar.style.width) {
+                            progressBar.style.width = currentWidth;
+                        }
+                        progressBar.offsetWidth;
+                        progressBar.style.transition = 'width 3s ease-in-out';
+                        progressBar.style.width = newWidth;
+                    }
                 }
-            }
-            
-            // Aktualisiere Progress-Text
-            const progressTextContainer = progressContainer.querySelector('.progress-text');
-            if (progressTextContainer) {
-                updateProgressText(progressTextContainer, variable);
-            }
-            // Aktualisiere Target Marker (falls vorhanden)
-            updateTargetMarkerDisplay(progressContainer, variable);
+                const progressTextContainer = progressContainer.querySelector('.progress-text');
+                if (progressTextContainer) {
+                    updateProgressText(progressTextContainer, variable);
+                }
+                updateTargetMarkerDisplay(progressContainer, variable);
+            });
         }
         
         // Hilfsfunktion für Progress-Text-Update
@@ -3616,7 +3631,8 @@
                         // Erweiterte Bool-Wert-Erkennung
                         const isScriptButton = (typeof variable.id === 'string' && variable.id.indexOf('script_') === 0);
                         const spinActive = (isScriptButton && window._scriptButtonSpinUntil && window._scriptButtonSpinUntil[variable.id] && Date.now() < window._scriptButtonSpinUntil[variable.id]);
-                        const isActive = isScriptButton ? !!spinActive : (variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true');
+                        // Script-Buttons sollen optisch immer aktiv sein
+                        const isActive = isScriptButton ? true : (variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true');
                         // Verwende den tatsächlichen Boolean-Wert für Association-Matching (nicht Integer-Konvertierung!)
                         const currentBoolValue = variable.rawValue; // Direkt verwenden, da Associations auch Boolean-Werte haben
                         
@@ -3728,6 +3744,7 @@
                                         onclick="handleButtonClick(this, '${variable.id}', 1);" 
                                         data-variable-id="${variable.id}"
                                         data-script-button="${isScriptButton ? '1' : '0'}"
+                                        data-open-object-id="${variable.openObjectId || 0}"
                                         style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${buttonStyleExtras}">
                                     ${buttonText}
                                 </div>
@@ -4054,12 +4071,13 @@
 
         // Funktion zum Animieren aller Progress Bars nach Re-Renders
         function updateProgressBarValue(variableId, newValue) {
-            // Locate progress elements
-            const progressContainer = document.querySelector(`[data-variable-id="${variableId}"]`);
-            if (!progressContainer) return;
-            const progressBar = progressContainer.querySelector('.progress-bar');
-            const progressTextContainer = progressContainer.querySelector('.progress-text');
-            if (!progressBar) return;
+            // Locate all matching progress elements (support multiple instances per variable)
+            const progressContainers = document.querySelectorAll(`.progress-container[data-variable-id="${variableId}"]`);
+            if (!progressContainers || progressContainers.length === 0) return;
+            progressContainers.forEach((progressContainer) => {
+                const progressBar = progressContainer.querySelector('.progress-bar');
+                const progressTextContainer = progressContainer.querySelector('.progress-text');
+                if (!progressBar) return;
             
             // Hole Variable-Konfiguration aus Cache
             const variableConfig = window.variableDataCache?.[variableId];
@@ -4093,39 +4111,40 @@
                 }
             } catch (_) {}
 
-            // 2. Update progress text (if container exists). We rebuild from cached config to keep formatting consistent.
-            if (progressTextContainer) {
-                // Temporarily update cached raw/ formatted values if appropriate
-                try {
-                    if (window.variableDataCache && window.variableDataCache[variableId]) {
-                        // rawValue already updated by caller; formattedValue may be updated separately in same message
-                        // Re-render the text from current cache
-                        updateProgressText(progressTextContainer, window.variableDataCache[variableId]);
-                    }
-                } catch (_) {}
-            }
+                // 2. Update progress text (if container exists). We rebuild from cached config to keep formatting consistent.
+                if (progressTextContainer) {
+                    // Temporarily update cached raw/ formatted values if appropriate
+                    try {
+                        if (window.variableDataCache && window.variableDataCache[variableId]) {
+                            // rawValue already updated by caller; formattedValue may be updated separately in same message
+                            // Re-render the text from current cache
+                            updateProgressText(progressTextContainer, window.variableDataCache[variableId]);
+                        }
+                    } catch (_) {}
+                }
             
-            // 3. ANIMATE PROGRESS BAR WIDTH (nur wenn sich Wert geändert hat)
-            if (Math.abs(oldWidth - newWidth) > 0.1) {
-                // Setze Bar auf alte Breite
-                progressBar.style.width = oldWidth + '%';
-                progressBar.style.transition = 'none';
+                // 3. ANIMATE PROGRESS BAR WIDTH (nur wenn sich Wert geändert hat)
+                if (Math.abs(oldWidth - newWidth) > 0.1) {
+                    // Setze Bar auf alte Breite
+                    progressBar.style.width = oldWidth + '%';
+                    progressBar.style.transition = 'none';
+                    
+                    // Force Reflow
+                    progressBar.offsetHeight;
+                    
+                    // Starte Animation (nur width, keine visuellen Effekte)
+                    progressBar.style.transition = 'width 0.5s ease';
+                    progressBar.style.width = newWidth + '%';
+                    
+                    setTimeout(() => {
+                        progressBar.style.width = `${newWidth}%`;
+                        progressBar.dataset.oldValue = newValue;
+                    }, 500);
+                }
                 
-                // Force Reflow
-                progressBar.offsetHeight;
-                
-                // Starte Animation (nur width, keine visuellen Effekte)
-                progressBar.style.transition = 'width 0.5s ease';
-                progressBar.style.width = newWidth + '%';
-                
-                setTimeout(() => {
-                    progressBar.style.width = `${newWidth}%`;
-                    progressBar.dataset.oldValue = newValue;
-                }, 500);
-            }
-            
-            // Speichere neuen Wert für nächste Animation
-            progressBar.dataset.oldValue = newValue;
+                // Speichere neuen Wert für nächste Animation
+                progressBar.dataset.oldValue = newValue;
+            });
         }
 
         function animateProgressBars() {
