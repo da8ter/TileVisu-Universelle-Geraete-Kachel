@@ -72,6 +72,8 @@ Die Konfiguration gliedert sich in mehrere Bereiche der Form:
   - Boolesche Buttons spiegeln den Variablenzustand.
   - Script-Buttons lösen das hinterlegte Skript aus, zeigen während der Ausführung ein drehendes FontAwesome-Icon und leuchten für die Dauer des Spins auf.
 - Deaktivierte Progress-Balken und Werte werden automatisch ausgegraut und mit `-` angezeigt.
+- Slider setzen Werte optimistisch und verifizieren anschließend, ob der Wert tatsächlich in die Variable geschrieben wurde. Falls nicht, springt der Slider automatisch auf den tatsächlichen Variablenwert zurück.
+- Slider-Farben: Sliders verwenden nun eigene Farben `SliderColor1` und `SliderColor2` (Formular → nur sichtbar bei Darstellungstyp „slider“). Sind diese nicht gesetzt, wird auf `ProgressColor1/2` zurückgefallen.
 
 ## PHP-Befehle
 Das Modul stellt aktuell keine öffentlichen PHP-Befehle bereit. Die komplette Funktionalität erfolgt über die Instanz-Konfiguration.

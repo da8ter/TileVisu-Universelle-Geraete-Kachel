@@ -1973,14 +1973,17 @@
                         }
                     }
                     
-                    // Label and Value
-                    if (variable.showLabel && association?.name) {
-                        if (variable.showValue) {
-                            // Label mit Doppelpunkt wenn auch Value gezeigt wird
-                            buttonContentParts.push(`<span style="font-weight: 700;">${association.name}:&nbsp;</span>`);
-                        } else {
-                            // Nur Label ohne Doppelpunkt
-                            buttonContentParts.push(`<span style="font-weight: 700;">${association.name}</span>`);
+                    // Label und Value (Beschriftung hat Vorrang)
+                    if (variable.showLabel) {
+                        const lbl = (typeof variable.label === 'string' && variable.label.trim() !== '') ? variable.label : (association?.name || '');
+                        if (lbl) {
+                            if (variable.showValue) {
+                                // Label mit Doppelpunkt wenn auch Value gezeigt wird
+                                buttonContentParts.push(`<span style="font-weight: 700;">${lbl}:&nbsp;</span>`);
+                            } else {
+                                // Nur Label ohne Doppelpunkt
+                                buttonContentParts.push(`<span style="font-weight: 700;">${lbl}</span>`);
+                            }
                         }
                     }
                     
@@ -2245,6 +2248,35 @@
             } catch (_) {}
         }
 
+        function scheduleSliderVerification(id, sc, intendedValue) {
+            if (!window._sliderPending) window._sliderPending = {};
+            const ex = window._sliderPending[id];
+            try { if (ex && ex.t) clearTimeout(ex.t); } catch (_) {}
+            const t = setTimeout(() => verifySliderWrite(id, sc), 1200);
+            window._sliderPending[id] = { intended: Number(intendedValue), t: t };
+        }
+
+        function verifySliderWrite(id, sc) {
+            const pend = window._sliderPending && window._sliderPending[id];
+            if (!pend) return;
+            try { delete window._sliderPending[id]; } catch (_) {}
+            let actual = NaN;
+            try { actual = Number(window.variableDataCache?.[id]?.rawValue); } catch (_) {}
+            const min = Number(sc.getAttribute('data-min')) || 0;
+            const max = Number(sc.getAttribute('data-max')) || 100;
+            const digits = Number(sc.getAttribute('data-digits')) || 0;
+            const stepAttr = sc.getAttribute('data-step');
+            const step = (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) ? Number(stepAttr) : NaN;
+            const intended = clampAndRound(Number(pend.intended), min, max, step, digits);
+            const actualClamped = clampAndRound(Number(actual), min, max, step, digits);
+            const tol = (Number.isFinite(step) && step > 0) ? (step / 2) : ((digits > 0) ? Math.pow(10, -digits) / 2 : 0.5);
+            if (!Number.isFinite(actualClamped)) return;
+            if (Math.abs(actualClamped - intended) > tol) {
+                updateSliderValue(id, actualClamped);
+                try { sc.setAttribute('data-current-value', String(actualClamped)); } catch (_) {}
+            }
+        }
+
         function attachSliderEvents(sc) {
             const track = sc.querySelector('.slider-track');
             const minusBtn = sc.querySelector('.slider-step-btn[data-dir="-1"]');
@@ -2304,14 +2336,10 @@
                 try { window.removeEventListener('pointermove', onPointerMove); } catch (_) {}
                 try { window.removeEventListener('pointerup', endDrag, true); } catch (_) {}
                 if (dragValue !== null && typeof requestAction === 'function') {
-                    // Cache und Dataset aktualisieren, damit +/- den neuen Wert als Basis nutzt
-                    try {
-                        if (window.variableDataCache && window.variableDataCache[id]) {
-                            window.variableDataCache[id].rawValue = dragValue;
-                        }
-                        sc.setAttribute('data-current-value', String(dragValue));
-                    } catch (_) {}
+                    // Dataset aktualisieren, damit +/- den neuen Wert als Basis nutzt
+                    try { sc.setAttribute('data-current-value', String(dragValue)); } catch (_) {}
                     requestAction(id, dragValue);
+                    try { scheduleSliderVerification(id, sc, dragValue); } catch (_) {}
                     try { console.debug(`[Slider DragEnd] id=${id} -> ${dragValue}`); } catch (_) {}
                 }
                 dragValue = null;
@@ -2355,13 +2383,13 @@
                 const s = Number.isFinite(step) && step > 0 ? step : ((max - min) > 0 ? (max - min) / 100 : 1);
                 const next = clampAndRound(base + dir * s, min, max, s, digits);
                 // Optimistic UI
-                try { if (window.variableDataCache && window.variableDataCache[id]) window.variableDataCache[id].rawValue = next; } catch (_) {}
                 try {
                     sc.setAttribute('data-current-value', String(next));
                     updateSliderUI(sc, valueToPercent(next), next);
                 } catch (_) {}
                 if (typeof requestAction === 'function') {
                     requestAction(id, next);
+                    try { scheduleSliderVerification(id, sc, next); } catch (_) {}
                 }
                 try { console.debug(`[Slider +/-] id=${id} base=${base} dir=${dir} step=${s} -> ${next}`); } catch (_) {}
             };
@@ -2389,6 +2417,17 @@
                     }
                 } catch (_) {}
                 updateSliderUI(sc, percent, display);
+                try {
+                    const pend = window._sliderPending && window._sliderPending[variableId];
+                    if (pend) {
+                        const tol = (Number.isFinite(step) && step > 0) ? (step / 2) : ((digits > 0) ? Math.pow(10, -digits) / 2 : 0.5);
+                        const intended = clampAndRound(Number(pend.intended), min, max, step, digits);
+                        if (Math.abs(v - intended) <= tol) {
+                            try { clearTimeout(pend.t); } catch (_) {}
+                            try { delete window._sliderPending[variableId]; } catch (_) {}
+                        }
+                    }
+                } catch (_) {}
             });
         }
         function updateProgressDisplay(targetVariableId, variable) {
@@ -3553,9 +3592,9 @@
                         if (/^#[0-9a-f]{8}$/.test(s) && s.endsWith('00')) return 'var(--accent-color)';
                         return c;
                     };
-                    const color1s = normalizeColorS(variable.progressColor1);
-                    const color2s = normalizeColorS(variable.progressColor2);
-                    try { console.log(`[Slider Colors] id=${variable.id}`, { raw1: variable.progressColor1, raw2: variable.progressColor2, color1: color1s, color2: color2s, dots: color1s }); } catch (_) {}
+                    const color1s = normalizeColorS(variable.sliderColor1);
+                    const color2s = normalizeColorS(variable.sliderColor2);
+                    try { console.log(`[Slider Colors] id=${variable.id}`, { raw1: variable.sliderColor1, raw2: variable.sliderColor2, color1: color1s, color2: color2s, dots: color1s }); } catch (_) {}
 
                     const suffixGuess = (() => {
                         if (typeof variable.formattedValue === 'string') {
@@ -3575,7 +3614,7 @@
                     const suffixAttr = String(suffixGuess).replace(/"/g, '&quot;');
 
                     content += `
-                        <div class="slider-container" data-variable-id="${variable.id}" data-min="${min}" data-max="${max}" data-step="${step !== null ? step : ''}" data-digits="${digits}" data-suffix="${suffixAttr}" data-show-value="${variable.showValue ? '1' : '0'}" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --slider-value-width: ${valueWidthCh}ch; ${inactiveStyle}">
+                        <div class="slider-container" data-variable-id="${variable.id}" data-min="${min}" data-max="${max}" data-step="${step !== null ? step : ''}" data-digits="${digits}" data-suffix="${suffixAttr}" data-show-value="${variable.showValue ? '1' : '0'}" data-current-value="${cur}" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --slider-value-width: ${valueWidthCh}ch; ${inactiveStyle}">
                             ${iconHtml}${labelHtml}
                             <button class="slider-step-btn" data-dir="-1">−</button>
                             <div class="slider-track" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --progress-bar-text-padding: ${individualPadding}px;">
@@ -3813,13 +3852,17 @@
                             }
                             
                             // Label hinzufügen falls konfiguriert
-                            if (variable.showLabel && association.name) {
-                                if (variable.showValue) {
-                                    // Label mit Doppelpunkt wenn auch Value gezeigt wird
-                                    buttonContentParts.push(`<span style="font-weight: 700;">${association.name}:&nbsp;</span>`);
-                                } else {
-                                    // Nur Label ohne Doppelpunkt
-                                    buttonContentParts.push(`<span style="font-weight: 700;">${association.name}</span>`);
+                            if (variable.showLabel) {
+                                // Beschriftung (variable.label) hat Vorrang, wenn gesetzt, sonst Association-Name
+                                const lbl = (typeof variable.label === 'string' && variable.label.trim() !== '') ? variable.label : association.name;
+                                if (lbl) {
+                                    if (variable.showValue) {
+                                        // Label mit Doppelpunkt wenn auch Value gezeigt wird
+                                        buttonContentParts.push(`<span style="font-weight: 700;">${lbl}:&nbsp;</span>`);
+                                    } else {
+                                        // Nur Label ohne Doppelpunkt
+                                        buttonContentParts.push(`<span style="font-weight: 700;">${lbl}</span>`);
+                                    }
                                 }
                             }
                             
@@ -3885,8 +3928,8 @@
                                 positionClass = 'middle-button'; // Mittlere Buttons: keine runden Ecken
                             }
                             
-                            // Button-Text basierend auf Association-Name
-                            let buttonText = association.name || String(association.value);
+                            // Button-Text: Beschriftung (variable.label) hat Vorrang, sonst Association-Name/Value
+                            let buttonText = ((typeof variable.label === 'string' && variable.label.trim() !== '') ? variable.label : (association.name || String(association.value)));
                             
                             // Icon hinzufügen falls vorhanden, mit Fallback auf Standard-Icon
                             let iconToUse = association.icon;

@@ -1603,7 +1603,7 @@ class UniversalDeviceTile extends IPSModule
                     $finalFormattedValue = GetValueFormatted($variable['Variable']);
                     $finalRawValue = GetValue($variable['Variable']);
                     
-                    if (!$progressbarActive && in_array(($variable['DisplayType'] ?? 'text'), ['progress','slider'])) {
+                    if (!$progressbarActive && (($variable['DisplayType'] ?? 'text') === 'progress')) {
                         // Progressbar deaktiviert: Zeige "-" für alle Werte und mache Text/Icon 50% transparent
                         $finalRawValue = 0;
                         $finalFormattedValue = '-';
@@ -1623,6 +1623,9 @@ class UniversalDeviceTile extends IPSModule
                         'isTextColorTransparent' => isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215),
                         'progressColor1' => isset($variable['ProgressColor1']) ? '#' . sprintf('%06X', $variable['ProgressColor1']) : '#4CAF50',
                         'progressColor2' => isset($variable['ProgressColor2']) ? '#' . sprintf('%06X', $variable['ProgressColor2']) : '#2196F3',
+                        // Slider-spezifische Farben (separat von Progress)
+                        'sliderColor1' => isset($variable['SliderColor1']) ? '#' . sprintf('%06X', $variable['SliderColor1']) : (isset($variable['ProgressColor1']) ? '#' . sprintf('%06X', $variable['ProgressColor1']) : '#4CAF50'),
+                        'sliderColor2' => isset($variable['SliderColor2']) ? '#' . sprintf('%06X', $variable['SliderColor2']) : (isset($variable['ProgressColor2']) ? '#' . sprintf('%06X', $variable['ProgressColor2']) : '#2196F3'),
                         'boolButtonColor' => isset($variable['boolButtonColor']) ? '#' . sprintf('%06X', $variable['boolButtonColor']) : '#CCCCCC',
                         'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
                         'buttonWidth' => $variable['ButtonWidth'] ?? 120,
@@ -1634,7 +1637,7 @@ class UniversalDeviceTile extends IPSModule
                         'rawValue' => $finalRawValue, // Backend-überschriebener Wert
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
-                        'progressbarInactive' => !$progressbarActive && in_array(($variable['DisplayType'] ?? 'text'), ['progress','slider']), // 50% Transparenz Flag
+                        'progressbarInactive' => (!$progressbarActive && (($variable['DisplayType'] ?? 'text') === 'progress')), // 50% Transparenz Flag nur für Progress
                         'useSecondVariableAsTarget' => (bool)($variable['UseSecondVariableAsTarget'] ?? false),
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
                         'scriptId' => intval($variable['ScriptID'] ?? 0),
@@ -2059,6 +2062,8 @@ class UniversalDeviceTile extends IPSModule
                 // Progress-Felder ausblenden
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
@@ -2098,6 +2103,8 @@ class UniversalDeviceTile extends IPSModule
                 // Progress-Felder ausblenden
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
@@ -2137,6 +2144,8 @@ class UniversalDeviceTile extends IPSModule
                 // Progress-Farben sichtbar
                 $this->UpdateFormField('ProgressColor1', 'visible', true);
                 $this->UpdateFormField('ProgressColor2', 'visible', true);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 // SecondVariable-Block sichtbar
                 $this->UpdateFormField('SecondVariable', 'visible', true);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', true);
@@ -2172,9 +2181,11 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('Label', 'visible', true);
                 $this->UpdateFormField('FontSize', 'visible', true);
                 $this->UpdateFormField('TextColor', 'visible', true);
-                // Progress-/Slider-Farben sichtbar
-                $this->UpdateFormField('ProgressColor1', 'visible', true);
-                $this->UpdateFormField('ProgressColor2', 'visible', true);
+                // Progress-Farnen unsichtbarSlider-Farben sichtbar
+                $this->UpdateFormField('ProgressColor1', 'visible', false);
+                $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', true);
+                $this->UpdateFormField('SliderColor2', 'visible', true);
                 // SecondVariable-Block ausblenden (Slider nutzt keinen Marker)
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
@@ -2193,7 +2204,7 @@ class UniversalDeviceTile extends IPSModule
                 // Text-Felder ausblenden
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 // Ausrichtung bei Slider ausblenden (feste horizontale Ausrichtung)
-                $this->UpdateFormField('VerticalAlignment', 'visible', false);
+                $this->UpdateFormField('VerticalAlignment', 'visible', true);
                 // OpenObjectId bei Slider ausblenden
                 $this->UpdateFormField('OpenObjectId', 'visible', false);
                 break;
@@ -2221,6 +2232,8 @@ class UniversalDeviceTile extends IPSModule
                 // Progress-Felder ausblenden
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
@@ -2249,6 +2262,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowValue', 'visible', false);
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
@@ -2933,6 +2948,7 @@ class UniversalDeviceTile extends IPSModule
             'min' => 0,
             'max' => 100
         ];
+        $profileMinMax = null; // Profil-Werte nur als Fallback verwenden
         
         if (!IPS_VariableExists($variableId)) {
             return $defaultMinMax;
@@ -2974,29 +2990,48 @@ class UniversalDeviceTile extends IPSModule
             return null;
         };
         
-        // **FALL 1: Alte Variablenprofile (höchste Priorität wie bei Icons)**
+        // **FALL 1: Alte Variablenprofile (nun nur noch Fallback, Präsentationen haben Vorrang)**
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
         if (!empty($profile) && IPS_VariableProfileExists($profile)) {
             $profileData = IPS_GetVariableProfile($profile);
             
             if (isset($profileData['MinValue']) && isset($profileData['MaxValue'])) {
-                $minMax = [
+                $profileMinMax = [
                     'min' => floatval($profileData['MinValue']),
                     'max' => floatval($profileData['MaxValue'])
                 ];
-                
-                return $minMax;
             }
         }
         
         // **FALL 2: CustomPresentation mit direkten MIN/MAX Parametern**
         // Presentation source: prefer CustomPresentation, fallback to standard VariablePresentation (Option B)
-        // This enables button rendering for standard (non-custom) presentations with OPTIONS/PRESENTATION/TEMPLATE
+        // Normalize to array (can be JSON string or array depending on IPS version)
         $customPresentation = [];
         if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
-            $customPresentation = $variable['VariableCustomPresentation'];
+            $raw = $variable['VariableCustomPresentation'];
         } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
-            $customPresentation = $variable['VariablePresentation'];
+            $raw = $variable['VariablePresentation'];
+        } else {
+            $raw = [];
+        }
+        if (is_string($raw)) {
+            $decodedTop = @json_decode($raw, true);
+            if (is_array($decodedTop)) {
+                $customPresentation = $decodedTop;
+            }
+        } elseif (is_array($raw)) {
+            $customPresentation = $raw;
+        }
+        // Wenn Präsentation nur GUID enthält, versuche vollständige Variable-Präsentation aufzulösen
+        if (!empty($customPresentation) && isset($customPresentation['PRESENTATION']) && count($customPresentation) <= 2) {
+            if (function_exists('IPS_GetVariablePresentation')) {
+                try {
+                    $fullPresentation = @IPS_GetVariablePresentation($variableId);
+                    if (is_array($fullPresentation) && !empty($fullPresentation)) {
+                        $customPresentation = $fullPresentation;
+                    }
+                } catch (Exception $e) { /* ignore */ }
+            }
         }
         
         if (!empty($customPresentation)) {
@@ -3157,6 +3192,10 @@ class UniversalDeviceTile extends IPSModule
             }
         }
         
+        // **Falls noch nichts gefunden: Profil-Werte verwenden (Fallback)**
+        if (is_array($profileMinMax)) {
+            return $profileMinMax;
+        }
         // **LETZTER FALLBACK: Standard Min/Max verwenden**
         return $defaultMinMax;
     }
