@@ -901,7 +901,7 @@
     "    [ 'caption' => 'center', 'value' => 'center' ],",
     "    [ 'caption' => 'left',   'value' => 'left'   ]",
     "], 'save' => true, 'add' => 'left', 'visible' => ($displayType !== 'progress') ];",
-    "$form[] = [ 'caption' => 'Separator line', 'name' => 'ShowBorderLine', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => false ];",
+    "$form[] = [ 'caption' => 'Separator line', 'name' => 'ShowBorderLine', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => ($displayType === 'text') ];",
     "",
     "return $form;"
 ]

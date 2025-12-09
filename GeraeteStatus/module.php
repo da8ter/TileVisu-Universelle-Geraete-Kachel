@@ -389,6 +389,23 @@ class UniversalDeviceTile extends IPSModule
             }
             return '';
         }
+        // OpenObject-Buttons: OpenObjectId-Namen anzeigen (hat Priorität)
+        if (($displayType === 'button') && isset($row['OpenObjectId'])) {
+            $openObjectId = intval($row['OpenObjectId']);
+            if ($openObjectId > 1 && IPS_ObjectExists($openObjectId)) {
+                $obj = IPS_GetObject($openObjectId);
+                $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
+                $parentName = '';
+                if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
+                    $parent = IPS_GetObject($obj['ParentID']);
+                    $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
+                }
+                if ($name !== '' && $parentName !== '') {
+                    return $name . ' (' . $parentName . ')';
+                }
+                return $name;
+            }
+        }
         // Script-Buttons ohne Variable: Script-Namen anzeigen
         if (($displayType === 'button') && isset($row['ScriptID'])) {
             $scriptId = intval($row['ScriptID']);
@@ -1806,7 +1823,7 @@ class UniversalDeviceTile extends IPSModule
                         'scriptId' => $scriptId,
                         'openObjectId' => intval($variable['OpenObjectId'] ?? 0),
                     ];
-                } else if ((($variable['DisplayType'] ?? 'text') === 'button') && intval($variable['OpenObjectId'] ?? 0) > 0) {
+                } else if ((($variable['DisplayType'] ?? 'text') === 'button') && intval($variable['OpenObjectId'] ?? 0) > 1) {
                     // SUPPORT BUTTON ROWS WITHOUT VARIABLE OR SCRIPT: OpenObject-Button (stateless)
                     $openObjectId = intval($variable['OpenObjectId']);
                     $label = $variable['Label'] ?? '';
