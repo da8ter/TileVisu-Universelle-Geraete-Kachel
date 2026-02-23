@@ -216,10 +216,16 @@
             min-height: 15px; /* Reduzierte Mindesthöhe für kompaktere Darstellung */
         }
         
-        /* Für gruppierte Variablen: Kein width: 100% damit sie nebeneinander passen */
-        /* NUR Progress-Balken-Gruppen sollen wachsen, nicht Button/Text-Gruppen */
+        /* Für gruppierte Variablen: Standardmäßig nur Inhaltsbreite */
+        .variable-group-item {
+            flex: 0 0 auto; /* Nur Inhaltsbreite, kein Wachstum oder Schrumpfen */
+        }
+        
+        /* Wachstum des letzten Items wird beim Rendern inline vergeben (letztes NICHT-Bild-Item) */
+        
+        /* Progress-Balken: Auch in der Mitte können sie wachsen wenn nötig */
         .variable-group-item:has(.progress-variable) {
-            flex: 1 1 100px; /* Nur Container mit Progress-Balken wachsen lassen */
+            flex: 1 1 100px; /* Mindestens 100px, kann wachsen */
         }
         
         /* SPEZIAL: Für group-name-above Layout (flex-direction: column) */
@@ -238,27 +244,36 @@
             margin-top: 0;
         }
         
-        /* Bild-Variablen in Gruppen: nebeneinander und volle Breite nutzen */
+        /* Bild-Variablen in Gruppen: Display flex für column layout, wachsen NICHT */
         .variable-group-item:has(.variable-inline-image) {
-            flex: 1 1 0;
             display: flex;
+            flex: 0 0 auto; /* nur Inhaltsbreite */
+            min-width: 0; /* Überlauf durch Inhalte verhindern */
+            overflow: hidden; /* Clipping innerhalb des Items */
         }
+        /* Wachstum des letzten Items steuern wir inline beim Rendern */
         .variable-group-item:has(.variable-inline-image) .variable-inline-image {
-            width: 100% !important;
+            /* Breite wird durch inline-style gesetzt (imageWidth) bzw. 100% vom Item in Gruppen */
             height: auto !important;
-            flex: 1 1 auto !important;
+            flex: 0 0 auto !important;
+            display: block; /* Entfernt inline-Grafik-Zwischenräume */
+            max-width: 100%;
         }
         /* Innerer Wrapper für Bild-Gruppenelemente: Inhalte (Label/Value) unter dem Bild stapeln */
         .variable-group-item:has(.variable-inline-image) .variable-item {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            width: 100%;
+            /* align-items wird durch inline-style gesetzt basierend auf alignment */
+            width: 100%; /* Fülle Item-Breite des .variable-group-item */
+            min-width: 0; /* Inhalte dürfen innerhalb des Items schrumpfen */
         }
+        /* Label/Value an Item-Breite binden, Überlauf vermeiden */
+        /* text-align wird durch inline-style gesetzt basierend auf alignment */
         .variable-group-item:has(.variable-inline-image) .variable-label,
         .variable-group-item:has(.variable-inline-image) .variable-value {
-            width: 100%;
-            text-align: center;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .variable-group-item:has(.variable-inline-image) .variable-value {
             flex-grow: 0;
@@ -272,6 +287,18 @@
         /* AUSNAHME: Progress-Balken brauchen volle Breite, auch in Gruppen */
         .variable-group-item .variable-item .progress-container {
             width: 100%;
+        }
+        /* Slider in Gruppen: volle Breite und flexibles Wachstum */
+        .variable-group-item:has(.slider-container) {
+            flex: 1 1 200px;
+            min-width: 0;
+        }
+        .variable-group-item:has(.slider-container) .variable-item {
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+        .variable-group-item .variable-item .slider-container {
+            width: 100% !important;
         }
         
         /* AUSNAHME: Progress-Bar-Container brauchen volle Breite */
@@ -331,6 +358,11 @@
             align-items: center; /* Vertikale Zentrierung für Values */
         }
 
+        img.variable-inline-image {
+            margin-top: 5px;
+            margin-bottom: 5px;
+        }
+
         /* Fortschrittsbalken-Styles - verwende zentrale Konfiguration */
         .progress-container {
             margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
@@ -347,8 +379,95 @@
             border-radius: var(--progress-bar-border-radius, 10px) 0 0 var(--progress-bar-border-radius, 10px);
             transition: width 3s ease-in-out;
             background: linear-gradient(to right, var(--progress-color1), var(--progress-color2));
+            /* Prefer OKLCH interpolation where supported for smoother, perceptually uniform gradients */
+            background: linear-gradient(to right in oklch, var(--progress-color1), var(--progress-color2));
             min-height: var(--progress-bar-height, 20px);
         }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+        }
+        .slider-track {
+            position: relative;
+            flex: 1 1 auto;
+            height: var(--slider-height, 5px);
+            background: var(--progress-bar-bg-color, rgba(135, 135, 135, 0.25));
+            border-radius: var(--slider-radius, 9999px);
+            overflow: visible; /* allow thumb to protrude so it's fully circular */
+            touch-action: none;
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 20%, transparent);
+        }
+        .slider-track::after {
+            content: "";
+            position: absolute;
+            left: 0; top: 0; right: 0; bottom: 0;
+            background-image: radial-gradient(circle, var(--slider-dots-color, var(--progress-color1)) var(--slider-dot-radius, 1px), transparent var(--slider-dot-radius, 1px));
+            background-size: var(--slider-step-px, 12px) var(--slider-step-px, 12px);
+            background-position: calc(var(--slider-step-px, 12px) / 2) 50%;
+            background-repeat: repeat-x;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .slider-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            /* Fallback for browsers without OKLCH gradient support */
+            background: linear-gradient(to right, var(--progress-color1), var(--progress-color2));
+            /* Prefer OKLCH interpolation where supported for smoother, perceptually uniform gradients */
+            background: linear-gradient(to right in oklch, var(--progress-color1), var(--progress-color2));
+            border-radius: inherit;
+            z-index: 2;
+        }
+        .slider-thumb {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: var(--slider-thumb-size, 22px);
+            height: var(--slider-thumb-size, 22px);
+            background: var(--slider-thumb-color, var(--progress-color2));
+            border-radius: 50%;
+            aspect-ratio: 1 / 1;
+            box-sizing: content-box;
+            pointer-events: auto; /* ensure clicks on protruding half are captured */
+            touch-action: none;
+            cursor: pointer;
+            z-index: 2; /* ensure thumb sits above fill */
+        }
+        .slider-value {
+            flex: 0 0 var(--slider-value-width, 48px);
+            width: var(--slider-value-width, 48px);
+            text-align: right;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        .slider-value:empty { display: none; }
+        .slider-step-btn {
+            flex: 0 0 auto;
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: transparent;
+            color: var(--progress-color1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px; /* doubled */
+            line-height: 1;
+            padding: 0;
+            border-radius: 0;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            font-weight: 400;
+        }
+        .slider-step-btn[data-dir="-1"] { color: var(--progress-color1); }
+        .slider-step-btn[data-dir="1"] { color: var(--progress-color1); }
+        .slider-step-btn:hover { transform: scale(1.0); opacity: 1; }
 
         .progress-text {
             position: absolute;
@@ -363,6 +482,57 @@
             padding: 0 var(--progress-bar-text-padding, 12px);
             white-space: nowrap;
             overflow: hidden;
+        }
+
+        /* Target SOC marker overlay (mirrors Wallbox zielsoc marker) */
+        .progress-container .target-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: calc(var(--target-percent, -1000%) - 4px);
+            width: 8px;
+            pointer-events: none;
+            z-index: 1;
+            background: none;
+        }
+        .progress-container .soc-triangle {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 3px solid transparent;
+            border-right: 3px solid transparent;
+            opacity: 0.3;
+        }
+        .progress-container .soc-triangle-top {
+            top: 0;
+            border-bottom: 0;
+            border-top: 3px solid #000;
+        }
+        .progress-container .soc-triangle-bottom {
+            bottom: 0;
+            border-top: 0;
+            border-bottom: 3px solid #000;
+        }
+        .progress-container .target-marker-text {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            left: calc(var(--target-percent, 0%) + 5px);
+            color: inherit;
+            z-index: 2;
+            font-size: var(--balkenschriftgroesse, inherit);
+            line-height: 1em;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 5px;
+            white-space: nowrap;
+            visibility: visible;
+        }
+        .progress-container .target-marker-text.position-before-bar {
+            left: auto;
+            right: calc(100% - var(--target-percent, 0%) + 5px);
         }
 
         .progress-main-text {
@@ -388,6 +558,24 @@
             transform: translateY(-1px); /* Icon 1px höher */
             margin-top: 0 !important; /* Überschreibe allgemeine Icon-Margins */
             margin-bottom: 0 !important; /* Überschreibe allgemeine Icon-Margins */
+        }
+        /* Gleiche Ausrichtung auch für Marker-Text-Icons anwenden */
+        .progress-container .target-marker-text .variable-icon {
+            vertical-align: text-bottom;
+            align-self: center;
+            display: inline-flex;
+            align-items: center;
+            transform: translateY(-1px);
+            font-size: 1em;
+            width: 1em;
+            height: 1em;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            margin-right: 4px; /* kleiner Abstand vor Label */
+        }
+        .progress-container .target-marker-text svg[class*="fa-"] {
+            width: 1em;
+            height: 1em;
         }
         
         /* Labels in Progress-Bars: Keine störenden Margins */
@@ -443,7 +631,9 @@
             width: 100% !important;
             gap: 16px !important;
             flex-wrap: nowrap !important;
-            align-items: flex-start !important; /* Behält natürliche Höhen bei */
+            column-gap: 16px !important;
+            row-gap: calc(var(--element-spacing, 8px)) !important;
+            align-items: flex-start; /* Inline-Styles können Ausrichtung bei Bedarf überschreiben */
         }
         
         /* === REINE BOOL-GRUPPEN: Gleichmäßige Verteilung === */
@@ -461,23 +651,33 @@
             display: flex !important;
             /* Margins beibehalten für konsistente vertikale Abstände */
         }
-        
+
         /* Reine Bool-Gruppen: Buttons volle Container-Breite */
         .variable-group.stretch-buttons:not(:has(.variable-multi-button-container)) .variable-group-item .variable-button-container .variable-button {
             width: 100% !important;
             min-width: 100% !important;
             max-width: 100% !important;
-            flex: none !important;
         }
+
+        /* Fallback ohne :has() Unterstützung – immer volle Breite für Bool-Buttons in Stretch-Gruppen */
+        .variable-group.stretch-buttons .variable-group-item .variable-button-container {
+            width: 100% !important;
+            display: flex !important;
+        }
+        .variable-group.stretch-buttons .variable-group-item .variable-button-container .variable-button {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            flex: 1 1 0% !important; /* Ensure buttons fill width */
+        }
+        
         
         /* === GEMISCHTE GRUPPEN: Bool feste Breite, Integer restlicher Platz === */
         
         /* Gemischte Gruppen: Bool-Button Items feste Breite */
         .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item:has(.variable-button-container) {
-            flex: none !important;
             display: flex !important;
         }
-        
         /* Gemischte Gruppen: Bool-Button Container */
         .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item .variable-button-container {
             display: flex !important;
@@ -503,21 +703,49 @@
         .variable-group.stretch-buttons .variable-group-item .variable-multi-button-container {
             width: 100% !important;
             display: flex !important;
+            align-items: stretch !important; /* ensure buttons fill height */
             /* Margins beibehalten für konsistente vertikale Abstände */
         }
         
         /* Multi-Buttons: Gleichmäßige Verteilung innerhalb des Containers */
         .variable-group.stretch-buttons .variable-group-item .variable-multi-button-container .variable-multi-button {
-            flex: 1 !important;
+            /* Equal distribution across container; flex-basis:0 for Safari/WebKit */
+            flex: 1 1 0% !important;
             min-width: 0 !important;
+            width: auto !important;
+            display: flex !important; /* avoid inline-flex + abs overlay quirks */
+            align-items: center !important;
         }
         
 
         
         /* Spezifische Regel für gruppierte Text-Variablen: Überschreibt die 0-Margin-Regel */
         .variable-group-item .variable-item.text-variable {
+            display: inline-flex; /* Sicherstellen, dass Elemente in einer Zeile bleiben */
+            flex-direction: row;
             margin-bottom: 0px; /* +5px mehr Abstand auch für gruppierte */
             margin-top: 0px; /* +5px mehr Abstand auch für gruppierte */
+            white-space: nowrap; /* Icon, Label, Value in einer Zeile halten */
+            width: auto; /* Nur Inhaltsbreite einnehmen, darf schrumpfen */
+            gap: 0px; /* Abstand über Icon-Margin, identisch zu ungruppierten Texten */
+            align-items: baseline; /* Zahlen auf Basislinie zum Label */
+        }
+        .variable-group-item .variable-item.text-variable .variable-icon,
+        .variable-group-item .variable-item.text-variable .variable-label,
+        .variable-group-item .variable-item.text-variable .variable-value {
+            display: inline-flex; /* Kinder ebenfalls inline darstellen */
+            white-space: nowrap; /* Sicherheit: keine Zeilenumbrüche */
+            margin: 0; /* Keine vertikalen Margins innerhalb der Zeile */
+        }
+        .variable-group-item .variable-item.text-variable .variable-value {
+            flex: 0 0 auto; /* Wachstum verhindern */
+            min-width: 0; /* Schrumpfen zulassen */
+        }
+        /* Gleicher Icon-Abstand wie ungruppiert: nur rechts 5px, keine vertikalen Margins */
+        .variable-group-item .variable-item.text-variable .variable-icon {
+            margin-right: 5px;
+            margin-top: 0;
+            margin-bottom: 0;
         }
 
         .variable-progress {
@@ -553,6 +781,14 @@
             min-width: 80px;
             justify-content: center;
             box-sizing: border-box;
+            position: relative; /* needed for ::after overlay */
+            overflow: hidden;  /* clip overlay to rounded corners */
+            z-index: 0; /* establish stacking context below overlay */
+            /* iOS/WebKit: ensure custom background covers full button area */
+            -webkit-appearance: none;
+            appearance: none;
+            -moz-appearance: none;
+               background-clip: padding-box;
         }
 
         /* Multi-Button-Container für Integer-Variablen */
@@ -582,6 +818,15 @@
             justify-content: center;
             box-sizing: border-box;
             flex: 0 0 auto; /* Verhindere automatisches Stretching, respektiere explizite Breite */
+            position: relative; /* needed for ::after overlay */
+            overflow: hidden;  /* clip overlay to rounded corners */
+            z-index: 0; /* establish stacking context below overlay */
+            /* iOS/WebKit: ensure custom background covers full button area */
+            -webkit-appearance: none;
+            appearance: none;
+            -moz-appearance: none;
+            -webkit-tap-highlight-color: transparent;
+            background-clip: padding-box;
         }
 
         .variable-multi-button:hover {
@@ -590,6 +835,18 @@
 
         .variable-multi-button.active {
             font-weight: 600;
+        }
+
+        /* Explicit inactive state overlay to force full-surface dimming on mobile/webviews */
+        .variable-button.inactive::after,
+        .variable-multi-button.inactive::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: inherit;
+            pointer-events: none;
+            z-index: 1;
         }
 
         /* Button-Gruppierung: Spezielle Border-Radius für zusammenhängende Button-Gruppe */
@@ -664,6 +921,22 @@
 
     <script>
 
+        // Lokalisierbare Frontend-Texte (werden aus GetFullUpdateMessage() überschrieben)
+        window.uiTexts = {
+            on: 'On',
+            off: 'Off',
+            targetSoc: 'Target SOC',
+            deviceImage: 'Device Image',
+            image: 'Image'
+        };
+
+        function getUiText(key, fallback) {
+            if (window.uiTexts && typeof window.uiTexts[key] === 'string' && window.uiTexts[key] !== '') {
+                return window.uiTexts[key];
+            }
+            return fallback;
+        }
+
         
         // Icons werden direkt vom Server gemappt, wir müssen nur noch die richtigen CSS-Klassen hinzufügen
         
@@ -728,6 +1001,156 @@
 
             // Fallback: bevorzuge Kit, ansonsten Solid
             return `fa-fw fa-kit fak fa-${baseName}`;
+        }
+        
+        // Globaler Spin-State pro Button-Ident (nur Script-Buttons)
+        window._scriptButtonSpinUntil = window._scriptButtonSpinUntil || {};
+        
+        // === Button-Icon Spin Helper ===
+        function startButtonIconSpin(buttonEl) {
+            if (!buttonEl) return;
+            // Entferne FA-Kommentare (<!-- i ... -->), die i2svg hinterlässt
+            try {
+                const childNodes = Array.from(buttonEl.childNodes);
+                for (const n of childNodes) {
+                    if (n.nodeType === 8) { // Kommentar
+                        buttonEl.removeChild(n);
+                    }
+                }
+            } catch (_) {}
+            // Script-Buttons während des Spins optisch aktiv setzen
+            if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
+                try {
+                    // Entferne inaktiv-Status für die Spin-Dauer
+                    if (buttonEl.classList) {
+                        buttonEl.classList.remove('inactive');
+                        buttonEl.classList.add('active');
+                    }
+                } catch (_) {}
+            }
+            // Ersten vorhandenen Icon-Knoten (svg oder i) ermitteln
+            let icon = buttonEl.querySelector('i[class*="fa-"], svg[class*="fa-"]');
+            if (icon) {
+                // Ursprüngliches Icon-HTML sichern und Icon-Knoten entfernen
+                if (!buttonEl.dataset.originalIconHtml) {
+                    try { buttonEl.dataset.originalIconHtml = icon.outerHTML; } catch (_) {}
+                }
+                try { icon.remove(); } catch (_) {}
+            }
+            // Neues Spinner-Icon einfügen; verwende FA "rotate" als Glyph
+            const temp = document.createElement('i');
+            const tempBase = prepareIconForDisplay('rotate') || 'fa-fw fa-kit fak fa-rotate';
+            temp.className = `${tempBase} fa-spin`;
+            temp.setAttribute('data-temp-spinner', '1');
+            temp.style.marginRight = '6px';
+            try { buttonEl.insertBefore(temp, buttonEl.firstChild); } catch (_) { buttonEl.appendChild(temp); }
+            // Sofortige Konvertierung von <i> zu <svg>, falls FA Kit verfügbar ist
+            try {
+                if (window.FontAwesome && window.FontAwesome.dom && typeof window.FontAwesome.dom.i2svg === 'function') {
+                    window.FontAwesome.dom.i2svg({ node: temp, observeMutations: false });
+                }
+            } catch (_) {}
+        }
+
+        function stopButtonIconSpin(buttonEl) {
+            if (!buttonEl) return;
+            // Entferne Spinner (konvertiert evtl. zu <svg>) – identifiziere über fa-spin
+            try {
+                const spinIcons = buttonEl.querySelectorAll('svg.fa-spin, i.fa-spin');
+                spinIcons.forEach(node => node.remove());
+            } catch (_) {}
+            // Entferne evtl. verbliebene FA-Kommentar-Knoten
+            try {
+                const childNodes = Array.from(buttonEl.childNodes);
+                for (const n of childNodes) {
+                    if (n.nodeType === 8) {
+                        buttonEl.removeChild(n);
+                    }
+                }
+            } catch (_) {}
+            // Script-Buttons sollen optisch IMMER aktiv bleiben
+            if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
+                try {
+                    if (buttonEl.classList) {
+                        buttonEl.classList.remove('inactive');
+                        buttonEl.classList.add('active');
+                    }
+                } catch (_) {}
+            }
+            // Ursprüngliches Icon (falls gesichert) wiederherstellen
+            try {
+                const html = buttonEl.dataset.originalIconHtml;
+                if (html && typeof html === 'string' && html.length > 0) {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = html;
+                    const restored = wrapper.firstElementChild;
+                    if (restored) {
+                        restored.style.marginRight = restored.style.marginRight || '6px';
+                        buttonEl.insertBefore(restored, buttonEl.firstChild);
+                        // Falls es ein <i> war, direkt konvertieren
+                        try {
+                            if (restored.tagName.toLowerCase() === 'i' && window.FontAwesome && window.FontAwesome.dom && typeof window.FontAwesome.dom.i2svg === 'function') {
+                                window.FontAwesome.dom.i2svg({ node: restored, observeMutations: false });
+                            }
+                        } catch (_) {}
+                    }
+                }
+                delete buttonEl.dataset.originalIconHtml;
+            } catch (_) {}
+        }
+
+        function handleButtonClick(buttonEl, ident, value) {
+            try {
+                const openObjectIdAttr = buttonEl && buttonEl.dataset ? buttonEl.dataset.openObjectId : null;
+                const openObjectId = openObjectIdAttr ? parseInt(openObjectIdAttr, 10) : 0;
+                if (openObjectId > 1 && typeof openObject === 'function') {
+                    openObject(openObjectId);
+                    return;
+                }
+            } catch (_) {}
+
+            const shouldSpin = (typeof ident === 'string' && ident.indexOf('script_') === 0);
+            if (shouldSpin) {
+                try {
+                    window._scriptButtonSpinUntil = window._scriptButtonSpinUntil || {};
+                    const spinUntil = Date.now() + 5000;
+                    window._scriptButtonSpinUntil[ident] = spinUntil;
+                    startButtonIconSpin(buttonEl);
+                    setTimeout(() => {
+                        try {
+                            if (!window._scriptButtonSpinUntil) {
+                                stopButtonIconSpin(buttonEl);
+                                return;
+                            }
+                            const current = window._scriptButtonSpinUntil[ident];
+                            if (!current || current <= Date.now()) {
+                                delete window._scriptButtonSpinUntil[ident];
+                                stopButtonIconSpin(buttonEl);
+                            }
+                        } catch (_) {}
+                    }, 5200);
+                } catch (_) {}
+            }
+            try {
+                if (typeof requestAction === 'function') {
+                    requestAction(ident, value);
+                }
+                // Optimistic UI: unmittelbar den Button-Status updaten
+                try {
+                    if (!shouldSpin) {
+                        // Kein Optimistic-Update: Anzeige erst nach Backend-Update ändern
+                    }
+                } catch (_) {}
+            } catch (_) {
+            }
+
+            // Nach Text-Änderungen Kollisionen neu prüfen und Marker ggf. wieder einblenden
+            try {
+                const progressContainer = progressTextContainer.closest('.progress-container');
+                if (progressContainer) {
+                    updateTargetMarkerDisplay(progressContainer, variable);
+                }
+            } catch (_) {}
         }
         
         // Hilfsfunktion zur Bestimmung der Textfarbe
@@ -840,7 +1263,18 @@
         }
 
         function handleMessage(data) {
-            const decodedData = JSON.parse(data);
+            let decodedData;
+            if (typeof data === 'string') {
+                try {
+                    decodedData = JSON.parse(data);
+                } catch (_) {
+                    return;
+                }
+            } else if (data && typeof data === 'object') {
+                decodedData = data; // already parsed object
+            } else {
+                return;
+            }
             const root = document.documentElement;
             
 
@@ -861,6 +1295,11 @@
                     case 'debugenabled':
                         debugEnabled = value;
                         break;
+                    case 'uitexts':
+                        if (value && typeof value === 'object') {
+                            window.uiTexts = Object.assign({}, window.uiTexts || {}, value);
+                        }
+                        break;
                     case 'elementspacing':
                         // Setze CSS-Variable für element-spacing
                         root.style.setProperty('--element-spacing', value + 'px');
@@ -880,6 +1319,27 @@
                             }
                         }
                         break;
+                    case 'image1url':
+                        // Hintergrundbild direkt per WebHook-URL setzen (Browser-Caching aktiv)
+                        try {
+                            if (typeof value === 'string' && value) {
+                                const mainDiv = document.querySelector('body');
+                                mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
+                                window._bgImageFromUrl = true;
+                            }
+                        } catch (_) {}
+                        break;
+                    case 'image1':
+                        try {
+                            if (typeof value === 'string' && value) {
+                                const mainDiv = document.querySelector('body');
+                                if (!window._bgImageFromUrl) {
+                                    mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
+                                }
+                            }
+                        } catch (_) {}
+                        break;
+
                     case 'imagealignment':
                         // Speichere Alignment global und wende sofort an
                         window.currentImageAlignment = value;
@@ -1113,6 +1573,11 @@
                                     continue;
                                 }
                                 processedEntries.add(compositeKey);
+
+                                // Always force a full re-render when image variables are present/updated
+                                if (displayType === 'image') {
+                                    hasOtherChanges = true;
+                                }
                                 
                                 if (oldVariable && newVariable && actualVariableId) {
                                     // Prüfe ob sich nur rawValue oder formattedValue geändert hat
@@ -1121,7 +1586,7 @@
                                     
                                     if (valueChanged || formattedValueChanged) {
                                         // Check display type and determine if minimal update is possible
-                                        if (displayType === 'progress' || displayType === 'button' || displayType === 'text') {
+                                        if (displayType === 'progress' || displayType === 'button' || displayType === 'text' || displayType === 'slider') {
                                             hasMinimalUpdates = true;
                                             minimalUpdates.push({ variableId: actualVariableId, type: displayType, variable: newVariable });
                                         } else {
@@ -1172,6 +1637,9 @@
                                         case 'text':
                                             updateTextValue(variableId, variable);
                                             break;
+                                        case 'slider':
+                                            updateSliderValue(variableId, variable.rawValue);
+                                            break;
                                     }
                                 });
                                 
@@ -1218,13 +1686,11 @@
                         if (typeof value === 'object') {
                             window.assets = window.assets || {};
                             Object.assign(window.assets, value);
-                            try { console.info('[UDT] Assets updated:', Object.keys(value)); } catch(_) {}
                             // Wichtig: Wenn sich Medieninhalte geändert haben, muss das Statusbild neu gerendert werden,
                             // da das <img>-src bereits auf den alten base64-String gesetzt wurde.
                             // Re-render mit dem zuletzt bekannten Status-Payload.
                             try {
                                 if (window._lastStatusPayload) {
-                                    try { console.info('[UDT] Re-render status due to assets update (using last payload)'); } catch(_) {}
                                     renderStatus(window._lastStatusPayload);
                                     updateImageVisibility();
                                 } else if (window.currentBildauswahl) {
@@ -1238,7 +1704,6 @@
                                     }
                                     const deviceImg = document.getElementById('image');
                                     if (deviceImg && imageUrl) {
-                                        try { console.info('[UDT] Directly updating image src due to assets update'); } catch(_) {}
                                         deviceImg.style.display = 'none';
                                         deviceImg.onload = function() { this.style.display = ''; };
                                         deviceImg.onerror = function() { this.style.display = 'none'; };
@@ -1254,18 +1719,23 @@
                             const updates = Array.isArray(value) ? value : [];
                             for (const u of updates) {
                                 const id = u?.id;
-                                const dataUri = u?.imageDataUri || '';
-                                if (!id || !dataUri) continue;
-                                // Selektor für Variable-Wrapper
+                                const hookUrl = u?.imageUrl || '';
+                                if (!id) continue;
                                 const wrapper = document.querySelector(`.variable-item[data-variable-id="${CSS.escape(String(id))}"]`);
                                 if (!wrapper) continue;
-                                // Suche img innerhalb des Wrappers
                                 const img = wrapper.querySelector('img.variable-inline-image');
                                 if (!img) continue;
                                 img.style.display = 'none';
                                 img.onload = function() { this.style.display = ''; };
                                 img.onerror = function() { this.style.display = 'none'; };
-                                img.src = dataUri;
+                                try { img.decoding = 'async'; } catch (_) {}
+                                try { img.loading = 'eager'; } catch (_) {}
+                                if (hookUrl) { img.src = hookUrl; }
+                                try {
+                                    if (img.complete && img.naturalWidth > 0) {
+                                        img.style.display = '';
+                                    }
+                                } catch (_) {}
                             }
                         } catch (_) {}
                         break;
@@ -1295,11 +1765,56 @@
                             root.style.setProperty('--hintergrundfarbe', value);
                         }
                         break;
-                    case 'image1':
-                        const mainDiv = document.querySelector('body');
-                        mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
-                        break;
+                    
                     default:
+                        // Handle minimal updates for SecondVariable (var_X_second*, var_X_second_value, var_X_second_icon)
+                        if (parameter.startsWith('var_') && parameter.includes('_second')) {
+                            const baseVarKey = parameter.split('_second')[0];
+                            const targetVariableId = window.varKeyToIdMapping?.[baseVarKey];
+                            if (targetVariableId && window.variableDataCache && window.variableDataCache[targetVariableId]) {
+                                const variable = window.variableDataCache[targetVariableId];
+                                variable.secondVariable = variable.secondVariable || {};
+                                if (parameter.endsWith('_second_value')) {
+                                    variable.secondVariable.rawValue = value;
+                                } else if (parameter.endsWith('_second_icon')) {
+                                    variable.secondVariable.icon = value;
+                                } else {
+                                    // formatted value update: 'var_X_second'
+                                    variable.secondVariable.formattedValue = value;
+                                }
+
+                                // Wenn Marker aus SecondVariable verwendet wird, spiegle minimal Updates in progressTarget
+                                try {
+                                    if (variable.displayType === 'progress' && variable.useSecondVariableAsTarget) {
+                                        variable.progressTarget = variable.progressTarget || {};
+                                        if (parameter.endsWith('_second_value')) {
+                                            variable.progressTarget.rawValue = value;
+                                        } else if (!parameter.endsWith('_second_icon')) {
+                                            // formatted text update
+                                            variable.progressTarget.formattedValue = value;
+                                        }
+                                        // label aus secondVariable übernehmen, falls vorhanden
+                                        if (variable.secondVariable && variable.secondVariable.label) {
+                                            variable.progressTarget.label = variable.secondVariable.label;
+                                        }
+                                    }
+                                } catch(_) {}
+
+                                // For progress bars, update text and marker immediately (first update), width is based on main rawValue
+                                if (variable.displayType === 'progress') {
+                                    const progressContainers = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`);
+                                    progressContainers.forEach((progressContainer) => {
+                                        const progressTextContainer = progressContainer.querySelector('.progress-text');
+                                        if (progressTextContainer) {
+                                            updateProgressText(progressTextContainer, variable);
+                                        }
+                                        updateTargetMarkerDisplay(progressContainer, variable);
+                                    });
+                                }
+                            }
+                            break; // handled in this branch
+                        }
+                        
                         // Prüfe auf Variable-Updates (Parameter endet mit '_value')
                         if (parameter.endsWith('_value')) {
                             // Extrahiere Variable-ID aus Parameter (z.B. 'var_3_value' -> 'var_3')
@@ -1307,16 +1822,24 @@
                             
                             // Aktualisiere rawValue im Cache
                             if (window.variableDataCache) {
-                                const targetVariableId = window.varKeyToIdMapping?.[varKey];
-                                if (targetVariableId && window.variableDataCache[targetVariableId]) {
-                                    window.variableDataCache[targetVariableId].rawValue = value;
-                                    
-                                    // MINIMAL UPDATE: Nur Progress Bar updaten, nicht komplettes Re-Render
-                                    const variable = window.variableDataCache[targetVariableId];
-                                    if (variable.displayType === 'progress') {
-                                        updateProgressBarValue(targetVariableId, value);
-                                        return; // Skip full re-render für Progress Bar Updates
+                                const targetVariableId = window.varKeyToIdMapping[varKey];
+                                if (targetVariableId) {
+                                    if (window.variableDataCache[targetVariableId]) {
+                                        window.variableDataCache[targetVariableId].rawValue = value;
                                     }
+                                    // Direkt-Updates nach DOM-Präsenz, nicht nach Cache-DisplayType
+                                    try {
+                                        const hasProgress = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`).length > 0;
+                                        if (hasProgress) {
+                                            updateProgressBarValue(targetVariableId, value);
+                                        }
+                                    } catch (_) {}
+                                    try {
+                                        const hasSlider = document.querySelectorAll(`.slider-container[data-variable-id="${CSS.escape(String(targetVariableId))}"]`).length > 0;
+                                        if (hasSlider) {
+                                            updateSliderValue(targetVariableId, value);
+                                        }
+                                    } catch (_) {}
                                 }
                             }
                             
@@ -1349,7 +1872,7 @@
             }
         }
 
-        // Universelle Variable-Update-Funktion für gruppierte und einzelne Variablen
+        // Universelle Variable-Update-Funktion: aktualisiert ALLE Darstellungen (Text, Button, Progress, Slider) für die Variable
         function updateVariable(varKey, newValue, updateType) {
             // Find target variable ID using mapping
             if (!window.varKeyToIdMapping || !window.varKeyToIdMapping[varKey]) {
@@ -1372,19 +1895,34 @@
                 variable.formattedValue = newValue;
             }
             
-            // Finde das DOM-Element für diese Variable
-            const variableElement = document.querySelector(`[data-variable-id="${targetVariableId}"]`);
-            
-            if (variable.displayType === 'button') {
-                // Button-Update: auf alle passenden Button-Instanzen anwenden
-                updateButtonValue(targetVariableId, variable);
-            } else if (variable.displayType === 'progress') {
-                // Progress: aktualisiere ausschließlich den Progress-Container (Text + ggf. width)
-                updateProgressDisplay(targetVariableId, variable);
-            } else {
-                // Text-Variable-Update (auch in Gruppen)
-                updateTextValue(targetVariableId, variable);
-            }
+            // Aktualisiere ALLE vorhandenen Darstellungen im DOM unabhängig vom gecachten displayType
+            try { updateTextValue(targetVariableId, variable); } catch (_) {}
+            try { updateButtonValue(targetVariableId, variable); } catch (_) {}
+            try {
+                const pc = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`);
+                if (pc && pc.length > 0) {
+                    // Text & Marker aktualisieren
+                    updateProgressDisplay(targetVariableId, variable);
+                    // Breite auch bei formatierten Updates anpassen, falls möglich
+                    if (updateType === 'formattedValue') {
+                        let numeric = NaN;
+                        try {
+                            const s = String(newValue);
+                            const m = s.match(/[-+]?\d+(?:[\.,]\d+)?/);
+                            if (m) numeric = parseFloat(m[0].replace(',', '.'));
+                        } catch (_) {}
+                        if (!Number.isNaN(numeric)) {
+                            updateProgressBarValue(targetVariableId, numeric);
+                        }
+                    }
+                }
+            } catch (_) {}
+            try {
+                const sc = document.querySelectorAll(`.slider-container[data-variable-id="${CSS.escape(String(targetVariableId))}"]`);
+                if (sc && sc.length > 0) {
+                    updateSliderValue(targetVariableId, variable.rawValue);
+                }
+            } catch (_) {}
         }
         
         // Hilfsfunktion für Button-Display-Update
@@ -1427,12 +1965,14 @@
                     
                     // Update button state
                     button.style.backgroundColor = buttonColor;
-                    button.style.opacity = opacity;
-                    
+                    // Do not set inline opacity; rely on classes for consistent full-surface dimming
+                    // Maintain active/inactive classes (used by mobile to dim full surface)
                     if (isActive) {
                         button.classList.add('active');
+                        button.classList.remove('inactive');
                     } else {
                         button.classList.remove('active');
+                        button.classList.add('inactive');
                     }
                     
                     // Update button content based on display configuration
@@ -1446,14 +1986,17 @@
                         }
                     }
                     
-                    // Label and Value
-                    if (variable.showLabel && association?.name) {
-                        if (variable.showValue) {
-                            // Label mit Doppelpunkt wenn auch Value gezeigt wird
-                            buttonContentParts.push(`<span style="font-weight: 700;">${association.name}:&nbsp;</span>`);
-                        } else {
-                            // Nur Label ohne Doppelpunkt
-                            buttonContentParts.push(`<span style="font-weight: 700;">${association.name}</span>`);
+                    // Label und Value (Beschriftung hat Vorrang)
+                    if (variable.showLabel) {
+                        const lbl = (typeof variable.label === 'string' && variable.label.trim() !== '') ? variable.label : (association?.name || '');
+                        if (lbl) {
+                            if (variable.showValue) {
+                                // Label mit Doppelpunkt wenn auch Value gezeigt wird
+                                buttonContentParts.push(`<span style="font-weight: 700;">${lbl}:&nbsp;</span>`);
+                            } else {
+                                // Nur Label ohne Doppelpunkt
+                                buttonContentParts.push(`<span style="font-weight: 700;">${lbl}</span>`);
+                            }
                         }
                     }
                     
@@ -1475,24 +2018,31 @@
 
             } else {
                 // Boolean variable: Single button update
-                const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
-                const currentBoolValue = isActive; // Use actual boolean value for Association-Matching
+                let isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+                let currentBoolValue = isActive; // Use actual boolean value for Association-Matching
                 
-                // Bool Buttons verwenden ausschließlich boolButtonColor
+                // Bool-Buttons: Farbe
+                // Wenn im Formular die Buttonfarbe transparent gewählt ist, nutze (falls vorhanden)
+                // die Farbe aus den Presentation/Associations; ansonsten fallback auf Accent-Color.
                 let buttonColor = 'var(--accent-color)';
                 let associationIcon = null;
                 let associationName = null;
                 
-                // Verwende ausschließlich boolButtonColor für Bool Buttons
                 if (variable.isBoolButtonColorTransparent) {
-                    buttonColor = 'var(--accent-color)';
+                    const arr = variable.variableAssociations;
+                    if (arr && Array.isArray(arr)) {
+                        const currentAssociation = arr.find(assoc => assoc.value === currentBoolValue);
+                        buttonColor = (currentAssociation && currentAssociation.color) ? currentAssociation.color : 'var(--accent-color)';
+                    } else {
+                        buttonColor = 'var(--accent-color)';
+                    }
                 } else {
                     buttonColor = variable.boolButtonColor || 'var(--accent-color)';
                 }
                 
 
                 
-                // Association-Icon und Name für Bool Buttons (nur für Icon/Name, nicht für Farbe)
+                // Association-Icon und Name für Bool Buttons (nur für Icon/Name)
                 const associations = variable.variableAssociations;
                 if (associations && Array.isArray(associations)) {
                     const currentAssociation = associations.find(assoc => assoc.value === currentBoolValue);
@@ -1502,7 +2052,7 @@
 
                     }
                 }                
-                const opacity = isActive ? '1' : '0.7';
+                const opacity = isActive ? '1' : '0.5';
 
                 // Resolve the actual button node; avoid mutating the wrapper
                 let targetButton = null;
@@ -1517,11 +2067,24 @@
                 if (!targetButton) {
                     return; // cannot safely update
                 }
+                // Script-Buttons: Immer aktiv darstellen
+                try {
+                    if (targetButton.dataset && targetButton.dataset.scriptButton === '1') {
+                        isActive = true;
+                        currentBoolValue = true;
+                    }
+                } catch (_) {}
 
                 // Aktualisiere Button-Style
                 targetButton.style.backgroundColor = buttonColor;
                 // targetButton.style.borderColor = buttonColor; // Border entfernt
-                targetButton.style.opacity = opacity;
+                // Do not set inline opacity; rely on classes for consistent full-surface dimming
+                // Maintain inactive class for mobile dimming
+                if (isActive) {
+                    targetButton.classList.remove('inactive');
+                } else {
+                    targetButton.classList.add('inactive');
+                }
                 
                 // Button-Inhalt zusammenstellen
                 let buttonText = '';
@@ -1546,7 +2109,7 @@
                 }
                 if (variable.showLabel) {
                     // Verwende Variablenname als Label (höchste Priorität), dann Association-Name als Fallback
-                    const displayLabel = variable.label || associationName || (isActive ? 'ON' : 'OFF');
+                    const displayLabel = variable.label || associationName || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off'));
                     if (variable.showValue) {
                         // Doppelpunkt nur wenn auch Value angezeigt wird - Label fett
                         textParts.push(`<span style="font-weight: 700;">${displayLabel}:&nbsp;</span>`);
@@ -1562,7 +2125,7 @@
                 
                 // Falls keine Checkbox aktiviert ist, zeige Label als Fallback (ohne Doppelpunkt) - fett
                 if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                    textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}</span>`);
+                    textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off'))}</span>`);
                 }
                 
                 buttonText = textParts.join(' ');
@@ -1580,70 +2143,349 @@
         }
         
         // Hilfsfunktion für Progress-Bar-Update
+
+        function clampAndRound(val, min, max, step, digits) {
+            let v = Number(val);
+            if (!Number.isFinite(v)) v = min;
+            if (max < min) { const t = min; min = max; max = t; }
+            if (!Number.isFinite(step) || step <= 0) {
+                const range = (max - min);
+                step = range > 0 ? (range / 100) : 1;
+            }
+            const ratio = (v - min) / step;
+            const rounded = Math.round(ratio);
+            v = min + (rounded * step);
+            if (v < min) v = min;
+            if (v > max) v = max;
+            if (Number.isFinite(digits) && digits >= 0) {
+                v = Number(v.toFixed(digits));
+            }
+            return v;
+        }
+
+        function updateSliderUI(sc, percent, displayText) {
+            const fill = sc.querySelector('.slider-fill');
+            const thumb = sc.querySelector('.slider-thumb');
+            if (fill) fill.style.width = `${percent}%`;
+            if (thumb) thumb.style.left = `${percent}%`;
+            const valEl = sc.querySelector('.slider-value');
+            const showVal = (() => {
+                try {
+                    const a = sc.getAttribute('data-show-value');
+                    return a === '1' || a === 'true';
+                } catch (_) { return true; }
+            })();
+            if (valEl && typeof displayText !== 'undefined') {
+                let suffix = sc.getAttribute('data-suffix') || '';
+                if (!suffix) {
+                    const cur = valEl.textContent || '';
+                    const m = cur.match(/^\s*[-+]?\d+(?:[\.,]\d+)?\s*(.*)$/);
+                    suffix = m ? m[1] : '';
+                    if (!suffix) {
+                        try {
+                            const vid = sc.getAttribute('data-variable-id');
+                            const fv = window.variableDataCache?.[vid]?.formattedValue;
+                            if (typeof fv === 'string') {
+                                const mF = fv.match(/^\s*[-+]?\d+(?:[\.,]\d+)?\s*(.*)$/);
+                                suffix = mF ? mF[1] : '';
+                            }
+                        } catch (_) {}
+                    }
+                    if (suffix) sc.setAttribute('data-suffix', suffix);
+                }
+                if (typeof displayText === 'number') {
+                    const digits = Number(sc.getAttribute('data-digits')) || 0;
+                    const numStr = Number(displayText).toFixed(Math.max(0, digits));
+                    if (showVal) {
+                        valEl.textContent = suffix ? `${numStr} ${suffix}` : numStr;
+                    } else {
+                        valEl.textContent = '';
+                    }
+                    try { sc.setAttribute('data-current-value', String(displayText)); } catch (_) {}
+                } else {
+                    if (showVal) {
+                        valEl.textContent = String(displayText);
+                    } else {
+                        valEl.textContent = '';
+                    }
+                    const m2 = String(displayText).match(/^\s*[-+]?\d+(?:[\.,]\d+)?\s*(.*)$/);
+                    const s2 = m2 ? m2[1] : '';
+                    if (s2) sc.setAttribute('data-suffix', s2);
+                    try {
+                        const mNum = String(displayText).match(/[-+]?\d+(?:[\.,]\d+)?/);
+                        if (mNum) sc.setAttribute('data-current-value', String(Number(mNum[0].replace(',', '.'))));
+                    } catch (_) {}
+                }
+            }
+        }
+
+        function updateSliderPattern(sc) {
+            try {
+                const track = sc.querySelector('.slider-track');
+                if (!track) return;
+                const rect = track.getBoundingClientRect();
+                const min = Number(sc.getAttribute('data-min')) || 0;
+                const max = Number(sc.getAttribute('data-max')) || 100;
+                let step = NaN;
+                const stepAttr = sc.getAttribute('data-step');
+                if (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) {
+                    step = Number(stepAttr);
+                } else {
+                    // try to get from cache
+                    const id = sc.getAttribute('data-variable-id');
+                    const vc = (window.variableDataCache && id) ? window.variableDataCache[id] : null;
+                    if (vc && Number.isFinite(Number(vc.sliderStep))) {
+                        step = Number(vc.sliderStep);
+                    }
+                }
+                const range = Math.max(0.000001, max - min);
+                // default: 100 steps if not provided
+                const s = (Number.isFinite(step) && step > 0) ? step : (range / 100);
+                // compute integer number of intervals using floor to avoid off-by-one
+                const stepsCount = Math.max(1, Math.floor((range / s) + 1e-9));
+                const px = (rect.width > 0 && stepsCount > 0) ? (rect.width / stepsCount) : 12;
+                track.style.setProperty('--slider-step-px', `${px}px`);
+                const heightPx = rect.height || parseFloat(getComputedStyle(track).height) || 6;
+                let dotPx = Math.max(1, Math.round(heightPx * 0.5));
+                // keep clear gap: cap dot size to 40% of tile width
+                if (px && isFinite(px)) {
+                    dotPx = Math.min(dotPx, Math.max(1, Math.floor(px * 0.4)));
+                }
+                track.style.setProperty('--slider-dot-size', `${dotPx}px`);
+                const dotRadius = Math.max(1, Math.floor(Math.min(dotPx / 2, (isFinite(px) ? px * 0.25 : dotPx / 2))));
+                track.style.setProperty('--slider-dot-radius', `${dotRadius}px`);
+            } catch (_) {}
+        }
+
+        function scheduleSliderVerification(id, sc, intendedValue) {
+            if (!window._sliderPending) window._sliderPending = {};
+            const ex = window._sliderPending[id];
+            try { if (ex && ex.t) clearTimeout(ex.t); } catch (_) {}
+            const t = setTimeout(() => verifySliderWrite(id, sc), 1200);
+            window._sliderPending[id] = { intended: Number(intendedValue), t: t };
+        }
+
+        function verifySliderWrite(id, sc) {
+            const pend = window._sliderPending && window._sliderPending[id];
+            if (!pend) return;
+            try { delete window._sliderPending[id]; } catch (_) {}
+            let actual = NaN;
+            try { actual = Number(window.variableDataCache?.[id]?.rawValue); } catch (_) {}
+            const min = Number(sc.getAttribute('data-min')) || 0;
+            const max = Number(sc.getAttribute('data-max')) || 100;
+            const digits = Number(sc.getAttribute('data-digits')) || 0;
+            const stepAttr = sc.getAttribute('data-step');
+            const step = (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) ? Number(stepAttr) : NaN;
+            const intended = clampAndRound(Number(pend.intended), min, max, step, digits);
+            const actualClamped = clampAndRound(Number(actual), min, max, step, digits);
+            const tol = (Number.isFinite(step) && step > 0) ? (step / 2) : ((digits > 0) ? Math.pow(10, -digits) / 2 : 0.5);
+            if (!Number.isFinite(actualClamped)) return;
+            if (Math.abs(actualClamped - intended) > tol) {
+                updateSliderValue(id, actualClamped);
+                try { sc.setAttribute('data-current-value', String(actualClamped)); } catch (_) {}
+            }
+        }
+
+        function attachSliderEvents(sc) {
+            const track = sc.querySelector('.slider-track');
+            const minusBtn = sc.querySelector('.slider-step-btn[data-dir="-1"]');
+            const plusBtn = sc.querySelector('.slider-step-btn[data-dir="1"]');
+            if (!track) return;
+            const id = sc.getAttribute('data-variable-id');
+            const min = Number(sc.getAttribute('data-min')) || 0;
+            const max = Number(sc.getAttribute('data-max')) || 100;
+            const digits = Number(sc.getAttribute('data-digits')) || 0;
+            const stepAttr = sc.getAttribute('data-step');
+            const step = (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) ? Number(stepAttr) : NaN;
+
+            // initialize dotted spacing according to step size
+            updateSliderPattern(sc);
+            // extra passes to ensure track width is known (iOS/WebView layout timing)
+            try { requestAnimationFrame(() => updateSliderPattern(sc)); } catch (_) {}
+            try { setTimeout(() => updateSliderPattern(sc), 0); } catch (_) {}
+            try {
+                if (typeof ResizeObserver !== 'undefined') {
+                    const ro = new ResizeObserver(() => updateSliderPattern(sc));
+                    ro.observe(track);
+                } else {
+                    window.addEventListener('resize', () => updateSliderPattern(sc));
+                }
+            } catch (_) {}
+
+            const getPercentFromClientX = (clientX) => {
+                const rect = track.getBoundingClientRect();
+                const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+                return rect.width > 0 ? (x / rect.width) * 100 : 0;
+            };
+            const percentToValue = (p) => {
+                const range = max - min;
+                const raw = min + (range * (p / 100));
+                return clampAndRound(raw, min, max, step, digits);
+            };
+            const valueToPercent = (v) => {
+                const range = max - min;
+                if (range <= 0) return 0;
+                return Math.max(0, Math.min(100, ((v - min) / range) * 100));
+            };
+
+            let dragging = false;
+            let dragValue = null;
+            const onPointerMove = (ev) => {
+                if (!dragging) return;
+                const p = getPercentFromClientX(ev.clientX);
+                const v = percentToValue(p);
+                dragValue = v;
+                const percent = valueToPercent(v);
+                updateSliderUI(sc, percent, v);
+            };
+            const endDrag = () => {
+                if (!dragging) return;
+                dragging = false;
+                try { window.removeEventListener('pointermove', onPointerMove); } catch (_) {}
+                try { window.removeEventListener('pointerup', endDrag, true); } catch (_) {}
+                if (dragValue !== null && typeof requestAction === 'function') {
+                    // Dataset aktualisieren, damit +/- den neuen Wert als Basis nutzt
+                    try { sc.setAttribute('data-current-value', String(dragValue)); } catch (_) {}
+                    requestAction(id, dragValue);
+                    try { scheduleSliderVerification(id, sc, dragValue); } catch (_) {}
+                }
+                dragValue = null;
+            };
+            track.addEventListener('pointerdown', (ev) => {
+                if (sc.style.pointerEvents === 'none') return;
+                dragging = true;
+                const p = getPercentFromClientX(ev.clientX);
+                const v = percentToValue(p);
+                dragValue = v;
+                const percent = valueToPercent(v);
+                updateSliderUI(sc, percent, v);
+                try { track.setPointerCapture(ev.pointerId); } catch (_) {}
+                window.addEventListener('pointermove', onPointerMove);
+                window.addEventListener('pointerup', endDrag, true);
+            });
+
+            const stepClick = (dir) => {
+                const vc = window.variableDataCache?.[id];
+                let base = NaN;
+                // 1) bevorzugt aktueller UI-Wert (Dataset)
+                try {
+                    const ds = sc.getAttribute('data-current-value');
+                    if (ds !== null && ds !== '' && !isNaN(Number(ds))) {
+                        base = Number(ds);
+                    }
+                } catch (_) {}
+                // 2) Cache
+                if (!Number.isFinite(base)) {
+                    base = Number(vc?.rawValue);
+                }
+                // 3) Fallback: Text
+                if (!Number.isFinite(base)) {
+                    try {
+                        const txt = sc.querySelector('.slider-value')?.textContent || '';
+                        const match = txt.match(/[-+]?\d+(?:[\.,]\d+)?/);
+                        if (match) base = Number(match[0].replace(',', '.'));
+                    } catch (_) {}
+                }
+                if (!Number.isFinite(base)) base = min;
+                const s = Number.isFinite(step) && step > 0 ? step : ((max - min) > 0 ? (max - min) / 100 : 1);
+                const next = clampAndRound(base + dir * s, min, max, s, digits);
+                // Optimistic UI
+                try {
+                    sc.setAttribute('data-current-value', String(next));
+                    updateSliderUI(sc, valueToPercent(next), next);
+                } catch (_) {}
+                if (typeof requestAction === 'function') {
+                    requestAction(id, next);
+                    try { scheduleSliderVerification(id, sc, next); } catch (_) {}
+                }
+            };
+            if (minusBtn) minusBtn.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); stepClick(-1); });
+            if (plusBtn) plusBtn.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); stepClick(1); });
+        }
+
+        function updateSliderValue(variableId, newValue) {
+            const scNodes = document.querySelectorAll(`.slider-container[data-variable-id="${CSS.escape(String(variableId))}"]`);
+            if (!scNodes || scNodes.length === 0) return;
+            scNodes.forEach((sc) => {
+                const min = Number(sc.getAttribute('data-min')) || 0;
+                const max = Number(sc.getAttribute('data-max')) || 100;
+                const digits = Number(sc.getAttribute('data-digits')) || 0;
+                const stepAttr = sc.getAttribute('data-step');
+                const step = (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) ? Number(stepAttr) : NaN;
+                const v = clampAndRound(Number(newValue), min, max, step, digits);
+                const range = max - min;
+                const percent = range > 0 ? Math.max(0, Math.min(100, ((v - min) / range) * 100)) : 0;
+                let display = v;
+                try {
+                    const vc = window.variableDataCache?.[variableId];
+                    if (vc && typeof vc.formattedValue !== 'undefined' && vc.formattedValue !== null) {
+                        display = vc.formattedValue;
+                    }
+                } catch (_) {}
+                updateSliderUI(sc, percent, display);
+                try {
+                    const pend = window._sliderPending && window._sliderPending[variableId];
+                    if (pend) {
+                        const tol = (Number.isFinite(step) && step > 0) ? (step / 2) : ((digits > 0) ? Math.pow(10, -digits) / 2 : 0.5);
+                        const intended = clampAndRound(Number(pend.intended), min, max, step, digits);
+                        if (Math.abs(v - intended) <= tol) {
+                            try { clearTimeout(pend.t); } catch (_) {}
+                            try { delete window._sliderPending[variableId]; } catch (_) {}
+                        }
+                    }
+                } catch (_) {}
+            });
+        }
         function updateProgressDisplay(targetVariableId, variable) {
 
             
-            // Finde Progress-Container mit der entsprechenden Variable-ID
-            const progressContainer = document.querySelector(`[data-variable-id="${targetVariableId}"].progress-container`);
-            
-            if (!progressContainer) {
+            // Finde alle Progress-Container mit der entsprechenden Variable-ID
+            const progressContainers = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`);
+            if (!progressContainers || progressContainers.length === 0) {
                 return;
             }
-            
-            // Aktualisiere Progress-Bar-Breite
-            const progressBar = progressContainer.querySelector('.progress-bar');
-            if (progressBar) {
-                // Berechne Prozentsatz basierend auf Min/Max-Werten
-                const rawValue = parseFloat(variable.rawValue) || 0;
-                const minValue = parseFloat(variable.progressMin) || 0;
-                const maxValue = parseFloat(variable.progressMax) || 100;
-                
-                let progressPercent = 0;
-                const range = maxValue - minValue;
-                if (range > 0) {
-                    progressPercent = ((rawValue - minValue) / range) * 100;
-                }
-                
-                // Animation Logic: Lese aktuelle Breite und animiere zur neuen Breite
-                const currentWidth = progressBar.style.width || '0%';
-                const newWidth = progressPercent + '%';
-                
-                if (currentWidth !== newWidth) {
-                    // Entferne temporär die CSS transition
-                    progressBar.style.transition = 'none';
-                    
-                    // Setze die aktuelle Breite falls noch nicht gesetzt
-                    if (!progressBar.style.width) {
-                        progressBar.style.width = currentWidth;
+            progressContainers.forEach((progressContainer) => {
+                const progressBar = progressContainer.querySelector('.progress-bar');
+                if (progressBar) {
+                    const rawValue = parseFloat(variable.rawValue) || 0;
+                    const minValue = parseFloat(variable.progressMin) || 0;
+                    const maxValue = parseFloat(variable.progressMax) || 100;
+                    let progressPercent = 0;
+                    const range = maxValue - minValue;
+                    if (range > 0) {
+                        progressPercent = ((rawValue - minValue) / range) * 100;
                     }
-                    
-                    // Force Reflow um sicherzustellen dass die aktuelle Breite angewendet ist
-                    progressBar.offsetWidth;
-                    
-                    // Aktiviere die CSS transition wieder
-                    progressBar.style.transition = 'width 3s ease-in-out';
-                    
-                    // Setze die neue Breite - das triggert die Animation
-                    progressBar.style.width = newWidth;
+                    const currentWidth = progressBar.style.width || '0%';
+                    const newWidth = progressPercent + '%';
+                    if (currentWidth !== newWidth) {
+                        progressBar.style.transition = 'none';
+                        if (!progressBar.style.width) {
+                            progressBar.style.width = currentWidth;
+                        }
+                        progressBar.offsetWidth;
+                        progressBar.style.transition = 'width 3s ease-in-out';
+                        progressBar.style.width = newWidth;
+                    }
                 }
-            }
-            
-            // Aktualisiere Progress-Text
-            const progressTextContainer = progressContainer.querySelector('.progress-text');
-            if (progressTextContainer) {
-                updateProgressText(progressTextContainer, variable);
-            }
+                const progressTextContainer = progressContainer.querySelector('.progress-text');
+                if (progressTextContainer) {
+                    updateProgressText(progressTextContainer, variable);
+                }
+                updateTargetMarkerDisplay(progressContainer, variable);
+            });
         }
         
         // Hilfsfunktion für Progress-Text-Update
         function updateProgressText(progressTextContainer, variable) {
             
             // Progress-Bar Inhalt basierend auf Konfiguration
+            // Transparenz-Stil für inaktive Progress-Bars (Konsistenz mit Initial-Render)
+            const inactiveOpacity = variable.progressbarInactive ? 'opacity: 0.5;' : '';
             let progressIconHtml = '';
             if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
                 const iconClass = prepareIconForDisplay(variable.icon);
                 if (iconClass) {
-                    progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`;
+                    progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`;
                 }
             }
             
@@ -1654,19 +2496,19 @@
             }
             
             if (variable.showLabel && variable.label) {
-                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.label}:&nbsp;</span>`);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.label}:&nbsp;</span>`);
             }
             
             if (variable.showValue) {
-                progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.formattedValue}</span>`);
             }
             
             // Falls nichts konfiguriert ist, zeige Wert als Fallback
             if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                progressTextParts.push(`<span style="color: ${getTextColor(variable)};">${variable.formattedValue}</span>`);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.formattedValue}</span>`);
             }
             
-            const progressText = progressTextParts.join(' ');
+            const progressText = progressTextParts.join('');
             
             // Aktualisiere den Haupt-Text
             const mainText = progressTextContainer.querySelector('.progress-main-text');
@@ -1684,33 +2526,204 @@
                     if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
                         const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
                         if (secondIconClass) {
-                            secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
+                            secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
                         }
                     }
                     
                     // Label für zweite Variable
                     if (variable.secondVariable.showLabel && variable.secondVariable.label) {
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700;">${variable.secondVariable.label}:&nbsp;</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.secondVariable.label}:&nbsp;</span>`);
                     }
                     
                     // Wert für zweite Variable (Backend-Wert direkt verwenden)
                     if (variable.secondVariable.showValue) {
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
                     if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)};">${variable.secondVariable.formattedValue}</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
                     }
-                    
-                    if (secondVariableParts.length > 0) {
-                        secondVariableSpan.innerHTML = secondVariableParts.join(' ');
-                    }
+
+                    secondVariableSpan.innerHTML = secondVariableParts.join('');
+                } else if (secondVariableSpan) {
+                    secondVariableSpan.innerHTML = '';
                 }
             }
         }
-        
 
+        // Update or create the target marker overlay for a progress bar
+        function updateTargetMarkerDisplay(progressContainer, variable) {
+            try {
+                const tgt = variable && variable.progressTarget ? variable.progressTarget : null;
+                const hasTarget = !!(tgt && (typeof tgt.rawValue !== 'undefined' || typeof tgt.formattedValue !== 'undefined'));
+                if (!hasTarget) {
+                    const oldMarker = progressContainer.querySelector('.target-marker');
+                    const oldText = progressContainer.querySelector('.target-marker-text');
+                    if (oldMarker) oldMarker.remove();
+                    if (oldText) oldText.remove();
+                    progressContainer.style.removeProperty('--target-percent');
+                    return;
+                }
+                const minValue = parseFloat(variable.progressMin) || 0;
+                const maxValue = parseFloat(variable.progressMax) || 100;
+                const raw = parseFloat(tgt.rawValue);
+                let percent = 0;
+                const range = maxValue - minValue;
+                if (range > 0 && !isNaN(raw)) {
+                    percent = Math.max(0, Math.min(100, ((raw - minValue) / range) * 100));
+                }
+                progressContainer.style.setProperty('--target-percent', percent + '%');
+
+                let marker = progressContainer.querySelector('.target-marker');
+                if (!marker) {
+                    marker = document.createElement('div');
+                    marker.className = 'target-marker';
+                    marker.innerHTML = '<div class="soc-triangle soc-triangle-top"></div><div class="soc-triangle soc-triangle-bottom"></div>';
+                    progressContainer.appendChild(marker);
+                }
+                let textEl = progressContainer.querySelector('.target-marker-text');
+                const label = (tgt.label && String(tgt.label).trim() !== '') ? String(tgt.label) : getUiText('targetSoc', 'Target SOC');
+                const displayVal = (typeof tgt.formattedValue !== 'undefined') ? String(tgt.formattedValue) : (isNaN(raw) ? '' : raw.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' %');
+                if (!textEl) {
+                    textEl = document.createElement('span');
+                    textEl.className = 'target-marker-text';
+                    progressContainer.appendChild(textEl);
+                }
+                // Synchronisiere Marker-Schriftgröße mit Progress-Text
+                try {
+                    // 1) CSS-Variable für globale Konsistenz
+                    if (typeof variable.fontSize === 'number' && variable.fontSize !== -1) {
+                        progressContainer.style.setProperty('--balkenschriftgroesse', variable.fontSize + 'px');
+                    } else {
+                        // Ermittele tatsächliche Schriftgröße aus dem Progress-Text
+                        const ref = progressContainer.querySelector('.progress-text .progress-main-text') || progressContainer.querySelector('.progress-text') || progressContainer;
+                        const cs = window.getComputedStyle(ref);
+                        if (cs && cs.fontSize) {
+                            progressContainer.style.setProperty('--balkenschriftgroesse', cs.fontSize);
+                            textEl.style.fontSize = cs.fontSize; // 2) Direkt setzen, falls CSS-Var überschrieben wird
+                        }
+                    }
+                } catch (_) {}
+                // Marker-Text basierend auf SecondVariable-Show-Flags zusammenstellen (falls aktiviert)
+                const inactiveOpacity = variable.progressbarInactive ? 'opacity: 0.5;' : '';
+                let markerHtml = '';
+                if (variable.useSecondVariableAsTarget && variable.secondVariable) {
+                    const parts = [];
+                    // Icon
+                    if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
+                        const iconClass = prepareIconForDisplay(variable.secondVariable.icon);
+                        if (iconClass) {
+                            parts.push(`<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
+                        }
+                    }
+                    // Label
+                    if (variable.secondVariable.showLabel && label) {
+                        const colon = variable.secondVariable.showValue ? ':&nbsp;' : '';
+                        parts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${label}${colon}</span>`);
+                    }
+                    // Value
+                    if (variable.secondVariable.showValue) {
+                        parts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayVal}</span>`);
+                    }
+                    // Fallback: wenn nichts angezeigt werden soll, dann nur Wert
+                    if (parts.length === 0) {
+                        parts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayVal}</span>`);
+                    }
+                    markerHtml = parts.join('');
+                } else {
+                    // Standard: Label: Wert
+                    markerHtml = `<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${label}:&nbsp;</span>` +
+                                 `<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayVal}</span>`;
+                }
+                textEl.innerHTML = markerHtml;
+                textEl.classList.remove('position-before-bar');
+                // Always reset to visible before re-evaluating collision
+                textEl.style.visibility = 'visible';
+                requestAnimationFrame(() => {
+                    try {
+                        const containerRect = progressContainer.getBoundingClientRect();
+                        const firstRect = textEl.getBoundingClientRect();
+                        const overflowsRight = firstRect.right > (containerRect.right - 2);
+                        let positionChanged = false;
+                        if (overflowsRight) {
+                            textEl.classList.add('position-before-bar');
+                            const markerX = containerRect.left + (containerRect.width * (percent / 100));
+                            const maxLeftWidth = Math.max(0, Math.floor(markerX - containerRect.left - 6));
+                            if (maxLeftWidth > 0) {
+                                textEl.style.maxWidth = maxLeftWidth + 'px';
+                            }
+                            positionChanged = true;
+                        } else {
+                            textEl.style.maxWidth = '';
+                        }
+                        const doOverlapCheck = () => {
+                            const textRect = textEl.getBoundingClientRect();
+                            const progressText = progressContainer.querySelector('.progress-text');
+                            const mainTextEl = progressContainer.querySelector('.progress-text .progress-main-text');
+                            // Wenn Progress-Text unsichtbar ist, nie verstecken
+                            if (!progressText) {
+                                textEl.style.visibility = 'visible';
+                                return;
+                            }
+                            const ptStyle = window.getComputedStyle(progressText);
+                            const ptRect = progressText.getBoundingClientRect();
+                            const progressTextHidden = (ptStyle.display === 'none') || (ptRect.width === 0 || ptRect.height === 0);
+                            if (progressTextHidden) {
+                                textEl.style.visibility = 'visible';
+                                return;
+                            }
+                            if (mainTextEl) {
+                                const mainRect = mainTextEl.getBoundingClientRect();
+                                const containerRect2 = progressContainer.getBoundingClientRect();
+                                const margin = 2; // px tolerance to avoid flicker
+                                // Rechte Sichtgrenze: bis zum linken Rand der SecondVariable (falls vorhanden)
+                                let rightBound = containerRect2.right;
+                                const secondEl = progressContainer.querySelector('.progress-text .progress-second-variable');
+                                if (secondEl) {
+                                    const secondRect = secondEl.getBoundingClientRect();
+                                    rightBound = Math.max(mainRect.left, secondRect.left - 8);
+                                }
+                                
+                                // WICHTIG: Prüfe gegen die tatsächlichen Kind-Elemente (SVG, spans), 
+                                // NICHT gegen mainTextEl selbst (der hat flex:1 und geht über volle Breite)
+                                const childNodes = Array.from(mainTextEl.querySelectorAll('svg, i, span, b, strong'));
+                                let contentLeft = Infinity;
+                                let contentRight = -Infinity;
+                                
+                                childNodes.forEach(node => {
+                                    const r = node.getBoundingClientRect();
+                                    if (r.width > 0 && r.height > 0) {
+                                        contentLeft = Math.min(contentLeft, r.left);
+                                        contentRight = Math.max(contentRight, r.right);
+                                    }
+                                });
+                                
+                                // Wenn keine sichtbaren Kinder gefunden: kein Text → keine Kollision
+                                if (contentLeft === Infinity || contentRight === -Infinity) {
+                                    textEl.style.visibility = 'visible';
+                                    return;
+                                }
+                                
+                                // Begrenze auf rightBound (für SecondVariable)
+                                contentRight = Math.min(contentRight, rightBound);
+                                const overlapsHorizontally = !(
+                                    (textRect.right <= (contentLeft + margin)) ||
+                                    (textRect.left >= (contentRight - margin))
+                                );
+                                textEl.style.visibility = overlapsHorizontally ? 'hidden' : 'visible';
+                            } else {
+                                textEl.style.visibility = 'visible';
+                            }
+                        };
+                        // Always one more rAF to let layout settle (after class/size changes)
+                        requestAnimationFrame(doOverlapCheck);
+                    } catch (_) {}
+                });
+            } catch (e) {
+                // ignore
+            }
+        }
 
         function renderStatus(data) {
             // Speichere den letzten Status-Payload für spätere Re-Renders (z.B. bei Asset-/Medien-Updates)
@@ -1861,6 +2874,57 @@
                         deviceImgContainer.classList.add('div1');
                         return; // Verlasse die Funktion, da Icon gerendert wurde
                     }
+                } else if (data.statusImageUrl) {
+                    // Bevorzuge WebHook-URL wenn vorhanden (Media oder Asset)
+                    try {
+                        if (!deviceImgContainer) return;
+                        const oldIcon = deviceImgContainer.querySelector('.fontawesome-icon-container');
+                        if (oldIcon) oldIcon.remove();
+                        let imgEl = document.getElementById('image');
+                        if (!imgEl) {
+                            imgEl = document.createElement('img');
+                            imgEl.id = 'image';
+                            imgEl.alt = getUiText('deviceImage', 'Device Image');
+                            deviceImgContainer.appendChild(imgEl);
+                        }
+                        imgEl.style.display = 'none';
+                        imgEl.style.visibility = 'hidden';
+                        try { imgEl.decoding = 'async'; } catch (_) {}
+                        try { imgEl.loading = 'eager'; } catch (_) {}
+                        let fallbackUrl = null;
+                        if (data.statusBildauswahl && typeof data.statusBildauswahl === 'string') {
+                            if (window.assets && window.assets[`img_${data.statusBildauswahl}`]) {
+                                fallbackUrl = window.assets[`img_${data.statusBildauswahl}`];
+                            } else if (data.statusBildauswahl === 'none') {
+                                fallbackUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABBJREFUeNpi+P//PwNAgAEACPwC/tuiTRYAAAAASUVORK5CYII=';
+                            }
+                        }
+
+                        let triedFallback = false;
+                        imgEl.onload = () => {
+                            imgEl.style.display = 'block';
+                            imgEl.style.visibility = 'visible';
+                        };
+                        imgEl.onerror = () => {
+                            if (!triedFallback && fallbackUrl) {
+                                triedFallback = true;
+                                imgEl.src = fallbackUrl;
+                            } else {
+                                imgEl.style.display = 'none';
+                                imgEl.style.visibility = 'hidden';
+                            }
+                        };
+                        imgEl.src = data.statusImageUrl;
+                        try {
+                            if (imgEl.complete && imgEl.naturalWidth > 0) {
+                                imgEl.style.display = 'block';
+                                imgEl.style.visibility = 'visible';
+                            }
+                        } catch (_) {}
+                        deviceImgContainer.classList.remove('hidden');
+                        deviceImgContainer.classList.add('div1');
+                    } catch (_) {}
+                    return;
                 } else if (data.statusBildauswahl.startsWith('img_custom_')) {
                     // Custom Image über Asset-System verwenden
                     imageUrl = window.assets[data.statusBildauswahl];
@@ -1886,7 +2950,7 @@
                     if (!deviceImg) {
                         deviceImg = document.createElement('img');
                         deviceImg.id = 'image';
-                        deviceImg.alt = 'Device Image';
+                        deviceImg.alt = getUiText('deviceImage', 'Device Image');
                         deviceImgContainer.appendChild(deviceImg);
                     }
                     // VOR dem Laden verstecken, Sichtbarkeit erst in onload setzen
@@ -2167,11 +3231,23 @@
                         const groupJustify = groupAlign === 'center' ? 'center' : (groupAlign === 'right' ? 'flex-end' : 'flex-start');
 
                         content += `
-                                <div class="variable-group-items" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; flex: 1; justify-content: ${groupJustify}; width: 100%;">
+                                <div class="variable-group-items" style="display: flex; flex-wrap: nowrap; column-gap: 16px; row-gap: calc(var(--element-spacing, 8px)); align-items: center; flex: 1; justify-content: ${groupJustify}; width: 100%;">
                         `;
-                        
-                        groupVariables.forEach(groupVar => {
-                            content += `<div class="variable-group-item">`;
+
+                        // Gleichmäßiges Wachstum für ALLE Progress/Slider in der Gruppe
+                        groupVariables.forEach((groupVar) => {
+                            const widthPercent = (groupVar.displayType === 'image' && Number.isFinite(Number(groupVar.imageWidth)))
+                                ? Number(groupVar.imageWidth)
+                                : null;
+                            const isProgressLike = (groupVar.displayType === 'progress' || groupVar.displayType === 'slider');
+                            const growStyle = isProgressLike ? 'flex: 1 1 0; min-width: 0;' : '';
+                            const widthStyle = (widthPercent !== null)
+                                ? ('flex: 0 0 ' + widthPercent + '%; max-width: ' + widthPercent + '%; min-width: ' + widthPercent + '%; box-sizing: border-box;')
+                                : '';
+                            const itemStyle = (widthPercent !== null || growStyle)
+                                ? (' style="' + widthStyle + growStyle + '"')
+                                : '';
+                            content += `<div class="variable-group-item"${itemStyle}>`;
                             content += renderSingleVariable(groupVar, true); // true = isGrouped
                             content += `</div>`;
                         });
@@ -2201,11 +3277,27 @@
             updateImageVisibility();
             
             container.innerHTML = content;
+            try {
+                const allProgressContainers = container.querySelectorAll('.progress-container');
+                allProgressContainers.forEach(pc => {
+                    const varId = pc.getAttribute('data-variable-id');
+                    const v = window.variableDataCache?.[varId];
+                    if (v && v.displayType === 'progress') {
+                        updateTargetMarkerDisplay(pc, v);
+                    }
+                });
+                const allSliderContainers = container.querySelectorAll('.slider-container');
+                allSliderContainers.forEach(sc => { attachSliderEvents(sc); });
+            } catch (_) {}
+            
+            
             
             // Trigger Progress-Bar-Animation nach DOM-Update
             setTimeout(() => {
                 animateProgressBars();
             }, 10); // Kurzer Delay um sicherzustellen dass DOM aktualisiert ist
+
+            // Keine Nachbearbeitung erforderlich – Bilder verwenden direkt WebHook-URLs
         }
         
         // Hilfsfunktion zum Rendern einer einzelnen Variable
@@ -2213,7 +3305,7 @@
             let content = '';
             
             // Bestimme Darstellungstyp für Gruppenlayout
-            const isProgressBar = variable.displayType === 'progress';
+            const isProgressBar = variable.displayType === 'progress' || variable.displayType === 'slider';
             
             // Wrapper-Stil je nach Kontext - Progress-Balken unterstützen jetzt auch Gruppen
             let wrapperStyle;
@@ -2227,16 +3319,20 @@
             if (isGrouped) {
                 if (isProgressBar) {
                     // Progress-Balken in Gruppen: Inline-flex damit sie nebeneinander passen, aber mit voller verfügbarer Breite
-                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0 2px 0 0; ${fontSizeStyle} color: ${getTextColor(variable)}; flex: none;`;
+                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0; ${fontSizeStyle} color: ${getTextColor(variable)};`;
                 } else {
                     // Text/Button-Variablen in Gruppen: eigene Breite, Ausrichtung übernimmt die Gruppe
-                    // SPEZIAL: Für Image in Gruppen zusätzlich die eigene Ausrichtung im Item anwenden
-                    const justifyForGroupItem = (variable.displayType === 'image') ? `justify-content: ${justifyMap};` : '';
-                    wrapperStyle = `display: inline-flex; align-items: center; ${justifyForGroupItem} margin: 0; white-space: nowrap; ${fontSizeStyle} color: ${getTextColor(variable)};`;
+                    // SPEZIAL: Für Image in Gruppen flex-direction: column, daher align-items für horizontale Ausrichtung
+                    const alignForGroupItem = (variable.displayType === 'image') ? `align-items: ${justifyMap};` : '';
+                    // Für Bilder in Gruppen: Keine Breite am Wrapper setzen; Breite wird am .variable-group-item gesetzt
+                    const noWrapForImage = (variable.displayType === 'image') ? '' : 'white-space: nowrap;';
+                    const justifyForGroupItem = (variable.displayType === 'image') ? '' : `justify-content: ${justifyMap};`;
+                    const alignSelfForGroupItem = (alignment === 'center') ? 'align-self: center;' : '';
+                    wrapperStyle = `display: inline-flex; align-items: center; ${justifyForGroupItem} ${alignForGroupItem} ${alignSelfForGroupItem} margin: 0; ${noWrapForImage} ${fontSizeStyle} color: ${getTextColor(variable)};`;
                 }
             } else {
                 // Ungrouped: Standard-Layout mit horizontaler Ausrichtung für Text/Button/Image
-                if (variable.displayType === 'text' || variable.displayType === 'button' || variable.displayType === 'image') {
+                if (variable.displayType === 'text' || variable.displayType === 'button' || variable.displayType === 'image' || variable.displayType === 'slider') {
                     wrapperStyle = `display: flex; align-items: center; justify-content: ${justifyMap}; width: 100%; ${fontSizeStyle} color: ${getTextColor(variable)};`;
                 } else {
                     wrapperStyle = `${fontSizeStyle} color: ${getTextColor(variable)};`;
@@ -2249,6 +3345,8 @@
                 cssClasses += ' text-variable';
             } else if (variable.displayType === 'progress') {
                 cssClasses += ' progress-variable';
+            } else if (variable.displayType === 'slider') {
+                cssClasses += ' slider-variable';
             }
             // Füge border-line Klasse hinzu wenn konfiguriert UND NICHT gruppiert
             // Bei gruppierten Variablen zeigt nur die Gruppe die Linie, nicht die einzelnen Variablen
@@ -2306,11 +3404,11 @@
                         progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayValue}</span>`);
                     }
                     
-                    const progressText = progressTextParts.join(' ');
+                    const progressText = progressTextParts.join('');
                     
                     // Zweite Variable für rechte Seite vorbereiten
                     let secondVariableText = '';
-                    if (variable.secondVariable) {
+                    if (variable.secondVariable && !variable.useSecondVariableAsTarget) {
                         let secondVariableParts = [];
                         
                         // Icon für zweite Variable
@@ -2337,7 +3435,7 @@
                         }
                         
                         if (secondVariableParts.length > 0) {
-                            secondVariableText = `<span class="progress-second-variable">${secondVariableParts.join(' ')}</span>`;
+                            secondVariableText = `<span class="progress-second-variable">${secondVariableParts.join('')}</span>`;
                         }
                     }
                     
@@ -2385,10 +3483,88 @@
                         window.previousProgressWidths[variable.id] = progressValue;
                     }
                     
+                    // Target marker percent based on optional progressTarget
+                    let targetPercent = null;
+                    if (variable.progressTarget && (typeof variable.progressTarget.rawValue !== 'undefined')) {
+                        const tRaw = parseFloat(variable.progressTarget.rawValue);
+                        const tMin = parseFloat(variable.progressMin) || 0;
+                        const tMax = parseFloat(variable.progressMax) || 100;
+                        const tRange = tMax - tMin;
+                        if (tRange > 0 && !isNaN(tRaw)) {
+                            targetPercent = Math.max(0, Math.min(100, ((tRaw - tMin) / tRange) * 100));
+                        } else {
+                            targetPercent = 0;
+                        }
+                    }
+
+                    // Build optional target marker HTML
+                    let targetMarkerHtml = '';
+                    if (targetPercent !== null) {
+                        const inactiveOpacity = variable.progressbarInactive ? 'opacity: 0.5;' : '';
+                        const posClass = (targetPercent <= 50) ? 'position-before-bar' : '';
+                        const tgtLabel = (variable.progressTarget.label && String(variable.progressTarget.label).trim() !== '') ? String(variable.progressTarget.label) : getUiText('targetSoc', 'Target SOC');
+                        const tgtText = (typeof variable.progressTarget.formattedValue !== 'undefined') ? String(variable.progressTarget.formattedValue) : '';
+                        let markerTextParts = [];
+                        if (variable.useSecondVariableAsTarget && variable.secondVariable) {
+                            // Icon
+                            if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
+                                const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
+                                if (secondIconClass) {
+                                    markerTextParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
+                                }
+                            }
+                            // Label
+                            if (variable.secondVariable.showLabel && tgtLabel) {
+                                const colon = variable.secondVariable.showValue ? ':&nbsp;' : '';
+                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${tgtLabel}${colon}</span>`);
+                            }
+                            // Value
+                            if (variable.secondVariable.showValue) {
+                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${tgtText}</span>`);
+                            }
+                            if (markerTextParts.length === 0) {
+                                // Fallback: nur Wert
+                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${tgtText}</span>`);
+                            }
+                        } else {
+                            // Fallback: Standarddarstellung Label: Value
+                            markerTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${tgtLabel}:&nbsp;</span>`);
+                            markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${tgtText}</span>`);
+                        }
+                        const markerTextHtml = markerTextParts.join('');
+                        targetMarkerHtml = `
+                            <div class="target-marker">
+                                <div class="soc-triangle soc-triangle-top"></div>
+                                <div class="soc-triangle soc-triangle-bottom"></div>
+                            </div>
+                            <span class="target-marker-text ${posClass}">${markerTextHtml}</span>
+                        `;
+                    }
+
+                    const targetPercentStyle = (targetPercent !== null) ? ` --target-percent: ${targetPercent}%;` : '';
+                    // Sync marker font-size with variable font-size via CSS var
+                    const markerFontSizeVar = (typeof variable.fontSize === 'number' && variable.fontSize !== -1) ? ` --balkenschriftgroesse: ${variable.fontSize}px;` : '';
+                    const normalizeColorP = (c) => {
+                        if (c === -1 || c === '-1' || c === null || c === undefined) return 'var(--accent-color)';
+                        if (typeof c !== 'string') return c;
+                        const s = c.trim().toLowerCase();
+                        // Symcon sentinel for -1 as 64-bit hex
+                        if (s === '#ffffffffffffffff' || s === '0xffffffffffffffff' || s === 'ffffffffffffffff') return 'var(--accent-color)';
+                        if (!s || s === 'transparent' || s === '#0000' || s === '#00000000') return 'var(--accent-color)';
+                        if (/^rgba\s*\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
+                        if (/^rgb\s*\(\s*\d+\s+\d+\s+\d+\s*\/\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
+                        if (/^hsla\s*\(.*?,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
+                        if (/^#[0-9a-f]{8}$/.test(s) && s.endsWith('00')) return 'var(--accent-color)';
+                        return c;
+                    };
+                    const color1p = normalizeColorP(variable.progressColor1);
+                    const color2p = normalizeColorP(variable.progressColor2);
+
                     content += `
                         <div class="variable-progress">
-                            <div class="progress-container" data-variable-id="${variable.id}" data-new-width="${progressValue}" style="--progress-color1: ${variable.progressColor1}; --progress-color2: ${variable.progressColor2}; --progress-bar-text-padding: ${individualPadding}px;">
+                            <div class="progress-container" data-variable-id="${variable.id}" data-new-width="${progressValue}" style="--progress-color1: ${color1p}; --progress-color2: ${color2p}; --progress-bar-text-padding: ${individualPadding}px;${targetPercentStyle}${markerFontSizeVar}">
                                 <div class="progress-bar" style="width: ${widthForDOM}%;"></div>
+                                ${targetMarkerHtml}
                                 <div class="progress-text">
                                     <span class="progress-main-text">${progressText}</span>
                                     ${secondVariableText}
@@ -2396,14 +3572,75 @@
                             </div>
                         </div>
                     `;
+                } else if (variable.displayType === 'slider') {
+                    const inactiveStyle = variable.progressbarInactive ? 'opacity: 0.5; pointer-events: none;' : '';
+                    const min = parseFloat(variable.progressMin) || 0;
+                    const max = parseFloat(variable.progressMax) || 100;
+                    const range = Math.max(0.000001, max - min);
+                    const cur = parseFloat(variable.rawValue) || 0;
+                    const percent = Math.max(0, Math.min(100, ((cur - min) / range) * 100));
+                    const step = Number.isFinite(Number(variable.sliderStep)) ? Number(variable.sliderStep) : null;
+                    const digits = Number.isFinite(Number(variable.sliderDigits)) ? Number(variable.sliderDigits) : 0;
+                    const iconHtml = (variable.showIcon && variable.icon && variable.icon !== 'Transparent') ? (()=>{ const c = prepareIconForDisplay(variable.icon); return c ? `<i class="${c} variable-icon" style="color: var(--accent-color);"></i>` : ''; })() : '';
+                    const labelHtml = (variable.showLabel && variable.label) ? `<span class="variable-label" style="font-weight: 700;">${variable.label}${variable.showValue ? ':&nbsp;' : ''}</span>` : '';
+                    const valueHtml = (variable.showValue && typeof variable.formattedValue !== 'undefined') ? `<span class="slider-value">${variable.formattedValue}</span>` : `<span class="slider-value"></span>`;
+                    const individualPadding = 0;
+                    const normalizeColorS = (c) => {
+                        if (c === -1 || c === '-1' || c === null || c === undefined) return 'var(--accent-color)';
+                        if (typeof c !== 'string') return c;
+                        const s = c.trim().toLowerCase();
+                        // Symcon sentinel for -1 as 64-bit hex
+                        if (s === '#ffffffffffffffff' || s === '0xffffffffffffffff' || s === 'ffffffffffffffff') return 'var(--accent-color)';
+                        if (!s || s === 'transparent' || s === '#0000' || s === '#00000000') return 'var(--accent-color)';
+                        if (/^rgba\s*\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
+                        if (/^rgb\s*\(\s*\d+\s+\d+\s+\d+\s*\/\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
+                        if (/^hsla\s*\(.*?,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
+                        if (/^#[0-9a-f]{8}$/.test(s) && s.endsWith('00')) return 'var(--accent-color)';
+                        return c;
+                    };
+                    const color1s = normalizeColorS(variable.sliderColor1);
+                    const color2s = normalizeColorS(variable.sliderColor2);
+
+                    const suffixGuess = (() => {
+                        if (typeof variable.formattedValue === 'string') {
+                            const m = variable.formattedValue.match(/^\s*[-+]?\d+(?:[\.,]\d+)?\s*(.*)$/);
+                            return m ? m[1] : '';
+                        }
+                        return '';
+                    })();
+                    const signChars = (min < 0 || max < 0) ? 1 : 0;
+                    const maxAbs = Math.max(Math.abs(min), Math.abs(max));
+                    let intDigits = 1;
+                    if (Number.isFinite(maxAbs) && maxAbs >= 1) {
+                        intDigits = Math.floor(Math.log10(maxAbs)) + 1;
+                    }
+                    const decimalChars = (digits > 0) ? (1 + digits) : 0; // Komma/Punkt + Nachkommastellen
+                    const valueWidthCh = Math.max(4, signChars + intDigits + decimalChars + (suffixGuess ? suffixGuess.length : 0));
+                    const suffixAttr = String(suffixGuess).replace(/"/g, '&quot;');
+
+                    content += `
+                        <div class="slider-container" data-variable-id="${variable.id}" data-min="${min}" data-max="${max}" data-step="${step !== null ? step : ''}" data-digits="${digits}" data-suffix="${suffixAttr}" data-show-value="${variable.showValue ? '1' : '0'}" data-current-value="${cur}" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --slider-value-width: ${valueWidthCh}ch; ${inactiveStyle}">
+                            ${iconHtml}${labelHtml}
+                            <button class="slider-step-btn" data-dir="-1">−</button>
+                            <div class="slider-track" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --progress-bar-text-padding: ${individualPadding}px;">
+                                <div class="slider-fill" style="width: ${percent}%;"></div>
+                                <div class="slider-thumb" style="left: ${percent}%;"></div>
+                            </div>
+                            <button class="slider-step-btn" data-dir="1">+</button>
+                            ${valueHtml}
+                        </div>
+                    `;
                 } else if (variable.displayType === 'image') {
                     // Rendering: Symcon Medienobjekt als Data-URI mit Breite/Radius und optional Icon/Label/Value
                     let parts = [];
                     // Image width is now percentage (1-100). Default 40% when not set.
-                    const imgWidth = Number.isFinite(variable.imageWidth) ? variable.imageWidth : 40;
+                    const imgWidth = Number.isFinite(Number(variable.imageWidth)) ? Number(variable.imageWidth) : 40;
                     const imgRadius = Number.isFinite(variable.imageBorderRadius) ? variable.imageBorderRadius : 6;
-                    const imgWidthForDOM = isGrouped ? 100 : imgWidth;
-                    const imgFlex = isGrouped ? '1 1 auto' : '0 0 auto';
+                    const imgWidthForDOM = imgWidth; // Respektiere konfigurierte Breite auch in Gruppen
+                    const imgFlex = '0 0 auto'; // Keine automatische Größenanpassung
+                    
+                    // Text-Align für gruppierte Bilder basierend auf alignment
+                    const textAlignStyle = isGrouped ? `text-align: ${alignment};` : '';
 
                     // Icon optional anzeigen
                     if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
@@ -2416,20 +3653,17 @@
                     // Label optional anzeigen (mit Doppelpunkt, wenn Value ebenfalls angezeigt wird)
                     if (variable.showLabel && variable.label) {
                         const labelText = variable.showValue ? `${variable.label}:&nbsp;` : variable.label;
-                        parts.push(`<span class="variable-label" style="color: ${getTextColor(variable)}; font-weight: 700;">${labelText}</span>`);
+                        parts.push(`<span class="variable-label" style="color: ${getTextColor(variable)}; font-weight: 700; ${textAlignStyle}">${labelText}</span>`);
                     }
 
-                    const imgAlt = variable.label ? String(variable.label).replace(/"/g, '&quot;') : 'Image';
-                    if (variable.imageDataUri && variable.imageDataUri !== '') {
-                        parts.push(`<img class="variable-inline-image" src="${variable.imageDataUri}" alt="${imgAlt}" style="width: ${imgWidthForDOM}%; height: auto; border-radius: ${imgRadius}px; flex: ${imgFlex};">`);
-                    } else {
-                        // Fallback falls kein Bild verfügbar
-                        parts.push(`<span class="variable-text" style="opacity: 0.6;">-</span>`);
-                    }
+                    const imgAlt = variable.label ? String(variable.label).replace(/"/g, '&quot;') : getUiText('image', 'Image');
+                    const imgWidthCss = isGrouped ? '100%' : `${imgWidthForDOM}%`;
+                    const primarySrc = (typeof variable.imageUrl === 'string') ? variable.imageUrl : '';
+                    parts.push(`<img class="variable-inline-image" ${primarySrc ? `src=\"${primarySrc}\"` : ''} alt="${imgAlt}" style="display: none; width: ${imgWidthCss}; height: auto; border-radius: ${imgRadius}px; flex: ${imgFlex};" onload="this.style.display='';" onerror="this.style.display='none';">`);
 
                     // Value optional anzeigen
                     if (variable.showValue && typeof variable.formattedValue !== 'undefined') {
-                        parts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
+                        parts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto; ${textAlignStyle}">${variable.formattedValue}</span>`);
                     }
 
                     content += parts.join(' ');
@@ -2439,19 +3673,28 @@
                         // Boolean-Variable: Einzelner Button
                         
                         // Erweiterte Bool-Wert-Erkennung
-                        const isActive = variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true';
+                        const isScriptButton = (typeof variable.id === 'string' && variable.id.indexOf('script_') === 0);
+                        const spinActive = (isScriptButton && window._scriptButtonSpinUntil && window._scriptButtonSpinUntil[variable.id] && Date.now() < window._scriptButtonSpinUntil[variable.id]);
+                        // Script-Buttons sollen optisch immer aktiv sein
+                        const isActive = isScriptButton ? true : (variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true');
                         // Verwende den tatsächlichen Boolean-Wert für Association-Matching (nicht Integer-Konvertierung!)
                         const currentBoolValue = variable.rawValue; // Direkt verwenden, da Associations auch Boolean-Werte haben
                         
                         
-                        // Bool Buttons verwenden ausschließlich boolButtonColor (initial rendering)
+                        // Bool-Buttons: Farbe (initial rendering)
+                        // Transparent im Formular => versuche Presentation-Farbe; sonst Accent-Color
                         let buttonColor = 'var(--accent-color)';
                         let associationIcon = null;
                         let associationName = null;
                         
-                        // Verwende ausschließlich boolButtonColor für Bool Buttons (initial rendering)
                         if (variable.isBoolButtonColorTransparent) {
-                            buttonColor = 'var(--accent-color)';
+                            const arr = variable.variableAssociations;
+                            if (arr && Array.isArray(arr)) {
+                                const currentAssociation = arr.find(assoc => assoc.value === currentBoolValue);
+                                buttonColor = (currentAssociation && currentAssociation.color) ? currentAssociation.color : 'var(--accent-color)';
+                            } else {
+                                buttonColor = 'var(--accent-color)';
+                            }
                         } else {
                             buttonColor = variable.boolButtonColor || 'var(--accent-color)';
                         }
@@ -2468,7 +3711,7 @@
 
                             }
                         }                
-                        const opacity = isActive ? '1' : '0.5';
+                        const opacity = isActive ? '1' : '0.5'; // Script-Buttons gelten immer als aktiv → oben isActive=true
                         const buttonWidth = variable.buttonWidth || 120;
                         
                         // Prüfe ob die aktuelle Gruppe im stretch-Modus ist
@@ -2490,12 +3733,15 @@
                         // Icon-Verarbeitung für Button - Verwende Association-Icon falls vorhanden
                         let finalIcon = associationIcon || variable.icon; // Association-Icon hat Priorität
                         if (variable.showIcon && finalIcon && finalIcon !== 'Transparent') {
-                            const iconClass = prepareIconForDisplay(finalIcon);
-                
-                            
-                            if (iconClass) {
+                            const baseClass = prepareIconForDisplay(finalIcon);
+                            if (baseClass) {
+                                const iconClass = spinActive ? `${baseClass} fa-spin` : baseClass; // nur fa-spin hinzufügen
                                 iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
                             }
+                        } else if (spinActive) {
+                            // Kein Icon konfiguriert, aber Spin aktiv → temporären Spinner darstellen
+                            const spinBase = prepareIconForDisplay('rotate') || 'fa-fw fa-kit fak fa-rotate';
+                            iconHtml = `<i class="${spinBase} fa-spin" style="margin-right: 6px;"></i>`;
                         }
                         let textParts = [];
                         
@@ -2505,7 +3751,7 @@
                         
                         if (variable.showLabel) {
                             // Verwende Variablenname als Label (höchste Priorität), dann Association-Name als Fallback
-                            const displayLabel = variable.label || associationName || (isActive ? 'ON' : 'OFF');
+                            const displayLabel = variable.label || associationName || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off'));
                             if (variable.showValue) {
                                 // Doppelpunkt nur wenn auch Value angezeigt wird - Label fett
                                 textParts.push(`<span style="font-weight: 700;">${displayLabel}:&nbsp;</span>`);
@@ -2521,7 +3767,7 @@
                         
                         // Falls keine Checkbox aktiviert ist, zeige Label als Fallback (ohne Doppelpunkt) - fett
                         if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                            textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? 'ON' : 'OFF')}</span>`);
+                            textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off'))}</span>`);
                         }
                         
                         buttonText = textParts.join(' ');
@@ -2538,12 +3784,14 @@
                         const buttonContainerJustify = (!isGrouped) ? `justify-content: ${justifyMap};` : '';
                         content += `
                             <div class="variable-button-container" style="${buttonContainerJustify}">
-                                <button class="variable-button" 
-                                        onclick="requestAction('${variable.id}', 1);" 
+                                <div class="variable-button ${isActive ? '' : 'inactive'}" role="button" tabindex="0"
+                                        onclick="handleButtonClick(this, '${variable.id}', 1);" 
                                         data-variable-id="${variable.id}"
-                                        style="background-color: ${buttonColor} !important; opacity: ${opacity} !important; color: ${getTextColor(variable)} !important; ${buttonStyleExtras}">
+                                        data-script-button="${isScriptButton ? '1' : '0'}"
+                                        data-open-object-id="${(variable.openObjectId && variable.openObjectId > 1) ? variable.openObjectId : 0}"
+                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${buttonStyleExtras}">
                                     ${buttonText}
-                                </button>
+                                </div>
                             </div>
                         `;
                         
@@ -2554,6 +3802,19 @@
                         
                         // ButtonWidth aus Variablenkonfiguration verwenden (wie bei Boolean-Buttons)
                         const buttonWidth = variable.buttonWidth || 80; // Etwas schmaler für Multi-Buttons
+                        
+                        // Prüfe ob die aktuelle Gruppe im stretch-Modus ist (dann keine feste Breite setzen)
+                        let isGroupStretched = false;
+                        if (isGrouped && variable.group && window.groupNames) {
+                            const groupMatch = variable.group.match(/Gruppe (\d+)/);
+                            if (groupMatch) {
+                                const groupNumber = parseInt(groupMatch[1]);
+                                const groupConfig = window.groupNames[groupNumber];
+                                if (groupConfig && groupConfig.stretch) {
+                                    isGroupStretched = true;
+                                }
+                            }
+                        }
                         
                         let buttonsHtml = '';
                         const currentValue = variable.variableType === 1 ? parseInt(variable.rawValue) : variable.rawValue;
@@ -2596,13 +3857,17 @@
                             }
                             
                             // Label hinzufügen falls konfiguriert
-                            if (variable.showLabel && association.name) {
-                                if (variable.showValue) {
-                                    // Label mit Doppelpunkt wenn auch Value gezeigt wird
-                                    buttonContentParts.push(`<span style="font-weight: 700;">${association.name}:&nbsp;</span>`);
-                                } else {
-                                    // Nur Label ohne Doppelpunkt
-                                    buttonContentParts.push(`<span style="font-weight: 700;">${association.name}</span>`);
+                            if (variable.showLabel) {
+                                // Beschriftung (variable.label) hat Vorrang, wenn gesetzt, sonst Association-Name
+                                const lbl = (typeof variable.label === 'string' && variable.label.trim() !== '') ? variable.label : association.name;
+                                if (lbl) {
+                                    if (variable.showValue) {
+                                        // Label mit Doppelpunkt wenn auch Value gezeigt wird
+                                        buttonContentParts.push(`<span style="font-weight: 700;">${lbl}:&nbsp;</span>`);
+                                    } else {
+                                        // Nur Label ohne Doppelpunkt
+                                        buttonContentParts.push(`<span style="font-weight: 700;">${lbl}</span>`);
+                                    }
                                 }
                             }
                             
@@ -2621,13 +3886,13 @@
                             const buttonText = buttonContentParts.join(' ');
                             
                             buttonsHtml += `
-                                <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
-                                        onclick="requestAction('${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"});" 
+                                <div class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''} ${isActive ? '' : 'inactive'}" role="button" tabindex="0"
+                                        onclick="handleButtonClick(this, '${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"});" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
-                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${isGroupStretched ? '' : `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`}">
                                     ${buttonText}
-                                </button>`;
+                                </div>`;
                         });
                         
                         // Für ungruppierte Multi-Buttons: horizontale Ausrichtung des Containers entsprechend Einstellung
@@ -2668,8 +3933,8 @@
                                 positionClass = 'middle-button'; // Mittlere Buttons: keine runden Ecken
                             }
                             
-                            // Button-Text basierend auf Association-Name
-                            let buttonText = association.name || String(association.value);
+                            // Button-Text: Beschriftung (variable.label) hat Vorrang, sonst Association-Name/Value
+                            let buttonText = ((typeof variable.label === 'string' && variable.label.trim() !== '') ? variable.label : (association.name || String(association.value)));
                             
                             // Icon hinzufügen falls vorhanden, mit Fallback auf Standard-Icon
                             let iconToUse = association.icon;
@@ -2685,13 +3950,13 @@
                             }
                             
                             buttonsHtml += `
-                                <button class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''}" 
-                                        onclick="requestAction('${variable.id}', '${association.value}');" 
+                                <div class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''} ${isActive ? '' : 'inactive'}" role="button" tabindex="0"
+                                        onclick="handleButtonClick(this, '${variable.id}', '${association.value}');" 
                                         data-variable-id="${variable.id}"
                                         data-association-value="${association.value}"
-                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; opacity: ${opacity}; width: ${buttonWidth}px; min-width: ${buttonWidth}px;">
+                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${isGroupStretched ? '' : `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`}">
                                     ${buttonText}
-                                </button>`;
+                                </div>`;
                         });
                         
                         // Für ungruppierte String-Multi-Buttons: horizontale Ausrichtung des Containers entsprechend Einstellung
@@ -2706,14 +3971,6 @@
                         
                     } else {
                         // Fallback für Nicht-Bool/Integer/String-Variablen oder Variablen ohne Associations: Zeige als Text
-                        if (variable.variableType === 1) {
-                            console.warn('Integer variable', variable.id, 'has no associations for button display. Showing as text.');
-                        } else if (variable.variableType === 3) {
-                            console.warn('String variable', variable.id, 'has no associations for button display. Showing as text.');
-                        } else {
-                            console.warn('Button display type only supported for boolean, integer, and string variables. Variable', variable.id, 'is type', variable.variableType);
-                        }
-                        
                         let textParts = [];
                         
                         if (variable.showLabel && variable.label) {
@@ -2769,6 +4026,19 @@
                 content += `</div>`; // Schließe variable-item div
                 
             return content;
+        }
+        
+        function updateVariableCache(list) {
+            try { window.variableDataCache = {}; } catch (_) {}
+            try {
+                const arr = Array.isArray(list) ? list : [];
+                for (const v of arr) {
+                    const id = (v && (v.variableId || v.id)) ? (v.variableId || v.id) : null;
+                    if (id !== null && id !== undefined) {
+                        window.variableDataCache[id] = v;
+                    }
+                }
+            } catch (_) {}
         }
         
         // Mini-Update-Funktion für Button-Variablen
@@ -2841,12 +4111,13 @@
 
         // Funktion zum Animieren aller Progress Bars nach Re-Renders
         function updateProgressBarValue(variableId, newValue) {
-            // Locate progress elements
-            const progressContainer = document.querySelector(`[data-variable-id="${variableId}"]`);
-            if (!progressContainer) return;
-            const progressBar = progressContainer.querySelector('.progress-bar');
-            const progressTextContainer = progressContainer.querySelector('.progress-text');
-            if (!progressBar) return;
+            // Locate all matching progress elements (support multiple instances per variable)
+            const progressContainers = document.querySelectorAll(`.progress-container[data-variable-id="${variableId}"]`);
+            if (!progressContainers || progressContainers.length === 0) return;
+            progressContainers.forEach((progressContainer) => {
+                const progressBar = progressContainer.querySelector('.progress-bar');
+                const progressTextContainer = progressContainer.querySelector('.progress-text');
+                if (!progressBar) return;
             
             // Hole Variable-Konfiguration aus Cache
             const variableConfig = window.variableDataCache?.[variableId];
@@ -2880,39 +4151,40 @@
                 }
             } catch (_) {}
 
-            // 2. Update progress text (if container exists). We rebuild from cached config to keep formatting consistent.
-            if (progressTextContainer) {
-                // Temporarily update cached raw/ formatted values if appropriate
-                try {
-                    if (window.variableDataCache && window.variableDataCache[variableId]) {
-                        // rawValue already updated by caller; formattedValue may be updated separately in same message
-                        // Re-render the text from current cache
-                        updateProgressText(progressTextContainer, window.variableDataCache[variableId]);
-                    }
-                } catch (_) {}
-            }
+                // 2. Update progress text (if container exists). We rebuild from cached config to keep formatting consistent.
+                if (progressTextContainer) {
+                    // Temporarily update cached raw/ formatted values if appropriate
+                    try {
+                        if (window.variableDataCache && window.variableDataCache[variableId]) {
+                            // rawValue already updated by caller; formattedValue may be updated separately in same message
+                            // Re-render the text from current cache
+                            updateProgressText(progressTextContainer, window.variableDataCache[variableId]);
+                        }
+                    } catch (_) {}
+                }
             
-            // 3. ANIMATE PROGRESS BAR WIDTH (nur wenn sich Wert geändert hat)
-            if (Math.abs(oldWidth - newWidth) > 0.1) {
-                // Setze Bar auf alte Breite
-                progressBar.style.width = oldWidth + '%';
-                progressBar.style.transition = 'none';
+                // 3. ANIMATE PROGRESS BAR WIDTH (nur wenn sich Wert geändert hat)
+                if (Math.abs(oldWidth - newWidth) > 0.1) {
+                    // Setze Bar auf alte Breite
+                    progressBar.style.width = oldWidth + '%';
+                    progressBar.style.transition = 'none';
+                    
+                    // Force Reflow
+                    progressBar.offsetHeight;
+                    
+                    // Starte Animation (nur width, keine visuellen Effekte)
+                    progressBar.style.transition = 'width 0.5s ease';
+                    progressBar.style.width = newWidth + '%';
+                    
+                    setTimeout(() => {
+                        progressBar.style.width = `${newWidth}%`;
+                        progressBar.dataset.oldValue = newValue;
+                    }, 500);
+                }
                 
-                // Force Reflow
-                progressBar.offsetHeight;
-                
-                // Starte Animation (nur width, keine visuellen Effekte)
-                progressBar.style.transition = 'width 0.5s ease';
-                progressBar.style.width = newWidth + '%';
-                
-                setTimeout(() => {
-                    progressBar.style.width = `${newWidth}%`;
-                    progressBar.dataset.oldValue = newValue;
-                }, 500);
-            }
-            
-            // Speichere neuen Wert für nächste Animation
-            progressBar.dataset.oldValue = newValue;
+                // Speichere neuen Wert für nächste Animation
+                progressBar.dataset.oldValue = newValue;
+            });
         }
 
         function animateProgressBars() {
