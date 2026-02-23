@@ -84,39 +84,5 @@ Die Konfiguration gliedert sich in mehrere Bereiche der Form:
 Das Modul stellt aktuell keine öffentlichen PHP-Befehle bereit. Die komplette Funktionalität erfolgt über die Instanz-Konfiguration.
 
 ## Changelog
-- **1.0.13**
-  - Fix: Modul-/Bibliotheksname auf „Universelle Geräte Kachel“ ohne Bindestrich vereinheitlicht und Klassenname entsprechend angepasst.
-- **1.0.12**
-  - Dokumentation: README-Funktionsumfang ergänzt (Schieberegler-Darstellungsart, Marker/Zweitvariable, assoziationsbasierte Mehrfach-Schalter, Schalter zum Öffnen von Objekten, variablelose Bild-/Schalter-Zeilen).
-- **1.0.11**
-  - Cleanup: JavaScript-Debugausgaben in der Visualisierung entfernt.
-- **1.0.10**
-  - Bugfix: Konfigurierte Gruppennamen werden nun auch im Variablen-Edit-Dialog korrekt angezeigt.
-  - Technisch: Neben den statischen Group-Select-Optionen werden jetzt auch die Group-Optionen im dynamischen `form`-Script zur Laufzeit ersetzt.
-- **1.0.9**
-  - Frontend-Sichttexte (`On/Off`, `Target SOC`, `Device Image`, `Image`) werden nun zentral über `locale.json` bereitgestellt und als `uiTexts` an die Visualisierung übertragen.
-- **1.0.7**
-  - Refactoring: `GetConfigurationForm()` aktualisiert Group-Optionen jetzt strukturiert im JSON-Array statt über fragile String-Replacements.
-  - Lifecycle: `ApplyChanges()` führt Side-Effects nur noch bei Kernel-Runlevel `KR_READY` aus.
-  - Cleanup: `Destroy()` entfernt den registrierten WebHook-Eintrag (`/hook/udtimages/<InstanceID>`) wieder.
-  - Diagnostik: Error-Suppression (`@...`) und leere `catch`-Blöcke an zentralen Stellen reduziert; Fehler werden via `SendDebug` protokolliert.
-- **1.0.6**
-  - Verbesserung: Lokalisierungen in `locale.json` für Backend-/Frontend-Sichttexte vervollständigt (Deutsch und Englisch).
-  - Ergänzt: Fehlende Schlüssel aus `form.json` (inkl. dynamischer Formularzeilen) und Status-Fallback-Texte.
-- **1.0.5**
-  - Bugfix: Statusvariable zeigt Icon jetzt auch dann korrekt, wenn das Icon nur über Associations (Profile/OPTIONS/TEMPLATE/PRESENTATION) bereitgestellt wird.
-  - Technisch: `GetIcon()` nutzt einen zusätzlichen Association-Fallback auf das aktuell aktive Association-Icon.
-- **1.0.4**
-  - Bugfix: Wenn eine Variable mehrfach in der Kachel dargestellt wird (z. B. in Gruppen oder in mehreren Sektionen), werden nun alle Instanzen korrekt aktualisiert.
-    - Fortschrittsbalken-Mini-/Vollupdate aktualisiert jetzt alle `.progress-container` mit gleicher `data-variable-id`.
-    - Schieberegler-Mini-Updates berücksichtigen alle `.slider-container`-Instanzen.
-    - Zweitvariablen-/Zielmarker-Updates (Fortschrittsbalken) werden auf alle zutreffenden Container angewendet.
-  - Änderung: Skript-Schalter werden optisch stets als aktiv dargestellt (keine Abdunkelung), inkl. Spin-Phase und danach.
-- **1.0.3**
-  - Verbesserte Skript-Schalter-Anzeige inklusive Spin-Status und Opacity-Handling.
-  - Korrekturen am Fallback-Icon und an der Icon-Wiederherstellung.
-  - Gleichmäßige Breitenverteilung für mehrere Fortschrittsbalken in Gruppen (alle Balken teilen den verfügbaren Platz nun 1:1:1 ...).
-- **1.0.2**
-  - Diverse Fehlerkorrekturen bei Default-Bildern und Progress-Anzeige.
-- **1.0.1**
-  - Initiale öffentliche Version.
+- **2.0.0**
+  - Stable Release.
