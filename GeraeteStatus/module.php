@@ -24,7 +24,7 @@ if (!defined('MM_UPDATE')) {
     define('MM_UPDATE', 10905);
 }
 
-class UniverselleGeräteKachel extends IPSModule
+class UniversalDeviceTile extends IPSModule
 {
     // Variablen-Zugriff und Status-Variable-ID
     
