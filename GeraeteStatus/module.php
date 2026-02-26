@@ -1592,8 +1592,8 @@ class UniversalDeviceTile extends IPSModule
             
             if (is_array($profilAssoziationen)) {
                 $currentValue = GetValue($statusId);
-                foreach ($profilAssoziationen as $assoziation) {
-                    if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentValue) {
+                $assoziation = $this->FindMatchingAssociation($profilAssoziationen, $currentValue);
+                if ($assoziation !== null) {
                         // Neue erweiterte Bildauswahl-Logik
                         $bildauswahl = $assoziation['Bildauswahl'] ?? 'wm_aus';
                         
@@ -1657,8 +1657,6 @@ class UniversalDeviceTile extends IPSModule
                         $statusColor = $assoziation['StatusColor'] ?? -1;
                         $result['statusColor'] = isset($assoziation['StatusColor']) ? '#' . sprintf('%06X', $assoziation['StatusColor']) : '#000000';
                         $result['isStatusColorTransparent'] = isset($assoziation['StatusColor']) && ($assoziation['StatusColor'] == -1 || $assoziation['StatusColor'] == 16777215);
-                        break;
-                    }
                 }
             }
             
@@ -1784,11 +1782,9 @@ class UniversalDeviceTile extends IPSModule
                         $statusId = $this->ReadPropertyInteger('Status');
                         if ($statusId > 0 && IPS_VariableExists($statusId)) {
                             $currentStatusValue = GetValue($statusId);
-                            foreach ($profilAssoziationen as $assoziation) {
-                                if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentStatusValue) {
-                                    $progressbarActive = $assoziation['ProgressbarActive'] ?? true;
-                                    break;
-                                }
+                            $matchedAssoz = $this->FindMatchingAssociation($profilAssoziationen, $currentStatusValue);
+                            if ($matchedAssoz !== null) {
+                                $progressbarActive = $matchedAssoz['ProgressbarActive'] ?? true;
                             }
                         }
                     }
@@ -2188,38 +2184,8 @@ class UniversalDeviceTile extends IPSModule
         $variable = IPS_GetVariable($id);
         $variableType = $variable['VariableType'];
         
-        $associations = null;
-        
-        // Verwende die existierenden Association-Funktionen basierend auf Variablentyp
-        if ($variableType === VARIABLETYPE_BOOLEAN) {
-            $associations = $this->GetBooleanAssociations($id);
-        } elseif ($variableType === VARIABLETYPE_INTEGER) {
-            $associations = $this->GetIntegerAssociations($id);
-        }
-        
-        // Fallback auf klassische Profile wenn keine Associations gefunden
-        if (empty($associations)) {
-            $profileName = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-            
-            if ($profileName != '') {
-                try {
-                    $profile = IPS_GetVariableProfile($profileName);
-                    if (isset($profile['Associations'])) {
-                        $associations = [];
-                        foreach ($profile['Associations'] as $association) {
-                            $associations[] = [
-                                'name' => $association['Name'],
-                                'value' => $association['Value'],
-                                'icon' => isset($association['Icon']) ? $association['Icon'] : '',
-                                'color' => isset($association['Color']) ? $association['Color'] : null
-                            ];
-                        }
-                    }
-                } catch (Exception $e) {
-                    // Profil existiert nicht oder ist nicht lesbar
-                }
-            }
-        }
+        // Alle Variablentypen über GetVariableAssociations (nutzt IPS_GetVariablePresentation + Profil-Fallback)
+        $associations = $this->GetVariableAssociations($id, $variableType);
         
         // Konvertiere Associations zu ListData Format
         if (!empty($associations)) {
@@ -3435,9 +3401,12 @@ class UniversalDeviceTile extends IPSModule
             if (!is_array($options)) return null;
             $associations = [];
             foreach ($options as $option) {
-                if (isset($option['Value']) && isset($option['Caption'])) {
+                // Diskrete OPTIONS: Value + Caption
+                // Intervall-OPTIONS: Min + Max + Caption (Min als Startwert = Value-Äquivalent)
+                $value = $option['Value'] ?? $option['Min'] ?? null;
+                if ($value !== null && isset($option['Caption'])) {
                     $associations[] = [
-                        'value' => $option['Value'],
+                        'value' => $value,
                         'name' => $option['Caption'],
                         'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
                         'icon' => (isset($option['IconValue']) && !empty($option['IconValue'])) ? $this->MapIconToFontAwesome($option['IconValue']) : null
@@ -3452,6 +3421,33 @@ class UniversalDeviceTile extends IPSModule
             $options = is_string($presentation['OPTIONS']) ? json_decode($presentation['OPTIONS'], true) : $presentation['OPTIONS'];
             $result = $mapOptions($options);
             if ($result !== null) return $result;
+        }
+        
+        // **INTERVALS aus aufgelöster Präsentation extrahieren**
+        if (!empty($presentation['INTERVALS_ACTIVE']) && isset($presentation['INTERVALS'])) {
+            $intervals = is_string($presentation['INTERVALS']) ? json_decode($presentation['INTERVALS'], true) : $presentation['INTERVALS'];
+            if (is_array($intervals)) {
+                $associations = [];
+                foreach ($intervals as $interval) {
+                    if (isset($interval['IntervalMinValue']) && !empty($interval['ConstantActive'])) {
+                        $color = null;
+                        if (!empty($interval['ColorActive']) && isset($interval['ColorValue']) && $interval['ColorValue'] !== -1) {
+                            $color = '#' . sprintf('%06X', $interval['ColorValue']);
+                        }
+                        $icon = null;
+                        if (!empty($interval['IconActive']) && isset($interval['IconValue']) && !empty($interval['IconValue'])) {
+                            $icon = $this->MapIconToFontAwesome($interval['IconValue']);
+                        }
+                        $associations[] = [
+                            'value' => $interval['IntervalMinValue'],
+                            'name' => $interval['ConstantValue'] ?? '',
+                            'color' => $color,
+                            'icon' => $icon
+                        ];
+                    }
+                }
+                if (!empty($associations)) return $associations;
+            }
         }
         
         // Fallback: groups → presentationParameters → OPTIONS (z. B. bei Numeric/String/Boolean-Gruppen)
@@ -3484,6 +3480,26 @@ class UniversalDeviceTile extends IPSModule
         return null;
     }
     
+    /**
+     * Findet die passende Assoziation für einen Wert (Intervall-Logik wie Symcon-Profile).
+     * Gibt die Assoziation mit dem höchsten AssoziationValue <= $currentValue zurück.
+     * @param array $associations Array von Assoziationen mit 'AssoziationValue'
+     * @param mixed $currentValue Aktueller Variablenwert
+     * @return array|null Passende Assoziation oder null
+     */
+    private function FindMatchingAssociation(array $associations, $currentValue) {
+        $match = null;
+        foreach ($associations as $assoziation) {
+            if (!isset($assoziation['AssoziationValue'])) continue;
+            $av = $assoziation['AssoziationValue'];
+            if ($av == $currentValue) return $assoziation;
+            if ($av <= $currentValue && ($match === null || $av > $match['AssoziationValue'])) {
+                $match = $assoziation;
+            }
+        }
+        return $match;
+    }
+
     /**
      * Hilfsfunktion: Gibt das konfigurierte Standard-Bild zurück oder 'none' wenn nicht konfiguriert
      * @return string Asset-Name für das Standard-Bild oder 'none'
