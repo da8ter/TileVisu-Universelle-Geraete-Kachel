@@ -3,6 +3,8 @@
 
 # Universelle Geräte Kachel
 
+https://github.com/da8ter/images/blob/main/kachelanleitung_ugk.png
+
 Das Modul **Universelle Geräte Kachel** stellt eine flexibel konfigurierbare Geräte-Kachel für die IP-Symcon Visualisierung bereit. Eine Kachel kann Statusinformationen, frei wählbare Variablen, Fortschrittsbalken, Schieberegler, Schalter und Bilder in einem gemeinsamen Layout kombinieren.
 
 ## Inhaltsverzeichnis
