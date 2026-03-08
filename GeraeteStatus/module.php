@@ -123,6 +123,7 @@ class UniversalDeviceTile extends IPSModule
             'statusShowValue',
             'statusFontSize',
             'statusBildauswahl',
+            'statusImageUrl',
             'statusColor',
             'isStatusColorTransparent',
             'statusIconColor',
@@ -557,6 +558,8 @@ class UniversalDeviceTile extends IPSModule
     public function ApplyChanges()
     {
         parent::ApplyChanges();
+
+        $this->RegisterMessage(0, IPS_KERNELSTARTED);
 
         if (!$this->IsKernelReady()) {
             return;
@@ -1090,7 +1093,11 @@ class UniversalDeviceTile extends IPSModule
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
-        // ...
+        if ($Message === IPS_KERNELSTARTED) {
+            $this->ApplyChanges();
+            return;
+        }
+
         $statusId = $this->ReadPropertyInteger('Status');
         if ($statusId > 0 && $SenderID === $statusId) {
             switch ($Message) {
@@ -2190,12 +2197,13 @@ class UniversalDeviceTile extends IPSModule
         // Konvertiere Associations zu ListData Format
         if (!empty($associations)) {
             foreach ($associations as $association) {
+                $hasIcon = isset($association['icon']) && !empty($association['icon']);
                 $listData[] = [
                     'AssoziationName' => $association['name'],
                     'AssoziationValue' => $association['value'],
-                    'Bildauswahl' => 'none',
+                    'Bildauswahl' => $hasIcon ? 'symcon_icon' : 'none',
                     'EigenesBild' => 0,
-                    'SymconIcon' => '',
+                    'SymconIcon' => $hasIcon ? $association['icon'] : '',
                     'IconColor' => -1,
                     'StatusColor' => -1,
                     'ProgressbarActive' => true
