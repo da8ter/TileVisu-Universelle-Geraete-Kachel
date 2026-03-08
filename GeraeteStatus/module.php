@@ -561,11 +561,7 @@ class UniversalDeviceTile extends IPSModule
 
         $this->RegisterMessage(0, IPS_KERNELSTARTED);
 
-        // DIAGNOSE: Kernel-Status beim ApplyChanges
-        $this->SendDebug('ApplyChanges', 'KernelReady=' . ($this->IsKernelReady() ? 'YES' : 'NO') . ' InstanceID=' . $this->InstanceID, 0);
-
         if (!$this->IsKernelReady()) {
-            $this->SendDebug('ApplyChanges', 'EARLY RETURN - Kernel not ready', 0);
             return;
         }
 
@@ -646,7 +642,6 @@ class UniversalDeviceTile extends IPSModule
         // Registriere Nachrichten für Status-Variable
         if ($statusId > 0) {
             $this->RegisterMessage($statusId, VM_UPDATE);
-            $this->SendDebug('ApplyChanges', 'Registered VM_UPDATE for Status ID=' . $statusId, 0);
         }
         
         // Registriere Nachrichten für konfigurierte Variablen
@@ -1102,13 +1097,9 @@ class UniversalDeviceTile extends IPSModule
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
         if ($Message === IPS_KERNELSTARTED) {
-            $this->SendDebug('MessageSink', 'IPS_KERNELSTARTED received - calling ApplyChanges()', 0);
             $this->ApplyChanges();
             return;
         }
-
-        // DIAGNOSE: Zeige empfangene Nachrichten
-        $this->SendDebug('MessageSink', 'SenderID=' . $SenderID . ' Message=' . $Message, 0);
 
         $statusId = $this->ReadPropertyInteger('Status');
         if ($statusId > 0 && $SenderID === $statusId) {
