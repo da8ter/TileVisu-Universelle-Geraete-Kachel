@@ -1160,6 +1160,61 @@
         }
         
         // Hilfsfunktion zur Bestimmung der Textfarbe
+        // 'left'|'center'|'right' → justify-content-Wert (Default: center)
+        function alignmentToFlex(alignment) {
+            switch (alignment) {
+                case 'left': return 'flex-start';
+                case 'right': return 'flex-end';
+                default: return 'center';
+            }
+        }
+
+        // 'left'|'center'|'right' → Auto-Margin (Default: zentriert)
+        function alignmentToMargin(alignment) {
+            switch (alignment) {
+                case 'left': return '0 auto 0 0';
+                case 'right': return '0 0 0 auto';
+                default: return '0 auto';
+            }
+        }
+
+        // Wendet die Bild-/Icon-Ausrichtung auf die Bildspalte an (Bild ODER Icon)
+        function applyImageAlignment(alignment) {
+            const div1 = document.querySelector('.main_container .div1');
+            const imgElement = document.querySelector('.main_container .div1 img');
+            const iconContainer = document.querySelector('.main_container .div1 .fontawesome-icon-container');
+            if (!div1) {
+                return;
+            }
+            // Stelle sicher, dass flex-Kontext vorhanden ist (für alle Positionen)
+            div1.style.display = 'flex';
+            div1.style.justifyContent = alignmentToFlex(alignment);
+            // Für IMG zusätzlich Margin setzen (visuelle Sicherheit)
+            if (imgElement) {
+                imgElement.style.margin = alignmentToMargin(alignment);
+            }
+            // Icon-Container: Margin und justify-content entsprechend setzen
+            if (iconContainer) {
+                iconContainer.style.margin = alignmentToMargin(alignment);
+                iconContainer.style.justifyContent = alignmentToFlex(alignment);
+            }
+        }
+
+        // Erkennt Symcon-Sentinels für "transparent/-1" und fällt auf die Accent-Color zurück
+        function normalizeColor(c) {
+            if (c === -1 || c === '-1' || c === null || c === undefined) return 'var(--accent-color)';
+            if (typeof c !== 'string') return c;
+            const s = c.trim().toLowerCase();
+            // Symcon sentinel for -1 as 64-bit hex
+            if (s === '#ffffffffffffffff' || s === '0xffffffffffffffff' || s === 'ffffffffffffffff') return 'var(--accent-color)';
+            if (!s || s === 'transparent' || s === '#0000' || s === '#00000000') return 'var(--accent-color)';
+            if (/^rgba\s*\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
+            if (/^rgb\s*\(\s*\d+\s+\d+\s+\d+\s*\/\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
+            if (/^hsla\s*\(.*?,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
+            if (/^#[0-9a-f]{8}$/.test(s) && s.endsWith('00')) return 'var(--accent-color)';
+            return c;
+        }
+
         function getTextColor(variable) {
             // Verwende --content-color wenn TextColor transparent ist, ansonsten die konfigurierte Farbe
             if (variable.isTextColorTransparent) {
@@ -1344,65 +1399,9 @@
                         break;
 
                     case 'imagealignment':
-                        // Speichere Alignment global und wende sofort an
+                        // Speichere Alignment global und wende sofort an (gilt für Bild ODER Icon)
                         window.currentImageAlignment = value;
-                        
-                        // Wende Alignment sofort an - gilt für Bild ODER Icon
-                        const div1 = document.querySelector('.main_container .div1');
-                        const alignmentContainer = document.querySelector('.main_container');
-                        const imgElement = document.querySelector('.main_container .div1 img');
-                        const iconContainerLive = document.querySelector('.main_container .div1 .fontawesome-icon-container');
-                        
-                        if (div1 && alignmentContainer) {
-                            // Stelle sicher, dass flex-Kontext vorhanden ist (für alle Positionen)
-                            div1.style.display = 'flex';
-                            switch (value) {
-                                case 'left':
-                                    div1.style.justifyContent = 'flex-start';
-                                    break;
-                                case 'center':
-                                    div1.style.justifyContent = 'center';
-                                    break;
-                                case 'right':
-                                    div1.style.justifyContent = 'flex-end';
-                                    break;
-                                default:
-                                    div1.style.justifyContent = 'center';
-                            }
-                            
-                            // Für IMG zusätzlich Margin setzen (visuelle Sicherheit)
-                            if (imgElement) {
-                                switch (value) {
-                                    case 'left':
-                                        imgElement.style.margin = '0 auto 0 0';
-                                        break;
-                                    case 'center':
-                                        imgElement.style.margin = '0 auto';
-                                        break;
-                                    case 'right':
-                                        imgElement.style.margin = '0 0 0 auto';
-                                        break;
-                                    default:
-                                        imgElement.style.margin = '0 auto';
-                                }
-                            }
-                            // Für Icon-Container: justify-content entsprechend setzen
-                            if (iconContainerLive) {
-                                switch (value) {
-                                    case 'left':
-                                        iconContainerLive.style.justifyContent = 'flex-start';
-                                        break;
-                                    case 'center':
-                                        iconContainerLive.style.justifyContent = 'center';
-                                        break;
-                                    case 'right':
-                                        iconContainerLive.style.justifyContent = 'flex-end';
-                                        break;
-                                    default:
-                                        iconContainerLive.style.justifyContent = 'center';
-                                }
-                            }
-                        }
+                        applyImageAlignment(value);
                         break;
                     case 'status':
                     case 'statusvalue':
@@ -1447,75 +1446,7 @@
                         
                         // Re-apply gespeicherte Bild-/Icon-Ausrichtung nach dem Rendering (Persistenz)
                         if (window.currentImageAlignment) {
-                            const div1Restore = document.querySelector('.main_container .div1');
-                            const imgRestore = document.querySelector('.main_container .div1 img');
-                            const iconRestore = document.querySelector('.main_container .div1 .fontawesome-icon-container');
-                            const mainContainerRestore = document.querySelector('.main_container');
-                            
-                            if (div1Restore && mainContainerRestore) {
-                                // Justify-Content auf dem Container anwenden (wirkt für Icon und Bild) – für alle Positionen
-                                div1Restore.style.display = 'flex';
-                                switch (window.currentImageAlignment) {
-                                    case 'left':
-                                        div1Restore.style.justifyContent = 'flex-start';
-                                        break;
-                                    case 'center':
-                                        div1Restore.style.justifyContent = 'center';
-                                        break;
-                                    case 'right':
-                                        div1Restore.style.justifyContent = 'flex-end';
-                                        break;
-                                    default:
-                                        div1Restore.style.justifyContent = 'center';
-                                }
-                                
-                                // Für IMG zusätzlich Margin setzen
-                                if (imgRestore) {
-                                    switch (window.currentImageAlignment) {
-                                        case 'left':
-                                            imgRestore.style.margin = '0 auto 0 0';
-                                            break;
-                                        case 'center':
-                                            imgRestore.style.margin = '0 auto';
-                                            break;
-                                        case 'right':
-                                            imgRestore.style.margin = '0 0 0 auto';
-                                            break;
-                                        default:
-                                            imgRestore.style.margin = '0 auto';
-                                    }
-                                }
-                                // Für Icon-Container ebenfalls Margin setzen
-                                if (iconRestore) {
-                                    switch (window.currentImageAlignment) {
-                                        case 'left':
-                                            iconRestore.style.margin = '0 auto 0 0';
-                                            break;
-                                        case 'center':
-                                            iconRestore.style.margin = '0 auto';
-                                            break;
-                                        case 'right':
-                                            iconRestore.style.margin = '0 0 0 auto';
-                                            break;
-                                        default:
-                                            iconRestore.style.margin = '0 auto';
-                                    }
-                                    // Und justify-content für den Icon-Container setzen
-                                    switch (window.currentImageAlignment) {
-                                        case 'left':
-                                            iconRestore.style.justifyContent = 'flex-start';
-                                            break;
-                                        case 'center':
-                                            iconRestore.style.justifyContent = 'center';
-                                            break;
-                                        case 'right':
-                                            iconRestore.style.justifyContent = 'flex-end';
-                                            break;
-                                        default:
-                                            iconRestore.style.justifyContent = 'center';
-                                    }
-                                }
-                            }
+                            applyImageAlignment(window.currentImageAlignment);
                         }
                         break;
                     case 'hideimagecolumn':
@@ -2867,19 +2798,7 @@
                         iconContainer.style.width = 'auto';
                         // Margin-basierte Ausrichtung für Icon-Container (wirkt unabhängig von Containerbreite)
                         if (window.currentImageAlignment) {
-                            switch (window.currentImageAlignment) {
-                                case 'left':
-                                    iconContainer.style.margin = '0 auto 0 0';
-                                    break;
-                                case 'center':
-                                    iconContainer.style.margin = '0 auto';
-                                    break;
-                                case 'right':
-                                    iconContainer.style.margin = '0 0 0 auto';
-                                    break;
-                                default:
-                                    iconContainer.style.margin = '0 auto';
-                            }
+                            iconContainer.style.margin = alignmentToMargin(window.currentImageAlignment);
                         }
                         
                         deviceImgContainer.classList.remove('hidden');
@@ -3532,21 +3451,8 @@
                     const targetPercentStyle = (targetPercent !== null) ? ` --target-percent: ${targetPercent}%;` : '';
                     // Sync marker font-size with variable font-size via CSS var
                     const markerFontSizeVar = (typeof variable.fontSize === 'number' && variable.fontSize !== -1) ? ` --balkenschriftgroesse: ${variable.fontSize}px;` : '';
-                    const normalizeColorP = (c) => {
-                        if (c === -1 || c === '-1' || c === null || c === undefined) return 'var(--accent-color)';
-                        if (typeof c !== 'string') return c;
-                        const s = c.trim().toLowerCase();
-                        // Symcon sentinel for -1 as 64-bit hex
-                        if (s === '#ffffffffffffffff' || s === '0xffffffffffffffff' || s === 'ffffffffffffffff') return 'var(--accent-color)';
-                        if (!s || s === 'transparent' || s === '#0000' || s === '#00000000') return 'var(--accent-color)';
-                        if (/^rgba\s*\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
-                        if (/^rgb\s*\(\s*\d+\s+\d+\s+\d+\s*\/\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
-                        if (/^hsla\s*\(.*?,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
-                        if (/^#[0-9a-f]{8}$/.test(s) && s.endsWith('00')) return 'var(--accent-color)';
-                        return c;
-                    };
-                    const color1p = normalizeColorP(variable.progressColor1);
-                    const color2p = normalizeColorP(variable.progressColor2);
+                    const color1p = normalizeColor(variable.progressColor1);
+                    const color2p = normalizeColor(variable.progressColor2);
 
                     content += `
                         <div class="variable-progress">
@@ -3573,21 +3479,8 @@
                     const labelHtml = (variable.showLabel && variable.label) ? `<span class="variable-label" style="font-weight: 700;">${variable.label}${variable.showValue ? ':&nbsp;' : ''}</span>` : '';
                     const valueHtml = (variable.showValue && typeof variable.formattedValue !== 'undefined') ? `<span class="slider-value">${variable.formattedValue}</span>` : `<span class="slider-value"></span>`;
                     const individualPadding = 0;
-                    const normalizeColorS = (c) => {
-                        if (c === -1 || c === '-1' || c === null || c === undefined) return 'var(--accent-color)';
-                        if (typeof c !== 'string') return c;
-                        const s = c.trim().toLowerCase();
-                        // Symcon sentinel for -1 as 64-bit hex
-                        if (s === '#ffffffffffffffff' || s === '0xffffffffffffffff' || s === 'ffffffffffffffff') return 'var(--accent-color)';
-                        if (!s || s === 'transparent' || s === '#0000' || s === '#00000000') return 'var(--accent-color)';
-                        if (/^rgba\s*\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
-                        if (/^rgb\s*\(\s*\d+\s+\d+\s+\d+\s*\/\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
-                        if (/^hsla\s*\(.*?,\s*0\s*\)$/.test(s)) return 'var(--accent-color)';
-                        if (/^#[0-9a-f]{8}$/.test(s) && s.endsWith('00')) return 'var(--accent-color)';
-                        return c;
-                    };
-                    const color1s = normalizeColorS(variable.sliderColor1);
-                    const color2s = normalizeColorS(variable.sliderColor2);
+                    const color1s = normalizeColor(variable.sliderColor1);
+                    const color2s = normalizeColor(variable.sliderColor2);
 
                     const suffixGuess = (() => {
                         if (typeof variable.formattedValue === 'string') {
