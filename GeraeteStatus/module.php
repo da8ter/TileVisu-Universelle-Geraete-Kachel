@@ -2081,247 +2081,114 @@ class UniversalDeviceTile extends IPSModule
         $this->UpdateDisplayTypeVisibility($displayType, $rowIndex);
     }
     
+    /**
+     * Feld-Sichtbarkeiten je Darstellungsart für die VariablesList-Bearbeitung.
+     * Bewusste Eigenheiten des bisherigen Verhaltens bleiben erhalten:
+     * - 'button' setzt UseSecondVariableAsTarget nicht (bleibt im zuletzt gesetzten Zustand)
+     * - 'default' lässt Variable, FontSize und TextColor unangetastet
+     * - OpenObjectId wird bei 'button' dynamisch gesetzt (SelectObject erst ab Kernel > 8.1)
+     */
+    private const DISPLAY_TYPE_FIELD_VISIBILITY = [
+        'text' => [
+            'ShowIcon' => true, 'ShowLabel' => true, 'ShowValue' => true,
+            'Variable' => true, 'ScriptID' => false,
+            'Label' => true, 'FontSize' => true, 'TextColor' => true,
+            'ProgressColor1' => false, 'ProgressColor2' => false,
+            'SliderColor1' => false, 'SliderColor2' => false,
+            'SecondVariable' => false, 'SecondVariableShowIcon' => false,
+            'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
+            'SecondVariableLabel' => false, 'UseSecondVariableAsTarget' => false,
+            'SecondVariablePopupButton' => false,
+            'ButtonWidth' => false, 'boolButtonColor' => false,
+            'ShowBorderLine' => true, 'VerticalAlignment' => true,
+            'OpenObjectId' => false,
+            'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
+        ],
+        'image' => [
+            'ShowIcon' => false, 'ShowLabel' => false, 'ShowValue' => false,
+            'Variable' => false, 'ScriptID' => false,
+            'Label' => false, 'FontSize' => false, 'TextColor' => false,
+            'ProgressColor1' => false, 'ProgressColor2' => false,
+            'SliderColor1' => false, 'SliderColor2' => false,
+            'SecondVariable' => false, 'SecondVariableShowIcon' => false,
+            'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
+            'SecondVariableLabel' => false, 'UseSecondVariableAsTarget' => false,
+            'SecondVariablePopupButton' => false,
+            'ButtonWidth' => false, 'boolButtonColor' => false,
+            'ShowBorderLine' => false, 'VerticalAlignment' => true,
+            'OpenObjectId' => false,
+            'ImageMedia' => true, 'ImageWidth' => true, 'ImageBorderRadius' => true,
+        ],
+        'progress' => [
+            'ShowIcon' => true, 'ShowLabel' => true, 'ShowValue' => true,
+            'Variable' => true, 'ScriptID' => false,
+            'Label' => true, 'FontSize' => true, 'TextColor' => true,
+            'ProgressColor1' => true, 'ProgressColor2' => true,
+            'SliderColor1' => false, 'SliderColor2' => false,
+            'SecondVariable' => true, 'SecondVariableShowIcon' => true,
+            'SecondVariableShowLabel' => true, 'SecondVariableShowValue' => true,
+            'SecondVariableLabel' => true, 'UseSecondVariableAsTarget' => true,
+            'SecondVariablePopupButton' => true,
+            'ButtonWidth' => false, 'boolButtonColor' => false,
+            'ShowBorderLine' => false, 'VerticalAlignment' => false,
+            'OpenObjectId' => false,
+            'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
+        ],
+        'slider' => [
+            'ShowIcon' => true, 'ShowLabel' => true, 'ShowValue' => true,
+            'Variable' => true, 'ScriptID' => false,
+            'Label' => true, 'FontSize' => true, 'TextColor' => true,
+            'ProgressColor1' => false, 'ProgressColor2' => false,
+            'SliderColor1' => true, 'SliderColor2' => true,
+            'SecondVariable' => false, 'SecondVariableShowIcon' => false,
+            'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
+            'SecondVariableLabel' => false, 'UseSecondVariableAsTarget' => false,
+            'SecondVariablePopupButton' => false,
+            'ButtonWidth' => false, 'boolButtonColor' => false,
+            'ShowBorderLine' => false, 'VerticalAlignment' => true,
+            'OpenObjectId' => false,
+            'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
+        ],
+        'button' => [
+            'ShowIcon' => true, 'ShowLabel' => true, 'ShowValue' => true,
+            'Variable' => true, 'ScriptID' => true,
+            'Label' => true, 'FontSize' => true, 'TextColor' => true,
+            'ProgressColor1' => false, 'ProgressColor2' => false,
+            'SliderColor1' => false, 'SliderColor2' => false,
+            'SecondVariable' => false, 'SecondVariableShowIcon' => false,
+            'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
+            'SecondVariableLabel' => false,
+            'SecondVariablePopupButton' => false,
+            'ButtonWidth' => true, 'boolButtonColor' => true,
+            'ShowBorderLine' => false, 'VerticalAlignment' => true,
+            'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
+        ],
+        'default' => [
+            'ShowIcon' => false, 'ShowLabel' => false, 'ShowValue' => false,
+            'ScriptID' => false, 'Label' => false,
+            'ProgressColor1' => false, 'ProgressColor2' => false,
+            'SliderColor1' => false, 'SliderColor2' => false,
+            'SecondVariable' => false, 'SecondVariableShowIcon' => false,
+            'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
+            'SecondVariableLabel' => false,
+            'SecondVariablePopupButton' => false,
+            'ButtonWidth' => false, 'boolButtonColor' => false,
+            'ShowBorderLine' => false, 'VerticalAlignment' => false,
+            'OpenObjectId' => false,
+            'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
+        ],
+    ];
+
     public function UpdateDisplayTypeVisibility(string $displayType, ?int $rowId = null)
     {
-        $supportsSelectObject = ((float)IPS_GetKernelVersion() > 8.1);
-        // Basierend auf Display Type verschiedene Felder ein-/ausblenden
-        switch ($displayType) {
-            case 'text':
-                // Bei Text: Show Icon ausblenden, da Text-Variablen normalerweise kein Icon haben
-                $this->UpdateFormField('ShowIcon', 'visible', true);
-                $this->UpdateFormField('ShowLabel', 'visible', true);
-                $this->UpdateFormField('ShowValue', 'visible', true);
-                // Variable wieder einblenden
-                $this->UpdateFormField('Variable', 'visible', true);
-                // ScriptID ausblenden
-                $this->UpdateFormField('ScriptID', 'visible', false);
-                // Generelle Text-Einstellungen sichtbar
-                $this->UpdateFormField('Label', 'visible', true);
-                $this->UpdateFormField('FontSize', 'visible', true);
-                $this->UpdateFormField('TextColor', 'visible', true);
-                // Progress-Felder ausblenden
-                $this->UpdateFormField('ProgressColor1', 'visible', false);
-                $this->UpdateFormField('ProgressColor2', 'visible', false);
-                $this->UpdateFormField('SliderColor1', 'visible', false);
-                $this->UpdateFormField('SliderColor2', 'visible', false);
-                $this->UpdateFormField('SecondVariable', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
-                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
-                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', false);
-                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
-                // Button-Felder ausblenden
-                $this->UpdateFormField('ButtonWidth', 'visible', false);
-                $this->UpdateFormField('boolButtonColor', 'visible', false);
-                // Text-spezifische Felder
-                $this->UpdateFormField('ShowBorderLine', 'visible', true);
-                $this->UpdateFormField('VerticalAlignment', 'visible', true);
-                // OpenObjectId bei Text ausblenden
-                $this->UpdateFormField('OpenObjectId', 'visible', false);
-                // Image-Felder ausblenden
-                $this->UpdateFormField('ImageMedia', 'visible', false);
-                $this->UpdateFormField('ImageWidth', 'visible', false);
-                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
-                break;
-            case 'image':
-                // Image-Display: relevante Felder steuern
-                // Grundfelder
-                $this->UpdateFormField('ShowIcon', 'visible', false);
-                $this->UpdateFormField('ShowLabel', 'visible', false);
-                $this->UpdateFormField('ShowValue', 'visible', false);
-                // Schriftgröße und Textfarbe ausblenden
-                $this->UpdateFormField('FontSize', 'visible', false);
-                $this->UpdateFormField('TextColor', 'visible', false);
-                // Label-Feld ausblenden
-                $this->UpdateFormField('Label', 'visible', false);
-                // SelectVariable ausblenden, Media zeigen
-                $this->UpdateFormField('Variable', 'visible', false);
-                // ScriptID ausblenden
-                $this->UpdateFormField('ScriptID', 'visible', false);
-
-                // Progress-Felder ausblenden
-                $this->UpdateFormField('ProgressColor1', 'visible', false);
-                $this->UpdateFormField('ProgressColor2', 'visible', false);
-                $this->UpdateFormField('SliderColor1', 'visible', false);
-                $this->UpdateFormField('SliderColor2', 'visible', false);
-                $this->UpdateFormField('SecondVariable', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
-                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
-                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', false);
-                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
-
-                // Button-Felder ausblenden
-                $this->UpdateFormField('ButtonWidth', 'visible', false);
-                $this->UpdateFormField('boolButtonColor', 'visible', false);
-
-                // Image-spezifische Felder einblenden
-                $this->UpdateFormField('ImageMedia', 'visible', true);
-                $this->UpdateFormField('ImageWidth', 'visible', true);
-                $this->UpdateFormField('ImageBorderRadius', 'visible', true);
-
-                // Alignment sichtbar, Borderline ausblenden
-                $this->UpdateFormField('VerticalAlignment', 'visible', true);
-                $this->UpdateFormField('ShowBorderLine', 'visible', false);
-                // OpenObjectId bei Image ausblenden
-                $this->UpdateFormField('OpenObjectId', 'visible', false);
-                break;
-            case 'progress':
-                // Progress: relevante Felder ein-/ausblenden
-                $this->UpdateFormField('ShowIcon', 'visible', true);
-                $this->UpdateFormField('ShowLabel', 'visible', true);
-                $this->UpdateFormField('ShowValue', 'visible', true);
-                // Variable benötigt
-                $this->UpdateFormField('Variable', 'visible', true);
-                // ScriptID ausblenden
-                $this->UpdateFormField('ScriptID', 'visible', false);
-                // Generelle Text-Einstellungen sichtbar
-                $this->UpdateFormField('Label', 'visible', true);
-                $this->UpdateFormField('FontSize', 'visible', true);
-                $this->UpdateFormField('TextColor', 'visible', true);
-                // Progress-Farben sichtbar
-                $this->UpdateFormField('ProgressColor1', 'visible', true);
-                $this->UpdateFormField('ProgressColor2', 'visible', true);
-                $this->UpdateFormField('SliderColor1', 'visible', false);
-                $this->UpdateFormField('SliderColor2', 'visible', false);
-                // SecondVariable-Block sichtbar
-                $this->UpdateFormField('SecondVariable', 'visible', true);
-                $this->UpdateFormField('SecondVariableShowIcon', 'visible', true);
-                $this->UpdateFormField('SecondVariableShowLabel', 'visible', true);
-                $this->UpdateFormField('SecondVariableShowValue', 'visible', true);
-                $this->UpdateFormField('SecondVariableLabel', 'visible', true);
-                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', true);
-                $this->UpdateFormField('SecondVariablePopupButton', 'visible', true);
-                // Button-Felder ausblenden
-                $this->UpdateFormField('ButtonWidth', 'visible', false);
-                $this->UpdateFormField('boolButtonColor', 'visible', false);
-                // Image-Felder ausblenden
-                $this->UpdateFormField('ImageMedia', 'visible', false);
-                $this->UpdateFormField('ImageWidth', 'visible', false);
-                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
-                // Text-Felder ausblenden
-                $this->UpdateFormField('ShowBorderLine', 'visible', false);
-                // Ausrichtung bei Progress ausblenden
-                $this->UpdateFormField('VerticalAlignment', 'visible', false);
-                // OpenObjectId bei Progress ausblenden
-                $this->UpdateFormField('OpenObjectId', 'visible', false);
-                break;
-            case 'slider':
-                // Slider: ähnlich Progress, aber ohne SecondVariable-Block
-                $this->UpdateFormField('ShowIcon', 'visible', true);
-                $this->UpdateFormField('ShowLabel', 'visible', true);
-                $this->UpdateFormField('ShowValue', 'visible', true);
-                // Variable benötigt
-                $this->UpdateFormField('Variable', 'visible', true);
-                // ScriptID ausblenden
-                $this->UpdateFormField('ScriptID', 'visible', false);
-                // Generelle Text-Einstellungen sichtbar
-                $this->UpdateFormField('Label', 'visible', true);
-                $this->UpdateFormField('FontSize', 'visible', true);
-                $this->UpdateFormField('TextColor', 'visible', true);
-                // Progress-Farnen unsichtbarSlider-Farben sichtbar
-                $this->UpdateFormField('ProgressColor1', 'visible', false);
-                $this->UpdateFormField('ProgressColor2', 'visible', false);
-                $this->UpdateFormField('SliderColor1', 'visible', true);
-                $this->UpdateFormField('SliderColor2', 'visible', true);
-                // SecondVariable-Block ausblenden (Slider nutzt keinen Marker)
-                $this->UpdateFormField('SecondVariable', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
-                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
-                $this->UpdateFormField('UseSecondVariableAsTarget', 'visible', false);
-                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
-                // Button-Felder ausblenden
-                $this->UpdateFormField('ButtonWidth', 'visible', false);
-                $this->UpdateFormField('boolButtonColor', 'visible', false);
-                // Image-Felder ausblenden
-                $this->UpdateFormField('ImageMedia', 'visible', false);
-                $this->UpdateFormField('ImageWidth', 'visible', false);
-                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
-                // Text-Felder ausblenden
-                $this->UpdateFormField('ShowBorderLine', 'visible', false);
-                // Ausrichtung bei Slider ausblenden (feste horizontale Ausrichtung)
-                $this->UpdateFormField('VerticalAlignment', 'visible', true);
-                // OpenObjectId bei Slider ausblenden
-                $this->UpdateFormField('OpenObjectId', 'visible', false);
-                break;
-            case 'button':
-                // Button-Display: relevante Felder steuern
-                // Grundfelder
-                $this->UpdateFormField('ShowIcon', 'visible', true);
-                $this->UpdateFormField('ShowLabel', 'visible', true);
-                $this->UpdateFormField('ShowValue', 'visible', true);
-                // Variable sichtbar
-                $this->UpdateFormField('Variable', 'visible', true);
-                // ScriptID sichtbar (optional, ermöglicht Script-Buttons ohne Variable)
-                $this->UpdateFormField('ScriptID', 'visible', true);
-                // OpenObjectId sichtbar (optional, ermöglicht Öffnen von Objekten)
-                $this->UpdateFormField('OpenObjectId', 'visible', $supportsSelectObject);
-                // Button-spezifische Felder sichtbar
-                $this->UpdateFormField('boolButtonColor', 'visible', true);
-                $this->UpdateFormField('ButtonWidth', 'visible', true);
-                $this->UpdateFormField('VerticalAlignment', 'visible', true);
-                // Generelle Text-Einstellungen sichtbar
-                $this->UpdateFormField('Label', 'visible', true);
-                $this->UpdateFormField('FontSize', 'visible', true);
-                $this->UpdateFormField('TextColor', 'visible', true);
-
-                // Progress-Felder ausblenden
-                $this->UpdateFormField('ProgressColor1', 'visible', false);
-                $this->UpdateFormField('ProgressColor2', 'visible', false);
-                $this->UpdateFormField('SliderColor1', 'visible', false);
-                $this->UpdateFormField('SliderColor2', 'visible', false);
-                $this->UpdateFormField('SecondVariable', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
-                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
-                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
-
-                // Image-Felder ausblenden
-                $this->UpdateFormField('ImageMedia', 'visible', false);
-                $this->UpdateFormField('ImageWidth', 'visible', false);
-                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
-
-                // Button-spezifische Felder einblenden
-                $this->UpdateFormField('ButtonWidth', 'visible', true);
-                $this->UpdateFormField('boolButtonColor', 'visible', true);
-
-                // Alignment sichtbar, Borderline ausblenden
-                $this->UpdateFormField('VerticalAlignment', 'visible', true);
-                $this->UpdateFormField('ShowBorderLine', 'visible', false);
-                break;
-            
-            default:
-                // Default-Fall: Alle Felder ausblenden
-                $this->UpdateFormField('ShowIcon', 'visible', false);
-                $this->UpdateFormField('ShowLabel', 'visible', false);
-                $this->UpdateFormField('ShowValue', 'visible', false);
-                $this->UpdateFormField('ProgressColor1', 'visible', false);
-                $this->UpdateFormField('ProgressColor2', 'visible', false);
-                $this->UpdateFormField('SliderColor1', 'visible', false);
-                $this->UpdateFormField('SliderColor2', 'visible', false);
-                $this->UpdateFormField('SecondVariable', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
-                $this->UpdateFormField('SecondVariableShowValue', 'visible', false);
-                $this->UpdateFormField('SecondVariableLabel', 'visible', false);
-                $this->UpdateFormField('SecondVariablePopupButton', 'visible', false);
-                $this->UpdateFormField('ButtonWidth', 'visible', false);
-                $this->UpdateFormField('boolButtonColor', 'visible', false);
-                $this->UpdateFormField('ImageMedia', 'visible', false);
-                $this->UpdateFormField('ImageWidth', 'visible', false);
-                $this->UpdateFormField('ImageBorderRadius', 'visible', false);
-                $this->UpdateFormField('VerticalAlignment', 'visible', false);
-                $this->UpdateFormField('ShowBorderLine', 'visible', false);
-                $this->UpdateFormField('ScriptID', 'visible', false);
-                $this->UpdateFormField('Label', 'visible', false);
-                $this->UpdateFormField('OpenObjectId', 'visible', false);
-
-                break;
+        $fields = self::DISPLAY_TYPE_FIELD_VISIBILITY[$displayType] ?? self::DISPLAY_TYPE_FIELD_VISIBILITY['default'];
+        foreach ($fields as $field => $visible) {
+            $this->UpdateFormField($field, 'visible', $visible);
+        }
+        // SelectObject steht erst ab Kernel > 8.1 zur Verfügung
+        if ($displayType === 'button') {
+            $supportsSelectObject = ((float)IPS_GetKernelVersion() > 8.1);
+            $this->UpdateFormField('OpenObjectId', 'visible', $supportsSelectObject);
         }
     }
 
