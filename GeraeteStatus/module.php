@@ -365,6 +365,7 @@ class UniversalDeviceTile extends IPSModule
 
     private function LogCaughtThrowable(string $context, Throwable $e): void
     {
+        $this->SendDebug($context, $e->getMessage(), 0);
     }
 
     private function IsKernelReady(): bool
