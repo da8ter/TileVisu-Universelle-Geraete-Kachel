@@ -1298,9 +1298,6 @@
                 const value = decodedData[parameter];
                 
                 switch (parameter.toLowerCase()) {
-                    case 'debugenabled':
-                        debugEnabled = value;
-                        break;
                     case 'uitexts':
                         if (value && typeof value === 'object') {
                             window.uiTexts = Object.assign({}, window.uiTexts || {}, value);
@@ -3464,39 +3461,15 @@
                     // Prüfe ob bereits eine alte Breite gespeichert ist
                     if (window.previousProgressWidths && window.previousProgressWidths[variable.id] !== undefined) {
                         const oldWidth = window.previousProgressWidths[variable.id];
-                        
-                        // ANIMATION VOR UPDATE: Prüfe ob Animation nötig ist
                         if (Math.abs(progressValue - oldWidth) > 0.1) {
-                            // Mark for animation - no DOM update yet!
-                            needsAnimation = true;
-                            animationTargetWidth = progressValue;
-                            widthForDOM = oldWidth; // Keep old width in DOM to enable animation
-                            
-                            // Store animation info for later triggering
-                            if (!window.pendingProgressAnimations) {
-                                window.pendingProgressAnimations = new Map();
-                            }
-                            window.pendingProgressAnimations.set(variable.id, {
-                                from: oldWidth,
-                                to: progressValue
-                            });
-                        } else {
-                            // Keine Animation nötig - DOM kann direkt aktualisiert werden
-                            widthForDOM = progressValue;
+                            // Alte Breite im DOM behalten, damit die Animation den Übergang fahren kann
+                            widthForDOM = oldWidth;
                         }
-                        
-                        // Erste Render: Speichere den Wert direkt
-                        if (!window.previousProgressWidths) {
-                            window.previousProgressWidths = {};
-                        }
-                        window.previousProgressWidths[variable.id] = progressValue;
-                    } else {
-                        // Erste Render: Speichere den Wert direkt
-                        if (!window.previousProgressWidths) {
-                            window.previousProgressWidths = {};
-                        }
-                        window.previousProgressWidths[variable.id] = progressValue;
                     }
+                    if (!window.previousProgressWidths) {
+                        window.previousProgressWidths = {};
+                    }
+                    window.previousProgressWidths[variable.id] = progressValue;
                     
                     // Target marker percent based on optional progressTarget
                     let targetPercent = null;
@@ -4049,19 +4022,6 @@
                 content += `</div>`; // Schließe variable-item div
                 
             return content;
-        }
-        
-        function updateVariableCache(list) {
-            try { window.variableDataCache = {}; } catch (_) {}
-            try {
-                const arr = Array.isArray(list) ? list : [];
-                for (const v of arr) {
-                    const id = (v && (v.variableId || v.id)) ? (v.variableId || v.id) : null;
-                    if (id !== null && id !== undefined) {
-                        window.variableDataCache[id] = v;
-                    }
-                }
-            } catch (_) {}
         }
         
         // Mini-Update-Funktion für Button-Variablen
