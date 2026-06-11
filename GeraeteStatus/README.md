@@ -116,5 +116,8 @@ Die Konfiguration gliedert sich in mehrere Bereiche der Form:
 Das Modul stellt aktuell keine öffentlichen PHP-Befehle bereit. Die komplette Funktionalität erfolgt über die Instanz-Konfiguration.
 
 ## Changelog
+- **2.1.0**
+  - Internes Refactoring: PHP-Backend in libs/-Traits modularisiert (module.php 3526 → ~700 Zeilen), Frontend-JS in IIFE strukturiert und nach Darstellungsarten zerlegt, toter Legacy-Code entfernt, strict_types eingeführt.
+  - Keine funktionalen Änderungen — bestehende Instanzen laufen ohne Neukonfiguration weiter.
 - **2.0.0**
   - Stable Release.
