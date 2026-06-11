@@ -2031,12 +2031,6 @@ class UniversalDeviceTile extends IPSModule
         return json_encode($result);
     }
 
-    public function UDST_UpdateList(int $id, int $Status): void
-    {
-        // $id is provided by the form system (InstanceID or row context) but not required here
-        $this->UpdateList($Status);
-    }
-
     public function UpdateList(int $StatusID)
     {
         $listData = []; // Hier sammeln Sie die Daten für Ihre Liste
@@ -2072,13 +2066,6 @@ class UniversalDeviceTile extends IPSModule
     // Konvertieren Sie Ihre Liste in JSON und aktualisieren Sie das Konfigurationsformular
     $jsonListData = json_encode($listData);
     $this->UpdateFormField('ProfilAssoziazionen', 'values', $jsonListData);
-    }
-    
-    // Temporary alias for cached form calls - can be removed after Symcon restart
-    public function UDST_UpdateDisplayTypeVisibility(int $id, string $displayType, ?int $rowIndex = null): void
-    {
-        // Forward to the new RequestAction system (displayType first, then optional row index/id)
-        $this->UpdateDisplayTypeVisibility($displayType, $rowIndex);
     }
     
     /**
