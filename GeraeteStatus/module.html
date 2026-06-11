@@ -8,6 +8,7 @@
     <style>
         /* Grundlegende Stildefinitionen für die neue dynamische Variablenliste */
 
+        /* ===== Basis & Layout-Variablen ========================================== */
         :root {
             --bildbreite: 40%;
             --bildtransparenz: 1;
@@ -47,6 +48,7 @@
             display: block;
         }
 
+        /* ===== Kachel-Layout (Bildspalte div1 / Inhalt div2, Bildposition) ======= */
         .main_container {
             width: 100%;
             max-width: 100%;
@@ -200,6 +202,7 @@
         
 
 
+        /* ===== Variablenliste & Gruppen ========================================== */
         /* Styles für dynamische Variablen */
         .variables-container {
             display: flex;
@@ -364,6 +367,7 @@
         }
 
         /* Fortschrittsbalken-Styles - verwende zentrale Konfiguration */
+        /* ===== Fortschrittsbalken & Target-Marker ================================ */
         .progress-container {
             margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
             margin-top: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
@@ -384,6 +388,7 @@
             min-height: var(--progress-bar-height, 20px);
         }
 
+        /* ===== Schieberegler ===================================================== */
         .slider-container {
             display: flex;
             align-items: center;
@@ -764,6 +769,7 @@
         }
 
         /* Button-Styles für Bool-Variablen */
+        /* ===== Schalter (Einzel- & Multi-Buttons) ================================ */
         .variable-button {
             display: inline-flex;
             align-items: center;
@@ -873,6 +879,7 @@
         }
 
         
+        /* ===== Statusbereich & Icons ============================================= */
         /* Status-Bereich Styles */
         .status-container {
             margin-bottom: var(--element-spacing, 8px);
