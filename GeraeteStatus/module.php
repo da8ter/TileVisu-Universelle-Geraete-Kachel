@@ -368,6 +368,60 @@ class UniversalDeviceTile extends IPSModule
         $this->SendDebug($context, $e->getMessage(), 0);
     }
 
+    /**
+     * Liefert den data-URI-Präfix für eine Bilddatei-Endung oder '' bei nicht unterstütztem Typ.
+     * Bewusst case-sensitiv (Verhalten der bisherigen switch-Blöcke).
+     */
+    private function mimePrefixFromExtension(string $ext): string
+    {
+        switch ($ext) {
+            case 'bmp':  return 'data:image/bmp;base64,';
+            case 'jpg':
+            case 'jpeg': return 'data:image/jpeg;base64,';
+            case 'gif':  return 'data:image/gif;base64,';
+            case 'png':  return 'data:image/png;base64,';
+            case 'ico':  return 'data:image/x-icon;base64,';
+            case 'webp': return 'data:image/webp;base64,';
+            default:     return '';
+        }
+    }
+
+    /**
+     * Erkennt den MIME-Type eines Bildes anhand der ersten Bytes (Magic Numbers).
+     */
+    private function detectMimeFromBinary(string $bin): string
+    {
+        $hdr = substr($bin, 0, 12);
+        if (strncmp($hdr, "\xFF\xD8\xFF", 3) === 0) return 'image/jpeg';
+        if (strncmp($hdr, "\x89PNG\x0D\x0A\x1A\x0A", 8) === 0) return 'image/png';
+        if (strncmp($hdr, 'GIF87a', 6) === 0 || strncmp($hdr, 'GIF89a', 6) === 0) return 'image/gif';
+        if (substr($hdr, 0, 4) === 'RIFF' && substr($hdr, 8, 4) === 'WEBP') return 'image/webp';
+        if (strncmp($hdr, 'BM', 2) === 0) return 'image/bmp';
+        return 'application/octet-stream';
+    }
+
+    /**
+     * Formatiert einen Objektnamen mit Parent-Namen als "Name (Parent)".
+     * Optional kann der Name überschrieben werden (z. B. durch ein konfiguriertes Label).
+     */
+    private function formatObjectWithParent(int $objectId, string $overrideName = ''): string
+    {
+        $obj = IPS_GetObject($objectId);
+        $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
+        if ($overrideName !== '') {
+            $name = $overrideName;
+        }
+        $parentName = '';
+        if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
+            $parent = IPS_GetObject($obj['ParentID']);
+            $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
+        }
+        if ($name !== '' && $parentName !== '') {
+            return $name . ' (' . $parentName . ')';
+        }
+        return $name;
+    }
+
     private function IsKernelReady(): bool
     {
         if (!function_exists('IPS_GetKernelRunlevel') || !defined('KR_READY')) {
@@ -488,17 +542,7 @@ class UniversalDeviceTile extends IPSModule
         if ($displayType === 'image') {
             $mid = intval($row['ImageMedia'] ?? 0);
             if ($mid > 0 && IPS_MediaExists($mid)) {
-                $obj = IPS_GetObject($mid);
-                $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
-                $parentName = '';
-                if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
-                    $parent = IPS_GetObject($obj['ParentID']);
-                    $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
-                }
-                if ($name !== '' && $parentName !== '') {
-                    return $name . ' (' . $parentName . ')';
-                }
-                return $name;
+                return $this->formatObjectWithParent($mid);
             }
             return '';
         }
@@ -506,52 +550,20 @@ class UniversalDeviceTile extends IPSModule
         if (($displayType === 'button') && isset($row['OpenObjectId'])) {
             $openObjectId = intval($row['OpenObjectId']);
             if ($openObjectId > 1 && IPS_ObjectExists($openObjectId)) {
-                $obj = IPS_GetObject($openObjectId);
-                $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
-                $parentName = '';
-                if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
-                    $parent = IPS_GetObject($obj['ParentID']);
-                    $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
-                }
-                if ($name !== '' && $parentName !== '') {
-                    return $name . ' (' . $parentName . ')';
-                }
-                return $name;
+                return $this->formatObjectWithParent($openObjectId);
             }
         }
-        // Script-Buttons ohne Variable: Script-Namen anzeigen
+        // Script-Buttons ohne Variable: Script-Namen anzeigen (Label überschreibt den Namen)
         if (($displayType === 'button') && isset($row['ScriptID'])) {
             $scriptId = intval($row['ScriptID']);
             if ($scriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($scriptId)) {
-                $obj = IPS_GetObject($scriptId);
-                $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
-                $parentName = '';
-                if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
-                    $parent = IPS_GetObject($obj['ParentID']);
-                    $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
-                }
-                if (!empty($row['Label'])) {
-                    $name = $row['Label'];
-                }
-                if ($name !== '' && $parentName !== '') {
-                    return $name . ' (' . $parentName . ')';
-                }
-                return $name;
+                $override = !empty($row['Label']) ? strval($row['Label']) : '';
+                return $this->formatObjectWithParent($scriptId, $override);
             }
         }
         $vid = intval($row['Variable'] ?? 0);
         if ($vid > 0 && IPS_VariableExists($vid)) {
-            $obj = IPS_GetObject($vid);
-            $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
-            $parentName = '';
-            if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
-                $parent = IPS_GetObject($obj['ParentID']);
-                $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
-            }
-            if ($name !== '' && $parentName !== '') {
-                return $name . ' (' . $parentName . ')';
-            }
-            return $name;
+            return $this->formatObjectWithParent($vid);
         }
         return '';
     }
@@ -926,13 +938,7 @@ class UniversalDeviceTile extends IPSModule
         }
         $MAX_SIZE = 5 * 1024 * 1024;
         $detectMime = function(string $bin) {
-            $hdr = substr($bin, 0, 12);
-            if (strncmp($hdr, "\xFF\xD8\xFF", 3) === 0) return 'image/jpeg';
-            if (strncmp($hdr, "\x89PNG\x0D\x0A\x1A\x0A", 8) === 0) return 'image/png';
-            if (strncmp($hdr, 'GIF87a', 6) === 0 || strncmp($hdr, 'GIF89a', 6) === 0) return 'image/gif';
-            if (substr($hdr, 0, 4) === 'RIFF' && substr($hdr, 8, 4) === 'WEBP') return 'image/webp';
-            if (strncmp($hdr, 'BM', 2) === 0) return 'image/bmp';
-            return 'application/octet-stream';
+            return $this->detectMimeFromBinary($bin);
         };
         $sendNotModified = function(string $etag = '', int $lastMod = 0) {
             $ifNoneMatch = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim($_SERVER['HTTP_IF_NONE_MATCH']) : '';
@@ -1990,34 +1996,8 @@ class UniversalDeviceTile extends IPSModule
             $image = IPS_GetMedia($imageID);
             if ($image['MediaType'] === MEDIATYPE_IMAGE) {
                 $imageFile = explode('.', $image['MediaFile']);
-                $imageContent = '';
-                // Falls ja, ermittle den Anfang der src basierend auf dem Dateitypen
-                switch (end($imageFile)) {
-                    case 'bmp':
-                        $imageContent = 'data:image/bmp;base64,';
-                        break;
-
-                    case 'jpg':
-                    case 'jpeg':
-                        $imageContent = 'data:image/jpeg;base64,';
-                        break;
-
-                    case 'gif':
-                        $imageContent = 'data:image/gif;base64,';
-                        break;
-
-                    case 'png':
-                        $imageContent = 'data:image/png;base64,';
-                        break;
-
-                    case 'ico':
-                        $imageContent = 'data:image/x-icon;base64,';
-                        break;
-
-                    case 'webp':
-                        $imageContent = 'data:image/webp;base64,';
-                        break;
-                }
+                // Ermittle den Anfang der src basierend auf dem Dateitypen
+                $imageContent = $this->mimePrefixFromExtension((string)end($imageFile));
 
                 // Nur fortfahren, falls Inhalt gesetzt wurde. Ansonsten ist das Bild kein unterstützter Dateityp
                 if ($imageContent) {
