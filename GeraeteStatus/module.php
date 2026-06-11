@@ -1303,71 +1303,66 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // Nachrichten von der HTML-Darstellung schicken immer den Ident passend zur Eigenschaft und im Wert die Differenz, welche auf die Variable gerechnet werden soll
-    $variableID = $Ident;
-    if (!IPS_VariableExists($variableID)) {
-        // Falls eine Script-ID direkt gesendet wurde (z. B. numerisch), führe Script aus
-        $maybeScriptId = intval($Ident);
-        if ($maybeScriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($maybeScriptId)) {
-            try {
-                IPS_RunScript($maybeScriptId);
-            } catch (Throwable $e) {
-                $this->LogCaughtThrowable(__FUNCTION__ . ':RunScriptByIdent', $e);
+        $variableID = $Ident;
+        if (!IPS_VariableExists($variableID)) {
+            // Falls eine Script-ID direkt gesendet wurde (z. B. numerisch), führe Script aus
+            $maybeScriptId = intval($Ident);
+            if ($maybeScriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($maybeScriptId)) {
+                try {
+                    IPS_RunScript($maybeScriptId);
+                } catch (Throwable $e) {
+                    $this->LogCaughtThrowable(__FUNCTION__ . ':RunScriptByIdent', $e);
+                }
             }
+            return;
         }
-        return;
-    }
-    
-    // Ermittle Variablentyp für unterschiedliche Behandlung
-    $variable = IPS_GetVariable($variableID);
-    $variableType = $variable['VariableType'];
-    
-    if ($variableType === VARIABLETYPE_BOOLEAN) {
-        // Boolean-Variable: Toggle-Verhalten (wie bisher)
-        $currentValue = GetValue($variableID);
-        $newValue = !$currentValue;
-        RequestAction($variableID, $newValue);
-    } else if ($variableType === VARIABLETYPE_INTEGER) {
-        // Integer-Variable: Verwende den übergebenen Wert direkt (für Multi-Button-Interface)
-        $newValue = intval($value);
-        $currentValue = GetValue($variableID);
-        
-        RequestAction($variableID, $newValue);
-    } else if ($variableType === VARIABLETYPE_FLOAT) {
-        $newValue = floatval($value);
-        $bounds = $this->GetProgressMinMax($variableID);
-        $minV = isset($bounds['min']) ? floatval($bounds['min']) : 0.0;
-        $maxV = isset($bounds['max']) ? floatval($bounds['max']) : 100.0;
-        if ($maxV < $minV) { $tmp = $minV; $minV = $maxV; $maxV = $tmp; }
-        $cfg = $this->GetSliderStepAndDigits($variableID);
-        $step = isset($cfg['step']) ? floatval($cfg['step']) : 0.0;
-        $digits = isset($cfg['digits']) ? intval($cfg['digits']) : 0;
-        $range = $maxV - $minV;
-        if ($range <= 0) { $minV = 0.0; $maxV = 100.0; $range = 100.0; }
-        if ($step <= 0) {
-            if ($digits > 0) {
-                $step = pow(10, -$digits);
-            } else {
-                $step = $range / 100.0;
+
+        // Ermittle Variablentyp für unterschiedliche Behandlung
+        $variable = IPS_GetVariable($variableID);
+        $variableType = $variable['VariableType'];
+
+        if ($variableType === VARIABLETYPE_BOOLEAN) {
+            // Boolean-Variable: Toggle-Verhalten (wie bisher)
+            $newValue = !GetValue($variableID);
+            RequestAction($variableID, $newValue);
+        } else if ($variableType === VARIABLETYPE_INTEGER) {
+            // Integer-Variable: Verwende den übergebenen Wert direkt (für Multi-Button-Interface)
+            $newValue = intval($value);
+            RequestAction($variableID, $newValue);
+        } else if ($variableType === VARIABLETYPE_FLOAT) {
+            $newValue = floatval($value);
+            $bounds = $this->GetProgressMinMax($variableID);
+            $minV = isset($bounds['min']) ? floatval($bounds['min']) : 0.0;
+            $maxV = isset($bounds['max']) ? floatval($bounds['max']) : 100.0;
+            if ($maxV < $minV) { $tmp = $minV; $minV = $maxV; $maxV = $tmp; }
+            $cfg = $this->GetSliderStepAndDigits($variableID);
+            $step = isset($cfg['step']) ? floatval($cfg['step']) : 0.0;
+            $digits = isset($cfg['digits']) ? intval($cfg['digits']) : 0;
+            $range = $maxV - $minV;
+            if ($range <= 0) { $minV = 0.0; $maxV = 100.0; $range = 100.0; }
+            if ($step <= 0) {
+                if ($digits > 0) {
+                    $step = pow(10, -$digits);
+                } else {
+                    $step = $range / 100.0;
+                }
             }
+            $ratio = ($newValue - $minV) / $step;
+            $rounded = round($ratio);
+            $newValue = $minV + ($rounded * $step);
+            if ($digits >= 0) { $newValue = floatval(number_format($newValue, $digits, '.', '')); }
+            if ($newValue < $minV) $newValue = $minV;
+            if ($newValue > $maxV) $newValue = $maxV;
+            RequestAction($variableID, $newValue);
+        } else if ($variableType === VARIABLETYPE_STRING) {
+            // String-Variable: Verwende den übergebenen String-Wert direkt (für Multi-Button-Interface)
+            $newValue = strval($value);
+            RequestAction($variableID, $newValue);
+        } else {
+            // Andere Variablentypen: Fallback auf Toggle-Verhalten
+            $newValue = !GetValue($variableID);
+            RequestAction($variableID, $newValue);
         }
-        $ratio = ($newValue - $minV) / $step;
-        $rounded = round($ratio);
-        $newValue = $minV + ($rounded * $step);
-        if ($digits >= 0) { $newValue = floatval(number_format($newValue, $digits, '.', '')); }
-        if ($newValue < $minV) $newValue = $minV;
-        if ($newValue > $maxV) $newValue = $maxV;
-        RequestAction($variableID, $newValue);
-    } else if ($variableType === VARIABLETYPE_STRING) {
-        // String-Variable: Verwende den übergebenen String-Wert direkt (für Multi-Button-Interface)
-        $newValue = strval($value);
-        $currentValue = GetValue($variableID);
-        RequestAction($variableID, $newValue);
-    } else {
-        // Andere Variablentypen: Fallback auf Toggle-Verhalten
-        $currentValue = GetValue($variableID);
-        $newValue = !$currentValue;
-        RequestAction($variableID, $newValue);
-    }
     }
 
 
@@ -1412,113 +1407,6 @@ class UniversalDeviceTile extends IPSModule
         // Script-Tag schließen für das vereinheitlichte Asset-System
         $assets .= '</script>';
         
-        // Custom image handling (legacy support)
-        if ($bildauswahl != '0' && $bildauswahl != '1') {
-            // Prüfe vorweg, ob ein Bild ausgewählt wurde
-        $imageID_Bild_An = $this->ReadPropertyInteger('Bild_An');
-        if (IPS_MediaExists($imageID_Bild_An)) {
-            $image = IPS_GetMedia($imageID_Bild_An);
-            if ($image['MediaType'] === MEDIATYPE_IMAGE) {
-                $imageFile = explode('.', $image['MediaFile']);
-                $imageContent = '';
-                // Falls ja, ermittle den Anfang der src basierend auf dem Dateitypen
-                switch (end($imageFile)) {
-                    case 'bmp':
-                        $imageContent = 'data:image/bmp;base64,';
-                        break;
-
-                    case 'jpg':
-                    case 'jpeg':
-                        $imageContent = 'data:image/jpeg;base64,';
-                        break;
-
-                    case 'gif':
-                        $imageContent = 'data:image/gif;base64,';
-                        break;
-
-                    case 'png':
-                        $imageContent = 'data:image/png;base64,';
-                        break;
-
-                    case 'ico':
-                        $imageContent = 'data:image/x-icon;base64,';
-                        break;
-
-                    case 'webp':
-                        $imageContent = 'data:image/webp;base64,';
-                        break;
-                }
-
-                // Nur fortfahren, falls Inhalt gesetzt wurde. Ansonsten ist das Bild kein unterstützter Dateityp
-                if ($imageContent) {
-                    // Hänge base64-codierten Inhalt des Bildes an
-                    $imageContent .= IPS_GetMediaContent($imageID_Bild_An);
-                }
-
-            }
-        }
-        else {
-            $imageContent = 'data:image/png;base64,';
-
-            $imageContent .= base64_encode(file_get_contents(__DIR__ . '/../imgs/transparent.webp'));
-
-            
-        } 
-
-                // Prüfe vorweg, ob ein Bild ausgewählt wurde
-                $imageID_Bild_Aus = $this->ReadPropertyInteger('Bild_Aus');
-                if (IPS_MediaExists($imageID_Bild_Aus)) {
-                    $image2 = IPS_GetMedia($imageID_Bild_Aus);
-                    if ($image2['MediaType'] === MEDIATYPE_IMAGE) {
-                        $imageFile2 = explode('.', $image2['MediaFile']);
-                        $imageContent2 = '';
-                        // Falls ja, ermittle den Anfang der src basierend auf dem Dateitypen
-                        switch (end($imageFile2)) {
-                            case 'bmp':
-                                $imageContent2 = 'data:image/bmp;base64,';
-                                break;
-        
-                            case 'jpg':
-                            case 'jpeg':
-                                $imageContent2 = 'data:image/jpeg;base64,';
-                                break;
-        
-                            case 'gif':
-                                $imageContent2 = 'data:image/gif;base64,';
-                                break;
-        
-                            case 'png':
-                                $imageContent2 = 'data:image/png;base64,';
-                                break;
-        
-                            case 'ico':
-                                $imageContent2 = 'data:image/x-icon;base64,';
-                                break;
-
-                            case 'webp':
-                                $imageContent2 = 'data:image/webp;base64,';
-                                break;
-                        }
-        
-                        // Nur fortfahren, falls Inhalt gesetzt wurde. Ansonsten ist das Bild kein unterstützter Dateityp
-                        if ($imageContent2) {
-                            // Hänge base64-codierten Inhalt des Bildes an
-                            $imageContent2 .= IPS_GetMediaContent($imageID_Bild_Aus);
-                        }
-        
-                    }
-                }
-                else {
-                    $imageContent2 = 'data:image/png;base64,';
-
-                    $imageContent2 .= base64_encode(file_get_contents(__DIR__ . '/../imgs/transparent.webp'));
-
-                    
-                }  
-
-            // Custom image assets already handled by unified asset system above
-            // No need for separate hardcoded assets - this is now integrated
-        }
 
 
          // Formulardaten lesen und Statusmapping Array für Bild und Farbe erstellen
@@ -1529,9 +1417,6 @@ class UniversalDeviceTile extends IPSModule
             $statusMappingImage[$item['AssoziationValue']] = $item['Bildauswahl'];
                       
             $statusMappingColor[$item['AssoziationValue']] = $item['StatusColor'] === -1 ? "" : sprintf('%06X', $item['StatusColor']);
-
-        // StatusBalken wurde entfernt - wird nicht mehr verwendet
-
         }
 
         $statusImagesJson = json_encode($statusMappingImage);
@@ -1946,7 +1831,6 @@ class UniversalDeviceTile extends IPSModule
                             ];
                         }
                     }
-                    // Spezielle Behandlung für Zeitwerte entfernt (nicht verwendet)
                     
                     $variables[] = $variableData;
                 } else if ((($variable['DisplayType'] ?? 'text') === 'image')) {
@@ -2484,21 +2368,12 @@ class UniversalDeviceTile extends IPSModule
     }
 
 
-    // Entfernte Helferfunktionen (CheckAndGetValueFormatted, GetColor, GetColorRGB) wurden bereinigt, da ungenutzt
 
     private function GetIcon($id) {
         try {
             $variable = IPS_GetVariable($id);
-            
             $Value = GetValue($id);
-            
             $icon = "";
-            
-            // Debug-Ausgabe für Variable
-            $objName = IPS_GetObject($id)['ObjectName'];
-            
-            // Vollständige Variable und Objekt Info
-            $obj = IPS_GetObject($id);
         } catch (Exception $e) {
             return 'Transparent'; // Fallback bei Fehler
         }
