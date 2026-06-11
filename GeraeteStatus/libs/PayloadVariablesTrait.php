@@ -1,0 +1,399 @@
+<?php
+
+namespace UDT;
+
+/**
+ * Aufbau des variables[]-Payloads aus der konfigurierten Variablenliste:
+ * alle Darstellungsarten (text/progress/slider/button/image) inkl.
+ * SecondVariable, variablenloser Bild-/Script-/OpenObject-Zeilen.
+ */
+trait PayloadVariablesTrait
+{
+    /**
+     * Die konfigurierte Variablenliste als variables[] in das Payload schreiben.
+     */
+    private function appendVariablesPayload(array &$result): void
+    {
+        // Lade die konfigurierte Variablenliste
+        $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
+        
+        // Sammle Informationen für jede konfigurierte Variable (Array-Reihenfolge durch changeOrder)
+        if (is_array($variablesList)) {
+            $variables = [];
+            foreach ($variablesList as $index => $variable) {
+                
+               
+                try {
+                $varId = $variable['Variable'] ?? 'NONE';
+                $varType = 'UNKNOWN';
+                if (isset($variable['Variable']) && IPS_VariableExists($variable['Variable'])) {
+                    $varInfo = IPS_GetVariable($variable['Variable']);
+                    $varType = $varInfo['VariableType'];
+                }
+                $typeString = ($varType === 3) ? 'TEXT' : $varType;
+
+                
+                
+                if (isset($variable['Variable']) && $variable['Variable'] > 0 && IPS_VariableExists($variable['Variable'])) {
+                    
+                    // Verwende Variablennamen als Fallback wenn kein Label gesetzt ist
+                    $label = $variable['Label'] ?? '';
+                    if (empty($label)) {
+                        $variableObject = IPS_GetObject($variable['Variable']);
+                        $label = $variableObject['ObjectName'];
+                    }
+                    
+                    
+                    
+                   
+                    // PROTECTION: Try-Catch um GetIcon call, um Abstürze zu verhindern
+                    try {
+                        $icon = $this->GetIcon($variable['Variable']);
+                        
+                        
+                        
+                        
+                    } catch (\Exception $e) {
+                        $icon = '';
+                        
+                        
+                        
+                        
+                    } catch (\Error $e) {
+                        $icon = '';
+                    
+                    }
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    $variableInfo = IPS_GetVariable($variable['Variable']);
+                    
+                    
+                    
+                    // Extrahiere Button-Farben aus Profil/Darstellung für Bool-Variablen
+                    $buttonColors = $this->GetButtonColors($variable['Variable']);
+                    
+                    // Extrahiere Variable-Associations für Button-Erstellung (Integer + String)
+                    $variableAssociations = null;
+                    
+                    
+                    
+                    if (($variable['DisplayType'] ?? 'text') === 'button') {
+                        if ($variableInfo['VariableType'] === VARIABLETYPE_INTEGER) {
+                            $variableAssociations = $this->GetIntegerAssociations($variable['Variable']);
+                        } elseif ($variableInfo['VariableType'] === VARIABLETYPE_STRING) {
+                            $variableAssociations = $this->GetStringAssociations($variable['Variable']);
+                        } elseif ($variableInfo['VariableType'] === VARIABLETYPE_BOOLEAN) {
+                            // Für Boolean: immer Associations aus Profil/Presentation ermitteln (Fallback intern geregelt)
+                            $variableAssociations = $this->GetBooleanAssociations($variable['Variable']);
+                        } else {
+                            $variableAssociations = null;
+                        }
+                    } else {
+                        $variableAssociations = null;
+                    }
+                    
+                    // Extrahiere Min/Max-Werte aus Variablenprofil für Progress-Balken
+                    $progressMinMax = $this->GetProgressMinMax($variable['Variable']);
+                    
+                    // Ermittle Progressbar Active Status basierend auf ProfilAssoziationen
+                    $progressbarActive = true; // Standard: aktiv
+                    $profilAssoziationen = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+                    if (is_array($profilAssoziationen)) {
+                        $statusId = $this->ReadPropertyInteger('Status');
+                        if ($statusId > 0 && IPS_VariableExists($statusId)) {
+                            $currentStatusValue = GetValue($statusId);
+                            $matchedAssoz = $this->FindMatchingAssociation($profilAssoziationen, $currentStatusValue);
+                            if ($matchedAssoz !== null) {
+                                $progressbarActive = $matchedAssoz['ProgressbarActive'] ?? true;
+                            }
+                        }
+                    }
+                    
+
+                    
+                    // SPECIAL: Für Boolean-Variablen mit PRESENTATION GUID, bei denen GetIcon leer ist
+                    // aber die Assoziationen Icons enthalten, verwende das Association-Icon als Haupt-Icon
+                    if (($icon === '' || $icon === 'Transparent') && $variableInfo['VariableType'] == VARIABLETYPE_BOOLEAN && !empty($variableAssociations)) {
+                        foreach ($variableAssociations as $assoc) {
+                            if (!empty($assoc['icon'])) {
+                                $icon = $assoc['icon'];
+                                break;
+                            }
+                        }
+                    }
+                    
+                  
+                    // Backend-basierte Progressbar-Deaktivierung: Überschreibe Werte wenn deaktiviert
+                    $finalFormattedValue = GetValueFormatted($variable['Variable']);
+                    $finalRawValue = GetValue($variable['Variable']);
+                    
+                    if (!$progressbarActive && (($variable['DisplayType'] ?? 'text') === 'progress')) {
+                        // Progressbar deaktiviert: Zeige "-" für alle Werte und mache Text/Icon 50% transparent
+                        $finalRawValue = 0;
+                        $finalFormattedValue = '-';
+                    }
+                    
+                    $variableData = [
+                        'id' => $variable['Variable'],
+                        'label' => $label,
+                        'displayType' => $variable['DisplayType'] ?? 'text',
+                        'variableType' => $variableInfo['VariableType'], // Für Button-Validierung
+                        'group' => $variable['Group'] ?? 'keine Gruppe', // Group-Information für Frontend-Gruppierung
+                        'showIcon' => $variable['ShowIcon'],
+                        'showLabel' => $variable['ShowLabel'] ?? true,
+                        'showValue' => $variable['ShowValue'] ?? true,
+                        'fontSize' => $variable['FontSize'] ?? 12,
+                        'textColor' => isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000',
+                        'isTextColorTransparent' => isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215),
+                        'progressColor1' => isset($variable['ProgressColor1']) ? '#' . sprintf('%06X', $variable['ProgressColor1']) : '#4CAF50',
+                        'progressColor2' => isset($variable['ProgressColor2']) ? '#' . sprintf('%06X', $variable['ProgressColor2']) : '#2196F3',
+                        // Slider-spezifische Farben (separat von Progress)
+                        'sliderColor1' => isset($variable['SliderColor1']) ? '#' . sprintf('%06X', $variable['SliderColor1']) : (isset($variable['ProgressColor1']) ? '#' . sprintf('%06X', $variable['ProgressColor1']) : '#4CAF50'),
+                        'sliderColor2' => isset($variable['SliderColor2']) ? '#' . sprintf('%06X', $variable['SliderColor2']) : (isset($variable['ProgressColor2']) ? '#' . sprintf('%06X', $variable['ProgressColor2']) : '#2196F3'),
+                        'boolButtonColor' => isset($variable['boolButtonColor']) ? '#' . sprintf('%06X', $variable['boolButtonColor']) : '#CCCCCC',
+                        'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
+                        'buttonWidth' => $variable['ButtonWidth'] ?? 120,
+                        'showBorderLine' => $variable['ShowBorderLine'] ?? false,
+                        'alignment' => $variable['VerticalAlignment'] ?? 'left',
+                        'progressMin' => $progressMinMax['min'],
+                        'progressMax' => $progressMinMax['max'],
+                        'formattedValue' => $finalFormattedValue, // Backend-überschriebener Wert
+                        'rawValue' => $finalRawValue, // Backend-überschriebener Wert
+                        'icon' => $icon,
+                        'progressbarActive' => $progressbarActive, // Progressbar Active Status
+                        'progressbarInactive' => (!$progressbarActive && (($variable['DisplayType'] ?? 'text') === 'progress')), // 50% Transparenz Flag nur für Progress
+                        'useSecondVariableAsTarget' => (bool)($variable['UseSecondVariableAsTarget'] ?? false),
+                        'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
+                        'scriptId' => intval($variable['ScriptID'] ?? 0),
+                        'openObjectId' => intval($variable['OpenObjectId'] ?? 0),
+                    ];
+
+                    // Bild (Symcon Medienobjekt) als eigene Darstellungsart
+                    if (($variable['DisplayType'] ?? 'text') === 'image') {
+                        $imageId = intval($variable['ImageMedia'] ?? 0);
+                        $variableData['imageMediaId'] = $imageId;
+                        $variableData['imageUrl'] = $this->BuildImageHookUrl($imageId);
+                        // Image width now in percent (1-100), default 40
+                        $variableData['imageWidth'] = max(1, min(100, intval($variable['ImageWidth'] ?? 40)));
+                        $variableData['imageBorderRadius'] = intval($variable['ImageBorderRadius'] ?? 6);
+                    }
+                    // Slider Zusatzdaten
+                    if (($variable['DisplayType'] ?? 'text') === 'slider') {
+                        $sd = $this->GetSliderStepAndDigits($variable['Variable']);
+                        $variableData['sliderStep'] = isset($sd['step']) ? $sd['step'] : null;
+                        $variableData['sliderDigits'] = isset($sd['digits']) ? $sd['digits'] : null;
+                    }
+                    
+                    // Vorbereitung für SecondVariable als Marker
+                    $useSecondAsTarget = !empty($variable['UseSecondVariableAsTarget']);
+                    $secondPresent = false; $secondId = 0; $secondLabel = ''; $secondFinalRawValue = 0; $secondFinalFormattedValue = '';
+
+                    // Zweite Variable für Progress-Bars hinzufügen
+                    if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0 && IPS_VariableExists($variable['SecondVariable'])) {
+                        // Icon für zweite Variable ermitteln
+                        $secondIcon = $this->GetIcon($variable['SecondVariable']);
+                        
+                        // SPECIAL: Für Boolean-Variablen mit PRESENTATION GUID, bei denen GetIcon leer ist
+                        // aber die Assoziationen Icons enthalten, verwende das Association-Icon als Haupt-Icon
+                        if (($secondIcon === '' || $secondIcon === 'Transparent') && $variableInfo['VariableType'] == VARIABLETYPE_BOOLEAN && !empty($variableAssociations)) {
+                            foreach ($variableAssociations as $assoc) {
+                                if (!empty($assoc['icon'])) {
+                                    $secondIcon = $assoc['icon'];
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Label für zweite Variable ermitteln
+                        $secondLabel = !empty($variable['SecondVariableLabel']) ? $variable['SecondVariableLabel'] : IPS_GetName($variable['SecondVariable']);
+                        
+                        // Backend-basierte Deaktivierung auch für zweite Variable
+                        $secondFinalFormattedValue = GetValueFormatted($variable['SecondVariable']);
+                        $secondFinalRawValue = GetValue($variable['SecondVariable']);
+                        
+                        if (!$progressbarActive) {
+                            // Progressbar deaktiviert: Zeige "-" für zweite Variable und mache Text/Icon 50% transparent
+                            $secondFinalRawValue = 0;
+                            $secondFinalFormattedValue = '-';
+                        }
+                        
+                        $variableData['secondVariable'] = [
+                            'id' => $variable['SecondVariable'],
+                            'label' => $secondLabel,
+                            'formattedValue' => $secondFinalFormattedValue, // Backend-überschriebener Wert
+                            'rawValue' => $secondFinalRawValue, // Backend-überschriebener Wert
+                            'icon' => $secondIcon,
+                            'showIcon' => ($variable['SecondVariableShowIcon'] ?? true) && !empty($secondIcon) && $secondIcon !== 'Transparent',
+                            'showLabel' => $variable['SecondVariableShowLabel'] ?? true,
+                            'showValue' => $variable['SecondVariableShowValue'] ?? true
+                        ];
+
+                        // Für Marker-Nutzung merken
+                        $secondPresent = true;
+                        $secondId = (int)$variable['SecondVariable'];
+                        // Werte bereits in $secondFinal* enthalten
+                    }
+                    // Marker nur aus SecondVariable, wenn konfiguriert
+                    if (($variable['DisplayType'] ?? 'text') === 'progress') {
+                        if ($useSecondAsTarget && $secondPresent) {
+                            $variableData['progressTarget'] = [
+                                'id' => $secondId,
+                                'label' => $secondLabel,
+                                'formattedValue' => $secondFinalFormattedValue,
+                                'rawValue' => $secondFinalRawValue
+                            ];
+                        }
+                    }
+                    
+                    $variables[] = $variableData;
+                } else if ((($variable['DisplayType'] ?? 'text') === 'image')) {
+                    // SUPPORT IMAGE ROWS WITHOUT A VARIABLE ID
+                    $imageId = intval($variable['ImageMedia'] ?? 0);
+                    // Label-Fallback
+                    $label = $variable['Label'] ?? '';
+                    // Alignment/Textfarbe
+                    $textColor = isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000';
+                    $isTextColorTransparent = isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215);
+                    $variables[] = [
+                        'id' => 'image_' . $index, // synthetische ID
+                        'label' => $label,
+                        'displayType' => 'image',
+                        'group' => $variable['Group'] ?? 'keine Gruppe',
+                        'showGroupName' => $variable['ShowGroupName'] ?? false,
+                        'showIcon' => false,
+                        'showLabel' => false,
+                        'showValue' => false,
+                        'fontSize' => $variable['FontSize'] ?? 12,
+                        'textColor' => $textColor,
+                        'isTextColorTransparent' => $isTextColorTransparent,
+                        'alignment' => $variable['VerticalAlignment'] ?? 'left',
+                        'imageMediaId' => $imageId,
+                        'imageUrl' => $this->BuildImageHookUrl($imageId),
+                        // Image width now in percent (1-100), default 40
+                        'imageWidth' => max(1, min(100, intval($variable['ImageWidth'] ?? 40))),
+                        'imageBorderRadius' => intval($variable['ImageBorderRadius'] ?? 6),
+                        'showBorderLine' => false,
+                        // folgende Felder für API-Konsistenz, ohne Relevanz
+                        'variableType' => 3,
+                        'progressbarActive' => true,
+                        'progressbarInactive' => false,
+                    ];
+                } else if ((($variable['DisplayType'] ?? 'text') === 'button') && intval($variable['ScriptID'] ?? 0) > 0) {
+                    // SUPPORT BUTTON ROWS WITHOUT A VARIABLE ID: Script-Button (stateless)
+                    $scriptId = intval($variable['ScriptID']);
+                    // Label ermitteln
+                    $label = $variable['Label'] ?? '';
+                    // Wenn kein eigenes Label gesetzt ist, verwende den Skript-Namen
+                    if ($label === '' && IPS_ScriptExists($scriptId)) {
+                        $obj = IPS_GetObject($scriptId);
+                        if (isset($obj['ObjectName'])) {
+                            $label = $obj['ObjectName'];
+                        }
+                    }
+                    // Script-Objekt-Icon (falls gesetzt) mappen
+                    $scriptIcon = '';
+                    try {
+                        if (IPS_ScriptExists($scriptId)) {
+                            $obj = IPS_GetObject($scriptId);
+                            $objIcon = isset($obj['ObjectIcon']) ? trim($obj['ObjectIcon']) : '';
+                            if ($objIcon !== '') {
+                                $scriptIcon = $this->MapIconToFontAwesome($objIcon);
+                            }
+                        }
+                    } catch (\Exception $e) { /* ignore */ }
+                    // Farben/Styles wie bei anderen Buttons
+                    $textColor = isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000';
+                    $isTextColorTransparent = isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215);
+                    $variables[] = [
+                        'id' => 'script_' . $scriptId,
+                        'label' => $label,
+                        'displayType' => 'button',
+                        'variableType' => 0, // Behandle als Bool-Button für Rendering
+                        'group' => $variable['Group'] ?? 'keine Gruppe',
+                        'showGroupName' => $variable['ShowGroupName'] ?? false,
+                        'showIcon' => $variable['ShowIcon'] ?? false,
+                        'showLabel' => $variable['ShowLabel'] ?? true,
+                        'showValue' => $variable['ShowValue'] ?? false,
+                        'fontSize' => $variable['FontSize'] ?? 12,
+                        'textColor' => $textColor,
+                        'isTextColorTransparent' => $isTextColorTransparent,
+                        'alignment' => $variable['VerticalAlignment'] ?? 'left',
+                        'formattedValue' => '',
+                        'rawValue' => 0,
+                        'icon' => $scriptIcon,
+                        'boolButtonColor' => isset($variable['boolButtonColor']) ? '#' . sprintf('%06X', $variable['boolButtonColor']) : '#CCCCCC',
+                        'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
+                        'buttonWidth' => $variable['ButtonWidth'] ?? 120,
+                        'progressbarActive' => true,
+                        'progressbarInactive' => false,
+                        'scriptId' => $scriptId,
+                        'openObjectId' => intval($variable['OpenObjectId'] ?? 0),
+                    ];
+                } else if ((($variable['DisplayType'] ?? 'text') === 'button') && intval($variable['OpenObjectId'] ?? 0) > 1) {
+                    // SUPPORT BUTTON ROWS WITHOUT VARIABLE OR SCRIPT: OpenObject-Button (stateless)
+                    $openObjectId = intval($variable['OpenObjectId']);
+                    $label = $variable['Label'] ?? '';
+                    $objectIcon = '';
+                    try {
+                        if (IPS_ObjectExists($openObjectId)) {
+                            $obj = IPS_GetObject($openObjectId);
+                            if ($label === '' && isset($obj['ObjectName'])) {
+                                $label = $obj['ObjectName'];
+                            }
+                            $objIcon = isset($obj['ObjectIcon']) ? trim($obj['ObjectIcon']) : '';
+                            if ($objIcon !== '') {
+                                $objectIcon = $this->MapIconToFontAwesome($objIcon);
+                            }
+                        }
+                    } catch (\Exception $e) { /* ignore */ }
+                    $textColor = isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000';
+                    $isTextColorTransparent = isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215);
+                    $variables[] = [
+                        'id' => 'object_' . $openObjectId,
+                        'label' => $label,
+                        'displayType' => 'button',
+                        'variableType' => 0, // wie Bool-Button rendern
+                        'group' => $variable['Group'] ?? 'keine Gruppe',
+                        'showGroupName' => $variable['ShowGroupName'] ?? false,
+                        'showIcon' => $variable['ShowIcon'] ?? false,
+                        'showLabel' => $variable['ShowLabel'] ?? true,
+                        'showValue' => $variable['ShowValue'] ?? false,
+                        'fontSize' => $variable['FontSize'] ?? 12,
+                        'textColor' => $textColor,
+                        'isTextColorTransparent' => $isTextColorTransparent,
+                        'alignment' => $variable['VerticalAlignment'] ?? 'left',
+                        'formattedValue' => '',
+                        'rawValue' => 1,
+                        'icon' => $objectIcon,
+                        'boolButtonColor' => isset($variable['boolButtonColor']) ? '#' . sprintf('%06X', $variable['boolButtonColor']) : '#CCCCCC',
+                        'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
+                        'buttonWidth' => $variable['ButtonWidth'] ?? 120,
+                        'progressbarActive' => true,
+                        'progressbarInactive' => false,
+                        'scriptId' => 0,
+                        'openObjectId' => $openObjectId,
+                    ];
+                }
+                
+                
+                
+                } catch (\Exception $e) {
+
+                    // Continue mit nächster Variable statt abzubrechen
+                    continue;
+                } catch (\Error $e) {
+
+                    // Continue mit nächster Variable statt abzubrechen
+                    continue;
+                }
+            }
+            
+            $result['variables'] = $variables;
+        }
+    }
+}
