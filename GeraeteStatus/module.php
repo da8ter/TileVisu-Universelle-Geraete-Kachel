@@ -1271,6 +1271,17 @@ class UniversalDeviceTile extends IPSModule
      * @param mixed $value Der Wert der Aktion
      */
     public function RequestAction($Ident, $value) {
+        // TEMPORÄR (Refactoring-Regressionstest): Payload-Snapshot in tests/snapshots/_live/ schreiben.
+        // Wird vor dem Release wieder entfernt.
+        if ($Ident === 'RefactorDebugSnapshot') {
+            $dir = __DIR__ . '/../tests/snapshots/_live';
+            if (!is_dir($dir)) {
+                mkdir($dir, 0775, true);
+            }
+            file_put_contents($dir . '/' . $this->InstanceID . '.json', $this->GetDebugPayload());
+            return;
+        }
+
         // Prüfe zuerst auf spezielle Aktionen
         if ($Ident === 'UpdateDisplayTypeFields') {
             $this->UpdateDisplayTypeVisibility($value, $this->InstanceID);
@@ -3522,6 +3533,16 @@ class UniversalDeviceTile extends IPSModule
         }
         return 'none';
     }
-    
+
+    // TEMPORÄR (Refactoring-Regressionstest): liefert das volle Visualisierungs-Payload
+    // inkl. generierter Assets. Wird vor dem Release wieder entfernt.
+    public function GetDebugPayload()
+    {
+        return json_encode([
+            'payload' => json_decode($this->GetFullUpdateMessage(), true),
+            'assets'  => $this->GenerateAssets()
+        ]);
+    }
+
 }
 ?>
