@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 // Ensure all variable type constants are defined
 if (!defined('VARIABLETYPE_BOOLEAN')) {
     define('VARIABLETYPE_BOOLEAN', 0);
@@ -80,13 +82,13 @@ class UniversalDeviceTile extends IPSModule
         
         // Bildkonfiguration
         $this->RegisterPropertyInteger("Bildauswahl", 0);
-        $this->RegisterPropertyFloat("BildBreite", 20);
+        $this->RegisterPropertyFloat("BildBreite", 20.0);
         $this->RegisterPropertyString("BildPosition", "left");
         $this->RegisterPropertyBoolean("ShowBorderLine", true);
         $this->RegisterPropertyString("ImageAlignment", "center");
         $this->RegisterPropertyInteger("Bild_An", 0);
         $this->RegisterPropertyInteger("Bild_Aus", 0);
-        $this->RegisterPropertyBoolean('BG_Off', 1);
+        $this->RegisterPropertyBoolean('BG_Off', true);
         $this->RegisterPropertyInteger("bgImage", 0);
         $this->RegisterPropertyFloat('Bildtransparenz', 0.7);
         $this->RegisterPropertyInteger('Kachelhintergrundfarbe', -1);
@@ -445,7 +447,7 @@ class UniversalDeviceTile extends IPSModule
 
         // Prüfe zuerst auf spezielle Aktionen
         if ($Ident === 'UpdateDisplayTypeFields') {
-            $this->UpdateDisplayTypeVisibility($value, $this->InstanceID);
+            $this->UpdateDisplayTypeVisibility((string)$value, $this->InstanceID);
             return;
         }
         
@@ -463,7 +465,7 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // Nachrichten von der HTML-Darstellung schicken immer den Ident passend zur Eigenschaft und im Wert die Differenz, welche auf die Variable gerechnet werden soll
-        $variableID = $Ident;
+        $variableID = (int)$Ident;
         if (!IPS_VariableExists($variableID)) {
             // Falls eine Script-ID direkt gesendet wurde (z. B. numerisch), führe Script aus
             $maybeScriptId = intval($Ident);

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UDT;
 
 /**
@@ -14,7 +16,7 @@ trait PresentationTrait
      * @param int $variableId Die Variable-ID
      * @return array Array mit 'active' und 'inactive' Farben
      */
-    private function GetButtonColors($variableId) {
+    private function GetButtonColors(int $variableId): array {
         $defaultColors = [
             'active' => '#28a745',   // Grün für aktiv/true
             'inactive' => '#dc3545'  // Rot für inaktiv/false
@@ -91,7 +93,7 @@ trait PresentationTrait
      * @param int $variableId Die Variable-ID
      * @return array Array mit 'min' und 'max' Werten
      */
-    private function GetProgressMinMax($variableId) {
+    private function GetProgressMinMax(int $variableId): array {
         $defaultMinMax = [
             'min' => 0,
             'max' => 100
@@ -256,7 +258,7 @@ trait PresentationTrait
         return $defaultMinMax;
     }
 
-    private function GetSliderStepAndDigits($variableId) {
+    private function GetSliderStepAndDigits(int $variableId): array {
         $res = ['step' => null, 'digits' => 0];
         if (!IPS_VariableExists($variableId)) {
             return $res;
@@ -323,7 +325,7 @@ trait PresentationTrait
      * Extrahiert Associations einer Integer-Variable für Button-Erstellung
      * Unterstützt 4 Fälle: Alte Variablenprofile, CustomPresentation mit OPTIONS/TEMPLATE/PRESENTATION GUID
      */
-    private function GetIntegerAssociations($variableId) {
+    private function GetIntegerAssociations(int $variableId): ?array {
         return $this->GetVariableAssociations($variableId, VARIABLETYPE_INTEGER);
     }
 
@@ -331,7 +333,7 @@ trait PresentationTrait
      * Extrahiert Associations einer String-Variable für Button-Erstellung
      * Unterstützt 4 Fälle: Alte Variablenprofile, CustomPresentation mit OPTIONS/TEMPLATE/PRESENTATION GUID
      */
-    private function GetStringAssociations($variableId) {
+    private function GetStringAssociations(int $variableId): ?array {
         return $this->GetVariableAssociations($variableId, VARIABLETYPE_STRING);
     }
 
@@ -339,7 +341,7 @@ trait PresentationTrait
      * Extrahiert Associations einer Boolean-Variable für Button-Erstellung
      * Unterstützt 4 Fälle: Alte Variablenprofile, CustomPresentation mit OPTIONS/TEMPLATE/PRESENTATION GUID
      */
-    private function GetBooleanAssociations($variableId) {
+    private function GetBooleanAssociations(int $variableId): ?array {
         return $this->GetVariableAssociations($variableId, VARIABLETYPE_BOOLEAN);
     }
 
@@ -347,7 +349,7 @@ trait PresentationTrait
      * Generische Funktion zum Extrahieren von Associations für Boolean-, Integer- und String-Variablen.
      * Nutzt IPS_GetVariablePresentation für die vollständige Auflösung von Vorlagen und GUIDs.
      */
-    private function GetVariableAssociations($variableId, $expectedVariableType) {
+    private function GetVariableAssociations(int $variableId, int $expectedVariableType): ?array {
         if (!IPS_VariableExists($variableId)) {
             return null;
         }
@@ -531,7 +533,7 @@ trait PresentationTrait
      * @param mixed $currentValue Aktueller Variablenwert
      * @return array|null Passende Assoziation oder null
      */
-    private function FindMatchingAssociation(array $associations, $currentValue) {
+    private function FindMatchingAssociation(array $associations, $currentValue): ?array {
         $match = null;
         foreach ($associations as $assoziation) {
             if (!isset($assoziation['AssoziationValue'])) continue;
