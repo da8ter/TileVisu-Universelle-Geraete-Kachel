@@ -926,19 +926,24 @@
     </style>
 
     <script>
+        (function () {
 
-        // Lokalisierbare Frontend-Texte (werden aus GetFullUpdateMessage() überschrieben)
-        window.uiTexts = {
-            on: 'On',
-            off: 'Off',
-            targetSoc: 'Target SOC',
-            deviceImage: 'Device Image',
-            image: 'Image'
+        // Zentraler Laufzeit-Zustand der Kachel (früher verstreute window.*-Globals).
+        // window.assets bleibt bewusst global: es wird vom PHP-injizierten Asset-Skript gesetzt.
+        const state = {
+            // Lokalisierbare Frontend-Texte (werden aus GetFullUpdateMessage() überschrieben)
+            uiTexts: {
+                on: 'On',
+                off: 'Off',
+                targetSoc: 'Target SOC',
+                deviceImage: 'Device Image',
+                image: 'Image'
+            }
         };
 
         function getUiText(key, fallback) {
-            if (window.uiTexts && typeof window.uiTexts[key] === 'string' && window.uiTexts[key] !== '') {
-                return window.uiTexts[key];
+            if (state.uiTexts && typeof state.uiTexts[key] === 'string' && state.uiTexts[key] !== '') {
+                return state.uiTexts[key];
             }
             return fallback;
         }
@@ -1010,7 +1015,7 @@
         }
         
         // Globaler Spin-State pro Button-Ident (nur Script-Buttons)
-        window._scriptButtonSpinUntil = window._scriptButtonSpinUntil || {};
+        state._scriptButtonSpinUntil = state._scriptButtonSpinUntil || {};
         
         // === Button-Icon Spin Helper ===
         function startButtonIconSpin(buttonEl) {
@@ -1118,19 +1123,19 @@
             const shouldSpin = (typeof ident === 'string' && ident.indexOf('script_') === 0);
             if (shouldSpin) {
                 try {
-                    window._scriptButtonSpinUntil = window._scriptButtonSpinUntil || {};
+                    state._scriptButtonSpinUntil = state._scriptButtonSpinUntil || {};
                     const spinUntil = Date.now() + 5000;
-                    window._scriptButtonSpinUntil[ident] = spinUntil;
+                    state._scriptButtonSpinUntil[ident] = spinUntil;
                     startButtonIconSpin(buttonEl);
                     setTimeout(() => {
                         try {
-                            if (!window._scriptButtonSpinUntil) {
+                            if (!state._scriptButtonSpinUntil) {
                                 stopButtonIconSpin(buttonEl);
                                 return;
                             }
-                            const current = window._scriptButtonSpinUntil[ident];
+                            const current = state._scriptButtonSpinUntil[ident];
                             if (!current || current <= Date.now()) {
-                                delete window._scriptButtonSpinUntil[ident];
+                                delete state._scriptButtonSpinUntil[ident];
                                 stopButtonIconSpin(buttonEl);
                             }
                         } catch (_) {}
@@ -1259,11 +1264,11 @@
             const div1 = document.getElementById('div1');
             const div2 = document.getElementById('div2');
             const mainContainer = document.querySelector('.main_container');
-            const bildauswahl = window.currentBildauswahl;
-            const bildbreite = window.currentBildbreite;
+            const bildauswahl = state.currentBildauswahl;
+            const bildbreite = state.currentBildbreite;
             
             // Only handle COLUMN hiding vs showing - let renderStatus() handle individual image content
-            const hideImageColumn = window.hideImageColumn || false;
+            const hideImageColumn = state.hideImageColumn || false;
             
             if (hideImageColumn) {
                 // Hide ENTIRE COLUMN when backend determines no images should be shown
@@ -1355,7 +1360,7 @@
                 switch (parameter.toLowerCase()) {
                     case 'uitexts':
                         if (value && typeof value === 'object') {
-                            window.uiTexts = Object.assign({}, window.uiTexts || {}, value);
+                            state.uiTexts = Object.assign({}, state.uiTexts || {}, value);
                         }
                         break;
                     case 'elementspacing':
@@ -1383,7 +1388,7 @@
                             if (typeof value === 'string' && value) {
                                 const mainDiv = document.querySelector('body');
                                 mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
-                                window._bgImageFromUrl = true;
+                                state._bgImageFromUrl = true;
                             }
                         } catch (_) {}
                         break;
@@ -1391,7 +1396,7 @@
                         try {
                             if (typeof value === 'string' && value) {
                                 const mainDiv = document.querySelector('body');
-                                if (!window._bgImageFromUrl) {
+                                if (!state._bgImageFromUrl) {
                                     mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
                                 }
                             }
@@ -1400,7 +1405,7 @@
 
                     case 'imagealignment':
                         // Speichere Alignment global und wende sofort an (gilt für Bild ODER Icon)
-                        window.currentImageAlignment = value;
+                        state.currentImageAlignment = value;
                         applyImageAlignment(value);
                         break;
                     case 'status':
@@ -1410,7 +1415,7 @@
                     case 'statusBildauswahl':  
                         // Set global currentBildauswahl for updateImageVisibility
                         if (decodedData.hasOwnProperty('statusBildauswahl')) {
-                            window.currentBildauswahl = decodedData.statusBildauswahl;
+                            state.currentBildauswahl = decodedData.statusBildauswahl;
                         }
 
                         // Build a minimal comparable snapshot of all status-relevant props
@@ -1431,28 +1436,28 @@
                             isStatusColorTransparent: decodedData.isStatusColorTransparent,
                             statusHidden: decodedData.statusHidden,
                             hideImageColumn: decodedData.hideImageColumn,
-                            imageAlignment: window.currentImageAlignment || null
+                            imageAlignment: state.currentImageAlignment || null
                         };
 
-                        const lastStatusSnapshotJson = window._lastStatusSnapshotJson || null;
+                        const lastStatusSnapshotJson = state._lastStatusSnapshotJson || null;
                         const currentStatusSnapshotJson = JSON.stringify(currentStatusSnapshot);
 
                         if (lastStatusSnapshotJson !== currentStatusSnapshotJson) {
                             // Only re-render if something relevant changed
                             renderStatus(decodedData);
                             updateImageVisibility();
-                            window._lastStatusSnapshotJson = currentStatusSnapshotJson;
+                            state._lastStatusSnapshotJson = currentStatusSnapshotJson;
                         }
                         
                         // Re-apply gespeicherte Bild-/Icon-Ausrichtung nach dem Rendering (Persistenz)
-                        if (window.currentImageAlignment) {
-                            applyImageAlignment(window.currentImageAlignment);
+                        if (state.currentImageAlignment) {
+                            applyImageAlignment(state.currentImageAlignment);
                         }
                         break;
                     case 'hideimagecolumn':
                         // NEW: Handle hideImageColumn flag for complete image column visibility
                         if (decodedData.hasOwnProperty('hideImageColumn')) {
-                            window.hideImageColumn = decodedData.hideImageColumn;
+                            state.hideImageColumn = decodedData.hideImageColumn;
                             updateImageVisibility();
                         }
                         break;
@@ -1465,12 +1470,12 @@
                         break;
                     case 'variables':
                         // Skip processing if incoming variables payload is IDENTICAL to the previous one
-                        if (window.lastVariablesData && JSON.stringify(value) === JSON.stringify(window.lastVariablesData)) {
+                        if (state.lastVariablesData && JSON.stringify(value) === JSON.stringify(state.lastVariablesData)) {
                             needsRerender = false; // Nothing changed at all
                             break;
                         }
 
-                        if (window.lastVariablesData && window.variableDataCache) {
+                        if (state.lastVariablesData && state.variableDataCache) {
                             let hasMinimalUpdates = false;
                             let hasOtherChanges = false;
                             
@@ -1492,8 +1497,8 @@
                                 // Find matching old variable from previous payload by same id and displayType
                                 let oldVariable = null;
                                 try {
-                                    if (window.lastVariablesData && actualVariableId) {
-                                        const prev = window.lastVariablesData.find(v => (v?.variableId || v?.id) === actualVariableId && (v?.displayType || 'text') === (newVariable?.displayType || 'text'));
+                                    if (state.lastVariablesData && actualVariableId) {
+                                        const prev = state.lastVariablesData.find(v => (v?.variableId || v?.id) === actualVariableId && (v?.displayType || 'text') === (newVariable?.displayType || 'text'));
                                         if (prev) oldVariable = prev;
                                     }
                                 } catch (_) { oldVariable = null; }
@@ -1557,8 +1562,8 @@
                                     
                                     // Ensure cache reflects latest values for this variable before rendering
                                     try {
-                                        if (!window.variableDataCache) window.variableDataCache = {};
-                                        window.variableDataCache[variableId] = variable;
+                                        if (!state.variableDataCache) state.variableDataCache = {};
+                                        state.variableDataCache[variableId] = variable;
                                     } catch (_) {}
 
                                     switch (type) {
@@ -1579,7 +1584,7 @@
                                 
                                 // Update cache mit korrekter Datenstruktur
                                 updateVariableCache(value);
-                                window.lastVariablesData = value;
+                                state.lastVariablesData = value;
                                 needsRerender = false; // 🚀 SKIP FULL RE-RENDER!
                                 break;
                             }
@@ -1587,18 +1592,18 @@
                         }
                         
                         // Store latest variables and rebuild the ID-indexed cache for correct diffing next time
-                        window.lastVariablesData = value;
+                        state.lastVariablesData = value;
                         updateVariableCache(value);
                         needsRerender = true;
                         break;
                     case 'progressbarconfig':
                         // Re-render nur, wenn sich die Konfiguration wirklich geändert hat
                         const newPbCfg = value || {};
-                        const oldPbCfg = window.cachedProgressBarConfig || {};
+                        const oldPbCfg = state.cachedProgressBarConfig || {};
                         if (JSON.stringify(newPbCfg) !== JSON.stringify(oldPbCfg)) {
                             updateProgressBarStyles(newPbCfg);
-                            window.cachedProgressBarConfig = newPbCfg;
-                            if (window.lastVariablesData) {
+                            state.cachedProgressBarConfig = newPbCfg;
+                            if (state.lastVariablesData) {
                                 needsRerender = true;
                             }
                         }
@@ -1606,11 +1611,11 @@
                     case 'buttonconfig':
                         // Re-render nur, wenn sich die Konfiguration wirklich geändert hat
                         const newBtnCfg = value || {};
-                        const oldBtnCfg = window.cachedButtonConfig || {};
+                        const oldBtnCfg = state.cachedButtonConfig || {};
                         if (JSON.stringify(newBtnCfg) !== JSON.stringify(oldBtnCfg)) {
                             updateButtonStyles(newBtnCfg);
-                            window.cachedButtonConfig = newBtnCfg;
-                            if (window.lastVariablesData) {
+                            state.cachedButtonConfig = newBtnCfg;
+                            if (state.lastVariablesData) {
                                 needsRerender = true;
                             }
                         }
@@ -1624,12 +1629,12 @@
                             // da das <img>-src bereits auf den alten base64-String gesetzt wurde.
                             // Re-render mit dem zuletzt bekannten Status-Payload.
                             try {
-                                if (window._lastStatusPayload) {
-                                    renderStatus(window._lastStatusPayload);
+                                if (state._lastStatusPayload) {
+                                    renderStatus(state._lastStatusPayload);
                                     updateImageVisibility();
-                                } else if (window.currentBildauswahl) {
+                                } else if (state.currentBildauswahl) {
                                     // Fallback: Kein gespeicherter Payload vorhanden -> Bild direkt aktualisieren
-                                    const key = window.currentBildauswahl;
+                                    const key = state.currentBildauswahl;
                                     let imageUrl = '';
                                     if (key && (key.startsWith('img_custom_') || key.startsWith('img_default_'))) {
                                         imageUrl = window.assets[key] || '';
@@ -1676,17 +1681,17 @@
                     case 'groupnames':
                         // Nur aktualisieren und re-rendern, wenn sich die Gruppennamen geändert haben
                         const newGroupNames = value || {};
-                        const oldGroupNames = window.groupNames || {};
+                        const oldGroupNames = state.groupNames || {};
                         if (JSON.stringify(newGroupNames) !== JSON.stringify(oldGroupNames)) {
-                            window.groupNames = newGroupNames;
-                            if (window.lastVariablesData) {
+                            state.groupNames = newGroupNames;
+                            if (state.lastVariablesData) {
                                 needsRerender = true;
                             }
                         }
                         break;
                     case 'bildbreite':
                         root.style.setProperty('--bildbreite', value + 'px');
-                        window.currentBildbreite = value;
+                        state.currentBildbreite = value;
                         updateImageVisibility();
                         break;
                     case 'bildtransparenz':
@@ -1704,9 +1709,9 @@
                         // Handle minimal updates for SecondVariable (var_X_second*, var_X_second_value, var_X_second_icon)
                         if (parameter.startsWith('var_') && parameter.includes('_second')) {
                             const baseVarKey = parameter.split('_second')[0];
-                            const targetVariableId = window.varKeyToIdMapping?.[baseVarKey];
-                            if (targetVariableId && window.variableDataCache && window.variableDataCache[targetVariableId]) {
-                                const variable = window.variableDataCache[targetVariableId];
+                            const targetVariableId = state.varKeyToIdMapping?.[baseVarKey];
+                            if (targetVariableId && state.variableDataCache && state.variableDataCache[targetVariableId]) {
+                                const variable = state.variableDataCache[targetVariableId];
                                 variable.secondVariable = variable.secondVariable || {};
                                 if (parameter.endsWith('_second_value')) {
                                     variable.secondVariable.rawValue = value;
@@ -1755,11 +1760,11 @@
                             const varKey = parameter.replace('_value', '');
                             
                             // Aktualisiere rawValue im Cache
-                            if (window.variableDataCache) {
-                                const targetVariableId = window.varKeyToIdMapping[varKey];
+                            if (state.variableDataCache) {
+                                const targetVariableId = state.varKeyToIdMapping[varKey];
                                 if (targetVariableId) {
-                                    if (window.variableDataCache[targetVariableId]) {
-                                        window.variableDataCache[targetVariableId].rawValue = value;
+                                    if (state.variableDataCache[targetVariableId]) {
+                                        state.variableDataCache[targetVariableId].rawValue = value;
                                     }
                                     // Direkt-Updates nach DOM-Präsenz, nicht nach Cache-DisplayType
                                     try {
@@ -1785,10 +1790,10 @@
                             if (parameter.startsWith('var_') && !parameter.endsWith('_value')) {
                             
                             // Aktualisiere formatierte Werte im Cache
-                            if (window.variableDataCache) {
-                                const targetVariableId = window.varKeyToIdMapping?.[parameter];
-                                if (targetVariableId && window.variableDataCache[targetVariableId]) {
-                                    window.variableDataCache[targetVariableId].formattedValue = value;
+                            if (state.variableDataCache) {
+                                const targetVariableId = state.varKeyToIdMapping?.[parameter];
+                                if (targetVariableId && state.variableDataCache[targetVariableId]) {
+                                    state.variableDataCache[targetVariableId].formattedValue = value;
                                     
                                     // Aktualisiere Variable-Darstellung mit neuem formatiertem Wert
                                     updateVariable(parameter, value, 'formattedValue');
@@ -1801,26 +1806,26 @@
             }
 
             // BATCH-RENDERING: Nur einmal rendern am Ende der Message-Verarbeitung
-            if (needsRerender && window.lastVariablesData) {
-                renderVariables(window.lastVariablesData);
+            if (needsRerender && state.lastVariablesData) {
+                renderVariables(state.lastVariablesData);
             }
         }
 
         // Universelle Variable-Update-Funktion: aktualisiert ALLE Darstellungen (Text, Button, Progress, Slider) für die Variable
         function updateVariable(varKey, newValue, updateType) {
             // Find target variable ID using mapping
-            if (!window.varKeyToIdMapping || !window.varKeyToIdMapping[varKey]) {
+            if (!state.varKeyToIdMapping || !state.varKeyToIdMapping[varKey]) {
                 return;
             }
             
-            const targetVariableId = window.varKeyToIdMapping[varKey];
+            const targetVariableId = state.varKeyToIdMapping[varKey];
             
             // Finde Variable-Daten aus Cache
-            if (!window.variableDataCache || !window.variableDataCache[targetVariableId]) {
+            if (!state.variableDataCache || !state.variableDataCache[targetVariableId]) {
                 return;
             }
             
-            const variable = window.variableDataCache[targetVariableId];
+            const variable = state.variableDataCache[targetVariableId];
             
             // Update cache based on updateType
             if (updateType === 'rawValue') {
@@ -2127,7 +2132,7 @@
                     if (!suffix) {
                         try {
                             const vid = sc.getAttribute('data-variable-id');
-                            const fv = window.variableDataCache?.[vid]?.formattedValue;
+                            const fv = state.variableDataCache?.[vid]?.formattedValue;
                             if (typeof fv === 'string') {
                                 const mF = fv.match(/^\s*[-+]?\d+(?:[\.,]\d+)?\s*(.*)$/);
                                 suffix = mF ? mF[1] : '';
@@ -2176,7 +2181,7 @@
                 } else {
                     // try to get from cache
                     const id = sc.getAttribute('data-variable-id');
-                    const vc = (window.variableDataCache && id) ? window.variableDataCache[id] : null;
+                    const vc = (state.variableDataCache && id) ? state.variableDataCache[id] : null;
                     if (vc && Number.isFinite(Number(vc.sliderStep))) {
                         step = Number(vc.sliderStep);
                     }
@@ -2201,19 +2206,19 @@
         }
 
         function scheduleSliderVerification(id, sc, intendedValue) {
-            if (!window._sliderPending) window._sliderPending = {};
-            const ex = window._sliderPending[id];
+            if (!state._sliderPending) state._sliderPending = {};
+            const ex = state._sliderPending[id];
             try { if (ex && ex.t) clearTimeout(ex.t); } catch (_) {}
             const t = setTimeout(() => verifySliderWrite(id, sc), 1200);
-            window._sliderPending[id] = { intended: Number(intendedValue), t: t };
+            state._sliderPending[id] = { intended: Number(intendedValue), t: t };
         }
 
         function verifySliderWrite(id, sc) {
-            const pend = window._sliderPending && window._sliderPending[id];
+            const pend = state._sliderPending && state._sliderPending[id];
             if (!pend) return;
-            try { delete window._sliderPending[id]; } catch (_) {}
+            try { delete state._sliderPending[id]; } catch (_) {}
             let actual = NaN;
-            try { actual = Number(window.variableDataCache?.[id]?.rawValue); } catch (_) {}
+            try { actual = Number(state.variableDataCache?.[id]?.rawValue); } catch (_) {}
             const min = Number(sc.getAttribute('data-min')) || 0;
             const max = Number(sc.getAttribute('data-max')) || 100;
             const digits = Number(sc.getAttribute('data-digits')) || 0;
@@ -2308,7 +2313,7 @@
             });
 
             const stepClick = (dir) => {
-                const vc = window.variableDataCache?.[id];
+                const vc = state.variableDataCache?.[id];
                 let base = NaN;
                 // 1) bevorzugt aktueller UI-Wert (Dataset)
                 try {
@@ -2360,20 +2365,20 @@
                 const percent = range > 0 ? Math.max(0, Math.min(100, ((v - min) / range) * 100)) : 0;
                 let display = v;
                 try {
-                    const vc = window.variableDataCache?.[variableId];
+                    const vc = state.variableDataCache?.[variableId];
                     if (vc && typeof vc.formattedValue !== 'undefined' && vc.formattedValue !== null) {
                         display = vc.formattedValue;
                     }
                 } catch (_) {}
                 updateSliderUI(sc, percent, display);
                 try {
-                    const pend = window._sliderPending && window._sliderPending[variableId];
+                    const pend = state._sliderPending && state._sliderPending[variableId];
                     if (pend) {
                         const tol = (Number.isFinite(step) && step > 0) ? (step / 2) : ((digits > 0) ? Math.pow(10, -digits) / 2 : 0.5);
                         const intended = clampAndRound(Number(pend.intended), min, max, step, digits);
                         if (Math.abs(v - intended) <= tol) {
                             try { clearTimeout(pend.t); } catch (_) {}
-                            try { delete window._sliderPending[variableId]; } catch (_) {}
+                            try { delete state._sliderPending[variableId]; } catch (_) {}
                         }
                     }
                 } catch (_) {}
@@ -2670,7 +2675,7 @@
 
         function renderStatus(data) {
             // Speichere den letzten Status-Payload für spätere Re-Renders (z.B. bei Asset-/Medien-Updates)
-            try { window._lastStatusPayload = data; } catch(_) {}
+            try { state._lastStatusPayload = data; } catch(_) {}
             const statusContainer = document.getElementById('status-container');
             const root = document.documentElement;
             
@@ -2744,7 +2749,7 @@
                 const deviceImg = document.getElementById('image');
                 
                 // GLOBALE ENTSCHEIDUNG: Soll die gesamte Bildspalte versteckt werden?
-                if (window.hideImageColumn) {
+                if (state.hideImageColumn) {
                     if (deviceImgContainer) {
                         deviceImgContainer.classList.add('hidden');
                         deviceImgContainer.classList.remove('div1');
@@ -2797,8 +2802,8 @@
                         iconContainer.style.flex = '0 0 auto';
                         iconContainer.style.width = 'auto';
                         // Margin-basierte Ausrichtung für Icon-Container (wirkt unabhängig von Containerbreite)
-                        if (window.currentImageAlignment) {
-                            iconContainer.style.margin = alignmentToMargin(window.currentImageAlignment);
+                        if (state.currentImageAlignment) {
+                            iconContainer.style.margin = alignmentToMargin(state.currentImageAlignment);
                         }
                         
                         deviceImgContainer.classList.remove('hidden');
@@ -2931,17 +2936,17 @@
 
             
             // Cache die Variablen-Daten für spätere Re-Rendering
-            window.cachedVariables = variables;
+            state.cachedVariables = variables;
             
             // Erstelle Mapping zwischen var_X und Variable-ID
-            window.varKeyToIdMapping = {};
-            window.variableDataCache = {};
+            state.varKeyToIdMapping = {};
+            state.variableDataCache = {};
             
 
             
             // PHASE 1: Berechne maximale Gruppenname-Breite für Alignment
             let maxGroupNameWidth = 0;
-            if (window.groupNames) {
+            if (state.groupNames) {
                 const tempDiv = document.createElement('div');
                 tempDiv.style.position = 'absolute';
                 tempDiv.style.visibility = 'hidden';
@@ -2966,9 +2971,9 @@
                     let shouldShowGroupName = false;
                     let showAbove = false;
                     const groupMatch = groupKey.match(/Gruppe (\d+)/);
-                    if (groupMatch && window.groupNames) {
+                    if (groupMatch && state.groupNames) {
                         const groupNumber = parseInt(groupMatch[1]);
-                        const groupConfig = window.groupNames[groupNumber];
+                        const groupConfig = state.groupNames[groupNumber];
                         shouldShowGroupName = groupConfig && groupConfig.showGroupName === true;
                         showAbove = groupConfig && groupConfig.showAbove === true;
                     }
@@ -2979,9 +2984,9 @@
                         // Bestimme Anzeigenamen
                         let displayGroupName = groupKey;
                         const groupMatch = groupKey.match(/Gruppe (\d+)/);
-                        if (groupMatch && window.groupNames) {
+                        if (groupMatch && state.groupNames) {
                             const groupNumber = parseInt(groupMatch[1]);
-                            const groupConfig = window.groupNames[groupNumber];
+                            const groupConfig = state.groupNames[groupNumber];
                             displayGroupName = (groupConfig && groupConfig.name) ? groupConfig.name : groupKey;
 
                         } else {
@@ -3000,9 +3005,9 @@
                         
                         // Prüfe ob diese Gruppe ein Icon hat und füge Icon-Breite hinzu
                         const iconGroupMatch = groupKey.match(/Gruppe (\d+)/);
-                        if (iconGroupMatch && window.groupNames) {
+                        if (iconGroupMatch && state.groupNames) {
                             const groupNumber = parseInt(iconGroupMatch[1]);
-                            const groupConfig = window.groupNames[groupNumber];
+                            const groupConfig = state.groupNames[groupNumber];
                             if (groupConfig?.groupIcon && groupConfig.groupIcon !== '') {
                                 // Icon-Breite: 16px Icon + 8px margin-right = 24px
                                 width += 24;
@@ -3026,8 +3031,8 @@
             variables.forEach((variable, index) => {
                 // Erstelle Mapping (var_0, var_1, var_2, etc.)
                 const varKey = 'var_' + index;
-                window.varKeyToIdMapping[varKey] = variable.id;
-                window.variableDataCache[variable.id] = variable;
+                state.varKeyToIdMapping[varKey] = variable.id;
+                state.variableDataCache[variable.id] = variable;
                 
                 
                 // Prüfe ob Variable gruppiert ist - alle Darstellungstypen unterstützen jetzt Gruppen
@@ -3046,25 +3051,25 @@
                         // Prüfe ShowGroupName aus Gruppenkonfiguration statt aus Variablen
                         let shouldShowGroupName = false;
                         const groupMatch = variable.group.match(/Gruppe (\d+)/);
-                        if (groupMatch && window.groupNames) {
+                        if (groupMatch && state.groupNames) {
                             const groupNumber = parseInt(groupMatch[1]);
-                            const groupConfig = window.groupNames[groupNumber];
+                            const groupConfig = state.groupNames[groupNumber];
                             shouldShowGroupName = groupConfig && groupConfig.showGroupName === true;
                         }
                         
                         // Bestimme den Gruppennamen basierend auf der Gruppenbezeichnung
-                        // WICHTIG: Mapping erfolgt immer wenn window.groupNames verfügbar ist,
+                        // WICHTIG: Mapping erfolgt immer wenn state.groupNames verfügbar ist,
                         // shouldShowGroupName kontrolliert nur die Anzeige!
                         let displayGroupName = variable.group;
                         let showAbove = false;
                         let showLine = false;
                         let stretch = false;
-                        if (window.groupNames) {
+                        if (state.groupNames) {
                             // Extrahiere Gruppennummer aus "Gruppe X" Format
                             const groupMatch = variable.group.match(/Gruppe (\d+)/);
                             if (groupMatch) {
                                 const groupNumber = parseInt(groupMatch[1]);
-                                const groupConfig = window.groupNames[groupNumber];
+                                const groupConfig = state.groupNames[groupNumber];
                                 displayGroupName = (groupConfig && groupConfig.name) ? groupConfig.name : variable.group;
                                 showAbove = groupConfig.showAbove || false;
                                 showLine = groupConfig.showLine || false;
@@ -3089,7 +3094,7 @@
                         // Alternative Darstellung: Gruppenname über der Gruppe
                         if (shouldShowGroupName && showAbove) {
                             // Verwende konfigurierte Schriftgröße aus groupnamesize oder Fallback
-                            const groupConfig = window.groupNames?.[parseInt(variable.group.match(/Gruppe (\d+)/)?.[1])];
+                            const groupConfig = state.groupNames?.[parseInt(variable.group.match(/Gruppe (\d+)/)?.[1])];
                             // Nur Fallback wenn fontSize undefined/null ist, nicht bei 0
                             const groupNameFontSize = groupConfig?.fontSize !== undefined ? groupConfig.fontSize : 16;
                             
@@ -3135,7 +3140,7 @@
                             const groupNameWidth = maxGroupNameWidth > 0 ? maxGroupNameWidth + 'px' : 'auto';
                             
                             // Group Icon vorbereiten
-                            const groupConfig = window.groupNames?.[parseInt(variable.group.match(/Gruppe (\d+)/)?.[1])];
+                            const groupConfig = state.groupNames?.[parseInt(variable.group.match(/Gruppe (\d+)/)?.[1])];
                             let groupIconHtml = '';
                             if (groupConfig?.groupIcon && groupConfig.groupIcon !== '') {
                                 const iconClass = prepareIconForDisplay(groupConfig.groupIcon);
@@ -3212,7 +3217,7 @@
                 const allProgressContainers = container.querySelectorAll('.progress-container');
                 allProgressContainers.forEach(pc => {
                     const varId = pc.getAttribute('data-variable-id');
-                    const v = window.variableDataCache?.[varId];
+                    const v = state.variableDataCache?.[varId];
                     if (v && v.displayType === 'progress') {
                         updateTargetMarkerDisplay(pc, v);
                     }
@@ -3378,17 +3383,17 @@
                     let widthForDOM = progressValue; // Default: neuer Wert
                     
                     // Prüfe ob bereits eine alte Breite gespeichert ist
-                    if (window.previousProgressWidths && window.previousProgressWidths[variable.id] !== undefined) {
-                        const oldWidth = window.previousProgressWidths[variable.id];
+                    if (state.previousProgressWidths && state.previousProgressWidths[variable.id] !== undefined) {
+                        const oldWidth = state.previousProgressWidths[variable.id];
                         if (Math.abs(progressValue - oldWidth) > 0.1) {
                             // Alte Breite im DOM behalten, damit die Animation den Übergang fahren kann
                             widthForDOM = oldWidth;
                         }
                     }
-                    if (!window.previousProgressWidths) {
-                        window.previousProgressWidths = {};
+                    if (!state.previousProgressWidths) {
+                        state.previousProgressWidths = {};
                     }
-                    window.previousProgressWidths[variable.id] = progressValue;
+                    state.previousProgressWidths[variable.id] = progressValue;
                     
                     // Target marker percent based on optional progressTarget
                     let targetPercent = null;
@@ -3555,7 +3560,7 @@
                         
                         // Erweiterte Bool-Wert-Erkennung
                         const isScriptButton = (typeof variable.id === 'string' && variable.id.indexOf('script_') === 0);
-                        const spinActive = (isScriptButton && window._scriptButtonSpinUntil && window._scriptButtonSpinUntil[variable.id] && Date.now() < window._scriptButtonSpinUntil[variable.id]);
+                        const spinActive = (isScriptButton && state._scriptButtonSpinUntil && state._scriptButtonSpinUntil[variable.id] && Date.now() < state._scriptButtonSpinUntil[variable.id]);
                         // Script-Buttons sollen optisch immer aktiv sein
                         const isActive = isScriptButton ? true : (variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true');
                         // Verwende den tatsächlichen Boolean-Wert für Association-Matching (nicht Integer-Konvertierung!)
@@ -3597,11 +3602,11 @@
                         
                         // Prüfe ob die aktuelle Gruppe im stretch-Modus ist
                         let isGroupStretched = false;
-                        if (isGrouped && variable.group && window.groupNames) {
+                        if (isGrouped && variable.group && state.groupNames) {
                             const groupMatch = variable.group.match(/Gruppe (\d+)/);
                             if (groupMatch) {
                                 const groupNumber = parseInt(groupMatch[1]);
-                                const groupConfig = window.groupNames[groupNumber];
+                                const groupConfig = state.groupNames[groupNumber];
                                 if (groupConfig && groupConfig.stretch) {
                                     isGroupStretched = true;
                                 }
@@ -3687,11 +3692,11 @@
                         
                         // Prüfe ob die aktuelle Gruppe im stretch-Modus ist (dann keine feste Breite setzen)
                         let isGroupStretched = false;
-                        if (isGrouped && variable.group && window.groupNames) {
+                        if (isGrouped && variable.group && state.groupNames) {
                             const groupMatch = variable.group.match(/Gruppe (\d+)/);
                             if (groupMatch) {
                                 const groupNumber = parseInt(groupMatch[1]);
-                                const groupConfig = window.groupNames[groupNumber];
+                                const groupConfig = state.groupNames[groupNumber];
                                 if (groupConfig && groupConfig.stretch) {
                                     isGroupStretched = true;
                                 }
@@ -3970,8 +3975,8 @@
         
         // Cache-Update-Funktion mit korrekter Datenstruktur
         function updateVariableCache(newVariables) {
-            if (!window.variableDataCache) {
-                window.variableDataCache = {};
+            if (!state.variableDataCache) {
+                state.variableDataCache = {};
             }
             
             // Konvertiere Array-basierte Daten zu ID-basiertem Cache
@@ -3980,7 +3985,7 @@
                 const variableId = variable?.variableId || variable?.id;
                 
                 if (variableId) {
-                    window.variableDataCache[variableId] = variable;
+                    state.variableDataCache[variableId] = variable;
                 }
             }
         }
@@ -3996,7 +4001,7 @@
                 if (!progressBar) return;
             
             // Hole Variable-Konfiguration aus Cache
-            const variableConfig = window.variableDataCache?.[variableId];
+            const variableConfig = state.variableDataCache?.[variableId];
             if (!variableConfig) {
                 return;
             }
@@ -4012,16 +4017,16 @@
             
             // 1. Update cached values for immediate text refresh
             try {
-                if (window.variableDataCache && window.variableDataCache[variableId]) {
+                if (state.variableDataCache && state.variableDataCache[variableId]) {
                     // Ensure cache has the newest raw value
-                    window.variableDataCache[variableId].rawValue = newValue;
+                    state.variableDataCache[variableId].rawValue = newValue;
                     // If not inactive, provisionally update formattedValue to the new raw value for instant UI update.
                     // The proper formatted value (with unit) will override this when its message arrives.
-                    const vc = window.variableDataCache[variableId];
+                    const vc = state.variableDataCache[variableId];
                     const shouldShow = vc && (vc.showValue === undefined || vc.showValue === true);
                     if (shouldShow && !(vc && vc.progressbarInactive)) {
                         if (typeof vc.formattedValue === 'undefined' || vc.formattedValue === null) {
-                            window.variableDataCache[variableId].formattedValue = String(newValue);
+                            state.variableDataCache[variableId].formattedValue = String(newValue);
                         }
                     }
                 }
@@ -4031,10 +4036,10 @@
                 if (progressTextContainer) {
                     // Temporarily update cached raw/ formatted values if appropriate
                     try {
-                        if (window.variableDataCache && window.variableDataCache[variableId]) {
+                        if (state.variableDataCache && state.variableDataCache[variableId]) {
                             // rawValue already updated by caller; formattedValue may be updated separately in same message
                             // Re-render the text from current cache
-                            updateProgressText(progressTextContainer, window.variableDataCache[variableId]);
+                            updateProgressText(progressTextContainer, state.variableDataCache[variableId]);
                         }
                     } catch (_) {}
                 }
@@ -4067,8 +4072,8 @@
             const progressBars = document.querySelectorAll('.progress-bar');
             
             // Initialisiere Storage für vorherige Breiten falls nicht vorhanden
-            if (!window.previousProgressWidths) {
-                window.previousProgressWidths = {};
+            if (!state.previousProgressWidths) {
+                state.previousProgressWidths = {};
             }
             
             progressBars.forEach((progressBar, index) => {
@@ -4109,7 +4114,7 @@
                 }
                 
                 // Speichere NEUE Breite für nächstes Mal
-                window.previousProgressWidths[variableId] = newWidthFromData;
+                state.previousProgressWidths[variableId] = newWidthFromData;
             });
             
 
@@ -4131,6 +4136,12 @@
         }
         
         // Hilfsfunktion für Progress-Bar-Update
+
+        // Globale Verträge: handleMessage wird vom PHP-injizierten Initial-Skript aufgerufen,
+        // handleButtonClick aus inline-onclick im generierten HTML.
+        window.handleMessage = handleMessage;
+        window.handleButtonClick = handleButtonClick;
+        })();
     </script>
 
 
