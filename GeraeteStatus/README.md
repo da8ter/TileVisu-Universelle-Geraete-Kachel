@@ -1,9 +1,11 @@
 
 ![IP-Symcon](https://img.shields.io/badge/IP--Symcon-Module-blue.svg)
 
-# Universal Device Tile
+# Universelle Geräte Kachel
 
-Das Modul **Universal Device Tile** stellt eine flexibel konfigurierbare Geräte-Kachel für die IP-Symcon Visualisierung bereit. Eine Kachel kann Statusinformationen, frei wählbare Variablen, Progress-Balken, Buttons und Bilder in einem gemeinsamen Layout kombinieren.
+![Kachelübersicht](https://github.com/da8ter/images/blob/main/kachelanleitung_ugk.png)
+
+Das Modul **Universelle Geräte Kachel** stellt eine flexibel konfigurierbare Geräte-Kachel für die IP-Symcon Visualisierung bereit. Eine Kachel kann Statusinformationen, frei wählbare Variablen, Fortschrittsbalken, Schieberegler, Schalter und Bilder in einem gemeinsamen Layout kombinieren.
 
 ## Inhaltsverzeichnis
 1. [Funktion](#funktion)
@@ -16,11 +18,13 @@ Das Modul **Universal Device Tile** stellt eine flexibel konfigurierbare Geräte
 
 ## Funktion
 - **Statusbereich**: Anzeige einer zentralen Statusvariable inklusive optionalem Icon, Label, Wert sowie Standard- oder Default-Bild.
-- **Universelle Variablenliste**: Darstellung mehrerer Variablen als Text, Progress-Balken, Buttons oder Bilder; Gruppierung mehrerer Variablen pro Zeile möglich.
-- **Progress-Balken**: Zweite Wertezeile, einstellbare Farben, deaktivierte Balken werden automatisch ausgegraut.
-- **Buttons & Skripte**: Boolesche Variablen oder Skriptaufrufe mit individuellen Icons, Beschriftungen und Spin-Indikator während der Ausführung.
+- **Universelle Variablenliste**: Darstellung mehrerer Variablen als Text, Fortschrittsbalken, Schieberegler, Schalter oder Bilder; Gruppierung mehrerer Variablen pro Zeile möglich.
+- **Fortschrittsbalken**: Optionale zweite Variable als Zusatzzeile oder Marker (z. B. Soll-/Zielwerte), einstellbare Farben; deaktivierte Balken werden automatisch ausgegraut.
+- **Schieberegler-Steuerung**: Profilbasierte Min-/Max-/Schrittwerte mit Drag-Steuerung, +/- Schaltern und automatischer Schreib-Verifikation.
+- **Schalter & Aktionen**: Bool-, Integer- und String-Variablen, optionale Skript-Schalter sowie Schalter zum Öffnen von Objekten und Kategorien in der Kachelvisualisierung.
+- **Variablelose Zeilen**: Bild- und Schalter-Zeilen können auch ohne direkte Variable über Medienobjekt, Skript oder Open Object konfiguriert werden.
 - **Bild- und Icon-Unterstützung**: Eigene Medienobjekte, Symcon-Icons oder vorkonfigurierte Bilder können angezeigt werden.
-- **Layout-Steuerung**: Globale Einstellungen für Abstände, Hintergrund, Bildposition, Gruppennamen, Stretch-Modus für Button-Gruppen u. v. m.
+- **Layout-Steuerung**: Globale Einstellungen für Abstände, Hintergrund, Status-Bildposition, Gruppennamen, Stretch-Modus für Button-Gruppen u. v. m.
 
 ## Voraussetzungen
 - IP-Symcon Version ≥ 7.2
@@ -36,52 +40,81 @@ Das Modul **Universal Device Tile** stellt eine flexibel konfigurierbare Geräte
 
 
 2. Das Modul aktualisieren/laden.
-3. In der Instanzen-Verwaltung eine neue Instanz vom Typ **Universal Device Tile** anlegen.
+3. In der Instanzen-Verwaltung eine neue Instanz vom Typ **Universelle Geräte Kachel** anlegen.
 
 ## Konfiguration
 
 Die Konfiguration gliedert sich in mehrere Bereiche der Form:
 
-- **Tile configuration**
-  - Hintergrundbild, Transparenz und Hintergrundfarbe der Kachel.
-  - Position und Ausrichtung des Hauptbildes; Standard-Hintergrund aktivieren/deaktivieren.
+- **Kachel-Konfiguration**
+  - Hintergrundbild: Bild welches als Kachelhintergrund angezeigt wird.
+  - Transparenz: Tranparenz vom Hintergrundbild. Werte zwischen 0 und 1 sind erlaubt.
+  - Kachelhintergrundfarbe: Farbe des Kachelhintergrunds.
+  - Bild-Breite: Breite des Status-Bildes in Pixeln.
+  - Bildposition: Möglich sind oben, unten, links und rechts.
+  - Ausrichtung: Ausrichtung des Stsusbildes im Bildbereich der Kachel. Möglich sind links, mitte und rechts.
+  - Trenlinie: Blendet eine Trennlinie zwischen Status-Bild und dem Rest der Kachel ein.
 
-- **Device status**
-  - Auswahl der Statusvariable, Schriftgröße sowie Anzeigeoptionen für Icon/Label/Wert.
-  - Festlegen eines Default-Bildes und Pflege der Profilassoziationen (inkl. Bild-, Icon- und Farbwahl, Progressbar-Status).
+- **Gerätestatus**
+  - Statusvariable ausblenden: Die Variable wird nicht in der Kachel angezeigt. Sinnvoll wenn z.B. nur das Statusbild verwendet werden soll.
+  - Status: Auswahl der Statusvariable.
+  - Schriftgröße: Schriftgröße des Status.
+  - Icon anzeigen: Icon an oder ausschalten.
+  - Beschriftung anzeigen: Variablenname als Beschriftung anzeigen.
+  - Variablen-Wert anzeigen: Zeigt den Wert im Frontend an.
+  - Benutzerdefinierte Beschriftung: Überschreibt den Variablennamen.
+  - Ausrichtung: Ausrichtung des Status. Möglich sind links, mitte und rechts.
+  - Standard-Bild: Standard-Bild wird immer dann angezeigt wenn bei der Profilzuordnung kein anderes Bild oder Icon eingestellt ist.
+  - Profilzuordnung: Konfigurtion der einzelnen Profilzuordnungen bzw. Darstellungs-Optionen. Folgende Konfigurationsmöglichkeiten gibt es:
+    - Bildauswahl: Auswahl des Bildes.
+    - Iconauswahl: Auswahl des Icons.
+    - Iconfarbe: Auswahl der Iconfarbe.
+    - Stausfarbe: Auswahl der Stausfarbe.
+    - Fortschrittsbalken aktiv = an: Bei diesem Status werden Fortschrittsbalken angezeigt.
+    - Fortschrittsbalken aktiv = aus: Bei diesem Status werden Fortschrittsbalken inaktiv und ausgegraut angezeigt. 
 
 - **Globale Darstellungsoptionen**
-  - Gemeinsame Einstellungen für Progress-Balken (Größe, Farben, Transparenz) und Buttons (Höhe).
-  - Steuerung des vertikalen Abstands zwischen Elementen und allgemeine Rundungen.
+  - Eckenradius Fortschrittsbalken und Schalter: Eckenradius der Fortschrittsbalken und Schalter.
+  - Vertikaler Abstand zwischen Elementen: Vertikaler Abstand zwischen den Elementen.
+    
+    Fortschrittsbalken:
+    - Höhe: Höhe der Fortschrittsbalken in Pixel
+    - Hintergrundfarbe: Hintergrundfarbe der Fortschrittsbalken.
+    - Hintergrundtransparenz: Transparenz des Fortschrittsbalken-Hintergrunds.
+    Schalter:
+    - Höhe: Höhe der Schalter in Pixel
 
-- **VariablesList**
+- **Variablenliste**
   - Zentrale Liste der dargestellten Variablen (Drag & Drop für Reihenfolge).
-  - Je Eintrag: Display-Typ (`text`, `progress`, `button`, `image`), Anzeigeoptionen, Gruppenzugehörigkeit, Farben, Skript-IDs, Zweitvariablen für Progress u. a.
-  - Für `button`-Einträge lassen sich optionale Skript-IDs und fixe Button-Breiten hinterlegen.
-  - Für `image`-Einträge stehen Medienobjekt, Breite und Radius zur Verfügung.
+  - Je Eintrag: Darstellungsart (Text, Fortschrittsbalken, Schieberegler, Schalter, Bild), Anzeigeoptionen, Gruppenzugehörigkeit, Farben, Skript-IDs, Objektziele zum Öffnen und Zweitvariablen für den Fortschrittsbalken.
+  - Für Fortschrittsbalken kann eine zweite Variable als Zusatzinformation oder Marker genutzt werden.
+  - Für Schieberegler stehen eigene Schieberegler-Farben (Schieberegler-Farbe 1/2) zur Verfügung.
+  - Für Schalter lassen sich optionale Skript-IDs, Objektziele zum Öffnen in der Kachelvisualisierungund feste Schalterbreiten hinterlegen (auch ohne Variable).
+  - Für Bilder stehen Medienobjekt, Breite und Radius zur Verfügung (auch ohne Variable).
 
-- **Group Configuration**
+- **Gruppenkonfiguration**
   - Definition der Gruppennamen, Icons und Optionen (Name über Gruppe, Trennlinie, Stretch-Modus).
-  - Globale Schriftgröße für Gruppennamen.
+  - Gruppennamen-Gröpße: Globale Schriftgröße für Gruppennamen.
+  - Gruppenname anzeigen: zeigt den Gruppennamen im Frontend an.
+  - Name über Gruppe: Wenn an, wird der Gruppenname über den Gruppenelementen angezeigt. Wenn aus, wird der Gruppenname links vor den Gruppenelementen angezeigt.
+  - Linie unter Gruppe: Blendet eine Trennlinie zwischen Gruppen ein.
+  - Schalter auf volle Breite: Schalter in einer Gruppe werden auf die volle verfügbare Breite gestreckt.
 
-> **Hinweis:** Änderungen an Variablen oder Medien werden durch das Modul überwacht und automatisch in die Visualisierung eingespielt.
 
 ## Visualisierung und Bedienung
-- Die Kachel wird im WebFront bzw. in unterstützten Visualisierungen angezeigt.
-- Buttons reagieren abhängig vom Modus:
-  - Boolesche Buttons spiegeln den Variablenzustand.
-  - Script-Buttons lösen das hinterlegte Skript aus, zeigen während der Ausführung ein drehendes FontAwesome-Icon und leuchten für die Dauer des Spins auf.
-- Deaktivierte Progress-Balken und Werte werden automatisch ausgegraut und mit `-` angezeigt.
+- Die Kachel wird in der Kachel-Visualisierung angezeigt.
+- Schalter reagieren abhängig vom Modus:
+  - Boolesche Schalter spiegeln den Variablenzustand.
+  - Integer-/String-Schalter werden aus Assoziationen und Darstellungen als Mehrfach-Schaltergruppe dargestellt.
+  - Skript-Schalter lösen das hinterlegte Skript aus, zeigen während der Ausführung ein drehendes FontAwesome-Icon und leuchten für die Dauer des Spins auf.
+  - Schalter zum Öffnen von Objekten öffnen das konfigurierte Zielobjekt in der Kachelvisualisierung.
+- Deaktivierte Fortschrittsbalken und Werte werden automatisch ausgegraut und mit dem Wert`-` angezeigt.
+- Schieberegler unterstützen Drag und +/- Schalter, setzen Werte optimistisch und verifizieren anschließend, ob der Wert tatsächlich in die Variable geschrieben wurde. Falls nicht, springt der Schieberegler automatisch auf den tatsächlichen Variablenwert zurück.
+- Schieberegler-Farben: Schieberegler verwenden eigene Schieberegler-Farben (Schieberegler-Farbe 1/2). Sind diese nicht gesetzt, wird auf die Fortschrittsbalken-Farben zurückgefallen.
 
 ## PHP-Befehle
 Das Modul stellt aktuell keine öffentlichen PHP-Befehle bereit. Die komplette Funktionalität erfolgt über die Instanz-Konfiguration.
 
 ## Changelog
-- **1.0.3**
-  - Verbesserte Script-Button-Anzeige inklusive Spin-Status und Opacity-Handling.
-  - Korrekturen am Fallback-Icon und an der Icon-Wiederherstellung.
-  - README nach Symcon-Vorgaben ergänzt.
-- **1.0.2**
-  - Diverse Fehlerkorrekturen bei Default-Bildern und Progress-Anzeige.
-- **1.0.1**
-  - Initiale öffentliche Version.
+- **2.0.0**
+  - Stable Release.
