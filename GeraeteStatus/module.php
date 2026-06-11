@@ -1095,6 +1095,46 @@ class UniversalDeviceTile extends IPSModule
         $this->LogMessage('UDTImagesHook: Not found', KL_ERROR);
     }
 
+    /**
+     * Prüft anhand des LastVarValues-Caches, ob sich der Wert der Variable geändert hat,
+     * und merkt sich den neuen Wert. Liefert false bei unverändertem Wert.
+     */
+    private function hasValueChangedAndRemember(int $senderId): bool
+    {
+        $last = json_decode($this->ReadAttributeString('LastVarValues'), true);
+        if (!is_array($last)) { $last = []; }
+        $cur = GetValue($senderId);
+        $k = strval($senderId);
+        if (array_key_exists($k, $last) && $last[$k] === $cur) {
+            return false;
+        }
+        $last[$k] = $cur;
+        $this->WriteAttributeString('LastVarValues', json_encode($last));
+        return true;
+    }
+
+    /**
+     * Sendet ein Minimal-Update in zwei Wellen (erst formatierte Werte, dann _value-Rohwerte).
+     * Fällt bei leerem Minimal-Update auf die vollständige Nachricht zurück.
+     */
+    private function sendSplitMinimalUpdate(array $minimal, string $fullMessageJson): void
+    {
+        if (empty($minimal)) {
+            $this->UpdateVisualizationValue($fullMessageJson);
+            return;
+        }
+        foreach ($minimal as $k => $v) {
+            if (substr($k, -6) !== '_value') {
+                $this->UpdateVisualizationValue(json_encode([$k => $v]));
+            }
+        }
+        foreach ($minimal as $k => $v) {
+            if (substr($k, -6) === '_value') {
+                $this->UpdateVisualizationValue(json_encode([$k => $v]));
+            }
+        }
+    }
+
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
         if ($Message === IPS_KERNELSTARTED) {
@@ -1102,109 +1142,47 @@ class UniversalDeviceTile extends IPSModule
             return;
         }
 
+        // Status-Variable: minimalen Status-Payload senden.
+        // Achtung: bewusst kein return — die Status-Variable kann zusätzlich
+        // in der Variablenliste konfiguriert sein (Dedup verhindert Doppel-Updates).
         $statusId = $this->ReadPropertyInteger('Status');
-        if ($statusId > 0 && $SenderID === $statusId) {
-            switch ($Message) {
-            case VM_UPDATE:
-                $last = json_decode($this->ReadAttributeString('LastVarValues'), true);
-                if (!is_array($last)) { $last = []; }
-                $cur = GetValue($SenderID);
-                $k = strval($SenderID);
-                if (array_key_exists($k, $last) && $last[$k] === $cur) { break; }
-                $last[$k] = $cur;
-                $this->WriteAttributeString('LastVarValues', json_encode($last));
-                // Status-Änderung: Sende minimalen Status-Update-Payload
-                $fullMessage = $this->GetFullUpdateMessage();
-                $fullArray = json_decode($fullMessage, true);
-                $minimal = $this->buildMinimalStatusUpdate($fullArray);
-                if (!empty($minimal)) {
-                    $this->UpdateVisualizationValue(json_encode($minimal));
-                    // WICHTIG: Variablen neu schicken, damit progressbarActive/Inaktiv sofort wirkt
-                    if (isset($fullArray['variables']) && is_array($fullArray['variables'])) {
-                        $this->UpdateVisualizationValue(json_encode(['variables' => $fullArray['variables']]));
-                    }
-                } else {
-                    // Fallback: vollständige Nachricht
-                    $this->UpdateVisualizationValue($fullMessage);
+        if ($Message === VM_UPDATE && $statusId > 0 && $SenderID === $statusId
+            && $this->hasValueChangedAndRemember($SenderID)) {
+            $fullMessage = $this->GetFullUpdateMessage();
+            $fullArray = json_decode($fullMessage, true);
+            $minimal = $this->buildMinimalStatusUpdate($fullArray);
+            if (!empty($minimal)) {
+                $this->UpdateVisualizationValue(json_encode($minimal));
+                // WICHTIG: Variablen neu schicken, damit progressbarActive/Inaktiv sofort wirkt
+                if (isset($fullArray['variables']) && is_array($fullArray['variables'])) {
+                    $this->UpdateVisualizationValue(json_encode(['variables' => $fullArray['variables']]));
                 }
-                break;
+            } else {
+                // Fallback: vollständige Nachricht
+                $this->UpdateVisualizationValue($fullMessage);
             }
         }
 
-        // Dynamische Verarbeitung der konfigurierten Variablen
-        $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
-    
-        if (is_array($variablesList)) {
-            foreach ($variablesList as $index => $variable) {
-                // Prüfe Haupt-Variable
-                if (isset($variable['Variable']) && $SenderID === $variable['Variable']) {
-                    switch ($Message) {
-                        case VM_UPDATE:
-                            $last = json_decode($this->ReadAttributeString('LastVarValues'), true);
-                            if (!is_array($last)) { $last = []; }
-                            $cur = GetValue($SenderID);
-                            $k = strval($SenderID);
-                            if (array_key_exists($k, $last) && $last[$k] === $cur) { break; }
-                            $last[$k] = $cur;
-                            $this->WriteAttributeString('LastVarValues', json_encode($last));
-                            // Variable-Änderung: Sende minimalen var_<index> und var_<index>_value Payload
-                            $fullMessage = $this->GetFullUpdateMessage();
-                            $fullArray = json_decode($fullMessage, true);
-                            $minimal = $this->buildMinimalVarUpdateForVariable($fullArray, $SenderID);
-                            if (!empty($minimal)) {
-                                // Split into two messages like Wallbox: formatted first, then rawValue
-                                foreach ($minimal as $k => $v) {
-                                    if (substr($k, -6) !== '_value') {
-                                        $this->UpdateVisualizationValue(json_encode([$k => $v]));
-                                    }
-                                }
-                                foreach ($minimal as $k => $v) {
-                                    if (substr($k, -6) === '_value') {
-                                        $this->UpdateVisualizationValue(json_encode([$k => $v]));
-                                    }
-                                }
-                            } else {
-                                // Fallback: vollständige Nachricht
-                                $this->UpdateVisualizationValue($fullMessage);
-                            }
-                            break;
+        // Dynamische Verarbeitung der konfigurierten Variablen (Haupt- und SecondVariable)
+        if ($Message === VM_UPDATE) {
+            $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
+            if (is_array($variablesList)) {
+                foreach ($variablesList as $variable) {
+                    $isMain = isset($variable['Variable']) && $SenderID === $variable['Variable'];
+                    $isSecond = !$isMain && isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable'];
+                    if (!$isMain && !$isSecond) {
+                        continue;
                     }
-                }
-                // Prüfe SecondVariable
-                elseif (isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable']) {
-                    switch ($Message) {
-                        case VM_UPDATE:
-                            $last = json_decode($this->ReadAttributeString('LastVarValues'), true);
-                            if (!is_array($last)) { $last = []; }
-                            $cur = GetValue($SenderID);
-                            $k = strval($SenderID);
-                            if (array_key_exists($k, $last) && $last[$k] === $cur) { break; }
-                            $last[$k] = $cur;
-                            $this->WriteAttributeString('LastVarValues', json_encode($last));
-                            // SecondVariable-Änderung: Sende minimalen Update-Payload für die zugehörige Progress-Variable
-                            $fullMessage = $this->GetFullUpdateMessage();
-                            $fullArray = json_decode($fullMessage, true);
-                            $minimal = $this->buildMinimalVarUpdateForSecondVariable($fullArray, $SenderID);
-                            if (!empty($minimal)) {
-                                // Split into two messages like Wallbox: formatted first, then rawValue
-                                foreach ($minimal as $k => $v) {
-                                    if (substr($k, -6) !== '_value') {
-                                        $this->UpdateVisualizationValue(json_encode([$k => $v]));
-                                    }
-                                }
-                                foreach ($minimal as $k => $v) {
-                                    if (substr($k, -6) === '_value') {
-                                        $this->UpdateVisualizationValue(json_encode([$k => $v]));
-                                    }
-                                }
-                            } else {
-                                // Fallback: vollständige Nachricht
-                                $this->UpdateVisualizationValue($fullMessage);
-                            }
-                            break;
+                    if (!$this->hasValueChangedAndRemember($SenderID)) {
+                        continue;
                     }
+                    $fullMessage = $this->GetFullUpdateMessage();
+                    $fullArray = json_decode($fullMessage, true);
+                    $minimal = $isMain
+                        ? $this->buildMinimalVarUpdateForVariable($fullArray, $SenderID)
+                        : $this->buildMinimalVarUpdateForSecondVariable($fullArray, $SenderID);
+                    $this->sendSplitMinimalUpdate($minimal, $fullMessage);
                 }
-                
             }
         }
 
