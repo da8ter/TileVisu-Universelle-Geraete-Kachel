@@ -3260,65 +3260,8 @@
             // Keine Nachbearbeitung erforderlich – Bilder verwenden direkt WebHook-URLs
         }
         
-        // Hilfsfunktion zum Rendern einer einzelnen Variable
-        function renderSingleVariable(variable, isGrouped = false) {
+        function renderProgressContent(variable, ctx) {
             let content = '';
-            
-            // Bestimme Darstellungstyp für Gruppenlayout
-            const isProgressBar = variable.displayType === 'progress' || variable.displayType === 'slider';
-            
-            // Wrapper-Stil je nach Kontext - Progress-Balken unterstützen jetzt auch Gruppen
-            let wrapperStyle;
-            // Alignment mapping for text/button
-            const alignment = (variable.alignment || 'left');
-            const justifyMap = alignment === 'center' ? 'center' : (alignment === 'right' ? 'flex-end' : 'flex-start');
-            
-            // Nur font-size setzen wenn nicht -1
-            const fontSizeStyle = variable.fontSize !== -1 ? `font-size: ${variable.fontSize}px;` : '';
-            
-            if (isGrouped) {
-                if (isProgressBar) {
-                    // Progress-Balken in Gruppen: Inline-flex damit sie nebeneinander passen, aber mit voller verfügbarer Breite
-                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0; ${fontSizeStyle} color: ${getTextColor(variable)};`;
-                } else {
-                    // Text/Button-Variablen in Gruppen: eigene Breite, Ausrichtung übernimmt die Gruppe
-                    // SPEZIAL: Für Image in Gruppen flex-direction: column, daher align-items für horizontale Ausrichtung
-                    const alignForGroupItem = (variable.displayType === 'image') ? `align-items: ${justifyMap};` : '';
-                    // Für Bilder in Gruppen: Keine Breite am Wrapper setzen; Breite wird am .variable-group-item gesetzt
-                    const noWrapForImage = (variable.displayType === 'image') ? '' : 'white-space: nowrap;';
-                    const justifyForGroupItem = (variable.displayType === 'image') ? '' : `justify-content: ${justifyMap};`;
-                    const alignSelfForGroupItem = (alignment === 'center') ? 'align-self: center;' : '';
-                    wrapperStyle = `display: inline-flex; align-items: center; ${justifyForGroupItem} ${alignForGroupItem} ${alignSelfForGroupItem} margin: 0; ${noWrapForImage} ${fontSizeStyle} color: ${getTextColor(variable)};`;
-                }
-            } else {
-                // Ungrouped: Standard-Layout mit horizontaler Ausrichtung für Text/Button/Image
-                if (variable.displayType === 'text' || variable.displayType === 'button' || variable.displayType === 'image' || variable.displayType === 'slider') {
-                    wrapperStyle = `display: flex; align-items: center; justify-content: ${justifyMap}; width: 100%; ${fontSizeStyle} color: ${getTextColor(variable)};`;
-                } else {
-                    wrapperStyle = `${fontSizeStyle} color: ${getTextColor(variable)};`;
-                }
-            }
-                
-            // CSS-Klassen für Variable zusammenstellen
-            let cssClasses = 'variable-item';
-            if (variable.displayType === 'text') {
-                cssClasses += ' text-variable';
-            } else if (variable.displayType === 'progress') {
-                cssClasses += ' progress-variable';
-            } else if (variable.displayType === 'slider') {
-                cssClasses += ' slider-variable';
-            }
-            // Füge border-line Klasse hinzu wenn konfiguriert UND NICHT gruppiert
-            // Bei gruppierten Variablen zeigt nur die Gruppe die Linie, nicht die einzelnen Variablen
-            if (variable.showBorderLine && variable.displayType === 'text' && !isGrouped) {
-                cssClasses += ' with-border-line';
-            }
-                
-            // Add data-variable-id to outer wrapper for minimal updates (text/button/image)
-            content += `<div class="${cssClasses}" style="${wrapperStyle}" data-variable-id="${variable.id}">`;
-
-                // Wert je nach Darstellungstyp hinzufügen
-                if (variable.displayType === 'progress') {
                     // Fortschrittsbalken - nutze Backend-Werte (Backend behandelt bereits Deaktivierung)
                     let rawValue = variable.rawValue;
                     let progressValue = calculateProgressValue(rawValue, variable.progressMin, variable.progressMax);
@@ -3495,7 +3438,11 @@
                             </div>
                         </div>
                     `;
-                } else if (variable.displayType === 'slider') {
+            return content;
+        }
+        
+        function renderSliderContent(variable, ctx) {
+            let content = '';
                     const inactiveStyle = variable.progressbarInactive ? 'opacity: 0.5; pointer-events: none;' : '';
                     const min = parseFloat(variable.progressMin) || 0;
                     const max = parseFloat(variable.progressMax) || 100;
@@ -3540,7 +3487,12 @@
                             ${valueHtml}
                         </div>
                     `;
-                } else if (variable.displayType === 'image') {
+            return content;
+        }
+        
+        function renderImageContent(variable, ctx) {
+            const { isGrouped, alignment } = ctx;
+            let content = '';
                     // Rendering: Symcon Medienobjekt als Data-URI mit Breite/Radius und optional Icon/Label/Value
                     let parts = [];
                     // Image width is now percentage (1-100). Default 40% when not set.
@@ -3577,7 +3529,12 @@
                     }
 
                     content += parts.join(' ');
-                } else if (variable.displayType === 'button') {
+            return content;
+        }
+        
+        function renderButtonContent(variable, ctx) {
+            const { isGrouped, justifyMap } = ctx;
+            let content = '';
                     // Button für Bool-Variablen (VARIABLETYPE_BOOLEAN = 0) und Integer-Variablen (VARIABLETYPE_INTEGER = 1)
                     if (variable.variableType === 0) {
                         // Boolean-Variable: Einzelner Button
@@ -3910,6 +3867,75 @@
                             ${textParts.join(' ')}
                         </div>`;
                     }
+            return content;
+        }
+        
+        // Hilfsfunktion zum Rendern einer einzelnen Variable
+        function renderSingleVariable(variable, isGrouped = false) {
+            let content = '';
+            
+            // Bestimme Darstellungstyp für Gruppenlayout
+            const isProgressBar = variable.displayType === 'progress' || variable.displayType === 'slider';
+            
+            // Wrapper-Stil je nach Kontext - Progress-Balken unterstützen jetzt auch Gruppen
+            let wrapperStyle;
+            // Alignment mapping for text/button
+            const alignment = (variable.alignment || 'left');
+            const justifyMap = alignment === 'center' ? 'center' : (alignment === 'right' ? 'flex-end' : 'flex-start');
+            
+            // Nur font-size setzen wenn nicht -1
+            const fontSizeStyle = variable.fontSize !== -1 ? `font-size: ${variable.fontSize}px;` : '';
+            
+            if (isGrouped) {
+                if (isProgressBar) {
+                    // Progress-Balken in Gruppen: Inline-flex damit sie nebeneinander passen, aber mit voller verfügbarer Breite
+                    wrapperStyle = `display: inline-flex; align-items: center; margin: 0; ${fontSizeStyle} color: ${getTextColor(variable)};`;
+                } else {
+                    // Text/Button-Variablen in Gruppen: eigene Breite, Ausrichtung übernimmt die Gruppe
+                    // SPEZIAL: Für Image in Gruppen flex-direction: column, daher align-items für horizontale Ausrichtung
+                    const alignForGroupItem = (variable.displayType === 'image') ? `align-items: ${justifyMap};` : '';
+                    // Für Bilder in Gruppen: Keine Breite am Wrapper setzen; Breite wird am .variable-group-item gesetzt
+                    const noWrapForImage = (variable.displayType === 'image') ? '' : 'white-space: nowrap;';
+                    const justifyForGroupItem = (variable.displayType === 'image') ? '' : `justify-content: ${justifyMap};`;
+                    const alignSelfForGroupItem = (alignment === 'center') ? 'align-self: center;' : '';
+                    wrapperStyle = `display: inline-flex; align-items: center; ${justifyForGroupItem} ${alignForGroupItem} ${alignSelfForGroupItem} margin: 0; ${noWrapForImage} ${fontSizeStyle} color: ${getTextColor(variable)};`;
+                }
+            } else {
+                // Ungrouped: Standard-Layout mit horizontaler Ausrichtung für Text/Button/Image
+                if (variable.displayType === 'text' || variable.displayType === 'button' || variable.displayType === 'image' || variable.displayType === 'slider') {
+                    wrapperStyle = `display: flex; align-items: center; justify-content: ${justifyMap}; width: 100%; ${fontSizeStyle} color: ${getTextColor(variable)};`;
+                } else {
+                    wrapperStyle = `${fontSizeStyle} color: ${getTextColor(variable)};`;
+                }
+            }
+                
+            // CSS-Klassen für Variable zusammenstellen
+            let cssClasses = 'variable-item';
+            if (variable.displayType === 'text') {
+                cssClasses += ' text-variable';
+            } else if (variable.displayType === 'progress') {
+                cssClasses += ' progress-variable';
+            } else if (variable.displayType === 'slider') {
+                cssClasses += ' slider-variable';
+            }
+            // Füge border-line Klasse hinzu wenn konfiguriert UND NICHT gruppiert
+            // Bei gruppierten Variablen zeigt nur die Gruppe die Linie, nicht die einzelnen Variablen
+            if (variable.showBorderLine && variable.displayType === 'text' && !isGrouped) {
+                cssClasses += ' with-border-line';
+            }
+                
+            // Add data-variable-id to outer wrapper for minimal updates (text/button/image)
+            content += `<div class="${cssClasses}" style="${wrapperStyle}" data-variable-id="${variable.id}">`;
+
+                // Wert je nach Darstellungstyp hinzufügen
+                if (variable.displayType === 'progress') {
+                    content += renderProgressContent(variable, {});
+                } else if (variable.displayType === 'slider') {
+                    content += renderSliderContent(variable, {});
+                } else if (variable.displayType === 'image') {
+                    content += renderImageContent(variable, { isGrouped, alignment });
+                } else if (variable.displayType === 'button') {
+                    content += renderButtonContent(variable, { isGrouped, justifyMap });
                 } else {
                     // Bei Textdarstellung: Label und Wert basierend auf Konfiguration
                     let textParts = [];
