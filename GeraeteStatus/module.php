@@ -123,6 +123,7 @@ class UniversalDeviceTile extends IPSModule
             'statusShowValue',
             'statusFontSize',
             'statusBildauswahl',
+            'statusImageUrl',
             'statusColor',
             'isStatusColorTransparent',
             'statusIconColor',
@@ -207,79 +208,190 @@ class UniversalDeviceTile extends IPSModule
      */
     public function GetConfigurationForm()
     {
-        // Hole die konfigurierten Gruppennamen
         $groupNames = $this->GetAllGroupNames();
-        
-        // Lade die statische Form als Text und ersetze Gruppennamen direkt
-        $formJson = file_get_contents(__DIR__ . '/form.json');
-        $formJson = $this->replaceGroupNamesInFormJson($formJson, $groupNames);
-        
-        // Parse die modifizierte Form
-        $form = json_decode($formJson, true);
-        
-        // Befülle die neue GroupName Anzeige-Spalte mit konfigurierten Gruppennamen
+        $formPath = __DIR__ . '/form.json';
+        $formJson = file_get_contents($formPath);
+        if ($formJson === false) {
+            $this->LogMessage('Could not read form.json.', KL_ERROR);
+            return '{}';
+        }
+
+        $form = $this->DecodeJsonArray($formJson, __FUNCTION__ . ':form.json');
+        if (!is_array($form)) {
+            $this->LogMessage('form.json is invalid JSON.', KL_ERROR);
+            return '{}';
+        }
+
+        $groupOptions = $this->BuildGroupSelectOptions($groupNames);
+        $this->UpdateGroupSelectOptionsInForm($form, $groupOptions);
+        $this->UpdateGroupOptionsInDynamicFormScript($form, $groupOptions);
         $this->populateGroupNameColumn($form, $groupNames);
-        
+
         return json_encode($form);
     }
-    
+
     /**
-     * Ersetzt Gruppennamen direkt im JSON-Text
-     * @param string $formJson Der JSON-Text der Form
      * @param array $groupNames Die konfigurierten Gruppennamen
-     * @return string Der modifizierte JSON-Text
+     * @return array
      */
-    private function replaceGroupNamesInFormJson($formJson, $groupNames)
+    private function BuildGroupSelectOptions(array $groupNames): array
     {
-        
-        // Baue die neuen Group-Optionen als Text
-        $newOptionsText = "";
-        
-        // Erste Option: keine Gruppe
-        $newOptionsText .= "        [ 'caption' => 'keine Gruppe', 'value' => 'keine Gruppe' ],\n";
-        
-        // Füge konfigurierte Gruppennamen hinzu
-        for ($i = 1; $i <= 10; $i++) {
-            $groupName = 'Gruppe ' . $i; // Fallback
-            
-            // Verwende konfigurierten Namen falls vorhanden
-            if (isset($groupNames[$i]) && !empty($groupNames[$i]['name'])) {
-                $groupName = $groupNames[$i]['name'];
-            }
-            
-            $comma = ($i < 10) ? ',' : ''; // Letztes Element ohne Komma
-            $newOptionsText .= "        [ 'caption' => '" . addslashes($groupName) . "', 'value' => 'Gruppe " . $i . "' ]" . $comma . "\n";
-        }
-        
-        // Definiere das Pattern für die alte Options-Sektion
-        $pattern = '/(
-        .*?"options" => \[\n).*?(        \],?\n)/s';
-        
-        // Alternative: Präziserer Pattern für Group Select Optionen
-        $pattern = '/("        \[ \'caption\' => \'keine Gruppe\'.*?)\n(.*?)(        \[ \'caption\' => \'Gruppe 10\'.*?)\n/s';
-        
-        // Noch einfacher: Ersetze direkt die bekannten statischen Zeilen
-        $patterns = [
-            "        [ 'caption' => 'Gruppe 1', 'value' => 'Gruppe 1' ]," => "        [ 'caption' => '" . addslashes($groupNames[1]['name'] ?? 'Gruppe 1') . "', 'value' => 'Gruppe 1' ],",
-            "        [ 'caption' => 'Gruppe 2', 'value' => 'Gruppe 2' ]," => "        [ 'caption' => '" . addslashes($groupNames[2]['name'] ?? 'Gruppe 2') . "', 'value' => 'Gruppe 2' ],",
-            "        [ 'caption' => 'Gruppe 3', 'value' => 'Gruppe 3' ]," => "        [ 'caption' => '" . addslashes($groupNames[3]['name'] ?? 'Gruppe 3') . "', 'value' => 'Gruppe 3' ],",
-            "        [ 'caption' => 'Gruppe 4', 'value' => 'Gruppe 4' ]," => "        [ 'caption' => '" . addslashes($groupNames[4]['name'] ?? 'Gruppe 4') . "', 'value' => 'Gruppe 4' ],",
-            "        [ 'caption' => 'Gruppe 5', 'value' => 'Gruppe 5' ]," => "        [ 'caption' => '" . addslashes($groupNames[5]['name'] ?? 'Gruppe 5') . "', 'value' => 'Gruppe 5' ],",
-            "        [ 'caption' => 'Gruppe 6', 'value' => 'Gruppe 6' ]," => "        [ 'caption' => '" . addslashes($groupNames[6]['name'] ?? 'Gruppe 6') . "', 'value' => 'Gruppe 6' ],",
-            "        [ 'caption' => 'Gruppe 7', 'value' => 'Gruppe 7' ]," => "        [ 'caption' => '" . addslashes($groupNames[7]['name'] ?? 'Gruppe 7') . "', 'value' => 'Gruppe 7' ],",
-            "        [ 'caption' => 'Gruppe 8', 'value' => 'Gruppe 8' ]," => "        [ 'caption' => '" . addslashes($groupNames[8]['name'] ?? 'Gruppe 8') . "', 'value' => 'Gruppe 8' ],",
-            "        [ 'caption' => 'Gruppe 9', 'value' => 'Gruppe 9' ]," => "        [ 'caption' => '" . addslashes($groupNames[9]['name'] ?? 'Gruppe 9') . "', 'value' => 'Gruppe 9' ],",
-            "        [ 'caption' => 'Gruppe 10', 'value' => 'Gruppe 10' ]" => "        [ 'caption' => '" . addslashes($groupNames[10]['name'] ?? 'Gruppe 10') . "', 'value' => 'Gruppe 10' ]"
+        $options = [
+            [
+                'caption' => 'keine Gruppe',
+                'value' => 'keine Gruppe'
+            ]
         ];
-        
-        // Ersetze jede Gruppe einzeln
-        foreach ($patterns as $search => $replace) {
-            $formJson = str_replace($search, $replace, $formJson);
+
+        for ($i = 1; $i <= 10; $i++) {
+            $caption = 'Gruppe ' . $i;
+            if (isset($groupNames[$i]['name']) && trim((string)$groupNames[$i]['name']) !== '') {
+                $caption = (string)$groupNames[$i]['name'];
+            }
+
+            $options[] = [
+                'caption' => $caption,
+                'value' => 'Gruppe ' . $i
+            ];
         }
-        
-        return $formJson;
+
+        return $options;
     }
-    
+
+    private function UpdateGroupSelectOptionsInForm(&$element, array $groupOptions): void
+    {
+        if (!is_array($element)) {
+            return;
+        }
+
+        if (($element['name'] ?? '') === 'Group' &&
+            isset($element['edit']) && is_array($element['edit']) &&
+            (($element['edit']['type'] ?? '') === 'Select')) {
+            $element['edit']['options'] = $groupOptions;
+        }
+
+        foreach ($element as &$subElement) {
+            $this->UpdateGroupSelectOptionsInForm($subElement, $groupOptions);
+        }
+    }
+
+    private function UpdateGroupOptionsInDynamicFormScript(&$element, array $groupOptions): void
+    {
+        if (!is_array($element)) {
+            return;
+        }
+
+        if (isset($element['form']) && is_array($element['form'])) {
+            $element['form'] = $this->PatchGroupOptionsInFormScriptLines($element['form'], $groupOptions);
+        }
+
+        foreach ($element as &$subElement) {
+            $this->UpdateGroupOptionsInDynamicFormScript($subElement, $groupOptions);
+        }
+    }
+
+    private function PatchGroupOptionsInFormScriptLines(array $formLines, array $groupOptions): array
+    {
+        $patched = [];
+        $inGroupSelect = false;
+        $inOptions = false;
+        $optionsInjected = false;
+        $groupOptionCount = count($groupOptions);
+
+        foreach ($formLines as $line) {
+            if (!is_string($line)) {
+                $patched[] = $line;
+                continue;
+            }
+
+            if (!$inGroupSelect &&
+                strpos($line, "'name' => 'Group'") !== false &&
+                strpos($line, "'type' => 'Select'") !== false) {
+                $inGroupSelect = true;
+            }
+
+            if ($inGroupSelect && !$inOptions && strpos($line, "'options' => [") !== false) {
+                $patched[] = $line;
+
+                foreach ($groupOptions as $index => $option) {
+                    $caption = addslashes((string)($option['caption'] ?? ''));
+                    $value = addslashes((string)($option['value'] ?? ''));
+                    $comma = ($index < ($groupOptionCount - 1)) ? ',' : '';
+                    $patched[] = "        [ 'caption' => '" . $caption . "', 'value' => '" . $value . "' ]" . $comma;
+                }
+
+                $inOptions = true;
+                $optionsInjected = true;
+                continue;
+            }
+
+            if ($inOptions) {
+                if (trim($line) === '],') {
+                    $patched[] = $line;
+                    $inOptions = false;
+                }
+                continue;
+            }
+
+            $patched[] = $line;
+
+            if ($inGroupSelect && strpos($line, "'visible' => true") !== false) {
+                $inGroupSelect = false;
+            }
+        }
+
+        return $optionsInjected ? $patched : $formLines;
+    }
+
+    private function DecodeJsonArray($value, string $context): ?array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (!is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $decoded = json_decode($value, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return null;
+        }
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        return $decoded;
+    }
+
+    private function LogCaughtThrowable(string $context, Throwable $e): void
+    {
+    }
+
+    private function IsKernelReady(): bool
+    {
+        if (!function_exists('IPS_GetKernelRunlevel') || !defined('KR_READY')) {
+            return true;
+        }
+
+        return IPS_GetKernelRunlevel() == KR_READY;
+    }
+
+    private function GetWebhookControlInstanceId(): int
+    {
+        if (!function_exists('IPS_GetInstanceListByModuleID')) {
+            return 0;
+        }
+
+        $webhookModuleId = '{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}';
+        $ids = IPS_GetInstanceListByModuleID($webhookModuleId);
+        if (!is_array($ids) || count($ids) === 0) {
+            return 0;
+        }
+
+        return (int)$ids[0];
+    }
+
+
 
     
 
@@ -389,6 +501,43 @@ class UniversalDeviceTile extends IPSModule
             }
             return '';
         }
+        // OpenObject-Buttons: OpenObjectId-Namen anzeigen (hat Priorität)
+        if (($displayType === 'button') && isset($row['OpenObjectId'])) {
+            $openObjectId = intval($row['OpenObjectId']);
+            if ($openObjectId > 1 && IPS_ObjectExists($openObjectId)) {
+                $obj = IPS_GetObject($openObjectId);
+                $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
+                $parentName = '';
+                if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
+                    $parent = IPS_GetObject($obj['ParentID']);
+                    $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
+                }
+                if ($name !== '' && $parentName !== '') {
+                    return $name . ' (' . $parentName . ')';
+                }
+                return $name;
+            }
+        }
+        // Script-Buttons ohne Variable: Script-Namen anzeigen
+        if (($displayType === 'button') && isset($row['ScriptID'])) {
+            $scriptId = intval($row['ScriptID']);
+            if ($scriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($scriptId)) {
+                $obj = IPS_GetObject($scriptId);
+                $name = isset($obj['ObjectName']) ? $obj['ObjectName'] : '';
+                $parentName = '';
+                if (isset($obj['ParentID']) && $obj['ParentID'] > 0 && IPS_ObjectExists($obj['ParentID'])) {
+                    $parent = IPS_GetObject($obj['ParentID']);
+                    $parentName = isset($parent['ObjectName']) ? $parent['ObjectName'] : '';
+                }
+                if (!empty($row['Label'])) {
+                    $name = $row['Label'];
+                }
+                if ($name !== '' && $parentName !== '') {
+                    return $name . ' (' . $parentName . ')';
+                }
+                return $name;
+            }
+        }
         $vid = intval($row['Variable'] ?? 0);
         if ($vid > 0 && IPS_VariableExists($vid)) {
             $obj = IPS_GetObject($vid);
@@ -409,8 +558,16 @@ class UniversalDeviceTile extends IPSModule
     public function ApplyChanges()
     {
         parent::ApplyChanges();
-        
-        
+
+        $this->RegisterMessage(0, IPS_KERNELSTARTED);
+
+        if (!$this->IsKernelReady()) {
+            return;
+        }
+
+        // Cache zurücksetzen für frischen Zustand nach Neustart
+        $this->WriteAttributeString('LastVarValues', '{}');
+
         // Stelle sicher, dass das Icon-Mapping geladen ist
         $this->LoadIconMapping();
 
@@ -418,7 +575,10 @@ class UniversalDeviceTile extends IPSModule
         $this->RegisterUDTImageHook('/hook/udtimages/' . $this->InstanceID);
 
         // Dynamische Referenzen und Nachrichten für konfigurierte Variablen
-        $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
+        $variablesList = $this->DecodeJsonArray($this->ReadPropertyString('VariablesList'), __FUNCTION__ . ':VariablesList');
+        if (!is_array($variablesList)) {
+            $variablesList = [];
+        }
         
 
         // Sammle alle Variablen-IDs
@@ -432,21 +592,19 @@ class UniversalDeviceTile extends IPSModule
             $ids[] = $statusId;
         }
         
-        if (is_array($variablesList)) {
-            foreach ($variablesList as $variable) {
-                if (isset($variable['Variable']) && $variable['Variable'] > 0) {
-                    $ids[] = $variable['Variable'];
-                }
-                // Registriere auch SecondVariable falls vorhanden
-                if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
-                    $ids[] = $variable['SecondVariable'];
-                }
-                // Sammle Medien für DisplayType=image
-                if ((($variable['DisplayType'] ?? 'text') === 'image')) {
-                    $imageId = intval($variable['ImageMedia'] ?? 0);
-                    if ($imageId > 0 && IPS_MediaExists($imageId)) {
-                        $mediaIds[] = $imageId;
-                    }
+        foreach ($variablesList as $variable) {
+            if (isset($variable['Variable']) && $variable['Variable'] > 0) {
+                $ids[] = $variable['Variable'];
+            }
+            // Registriere auch SecondVariable falls vorhanden
+            if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
+                $ids[] = $variable['SecondVariable'];
+            }
+            // Sammle Medien für DisplayType=image
+            if ((($variable['DisplayType'] ?? 'text') === 'image')) {
+                $imageId = intval($variable['ImageMedia'] ?? 0);
+                if ($imageId > 0 && IPS_MediaExists($imageId)) {
+                    $mediaIds[] = $imageId;
                 }
             }
         }
@@ -487,15 +645,13 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // Registriere Nachrichten für konfigurierte Variablen
-        if (is_array($variablesList)) {
-            foreach ($variablesList as $variable) {
-                if (isset($variable['Variable']) && $variable['Variable'] > 0) {
-                    $this->RegisterMessage($variable['Variable'], VM_UPDATE);
-                }
-                // Registriere auch SecondVariable falls vorhanden
-                if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
-                    $this->RegisterMessage($variable['SecondVariable'], VM_UPDATE);
-                }
+        foreach ($variablesList as $variable) {
+            if (isset($variable['Variable']) && $variable['Variable'] > 0) {
+                $this->RegisterMessage($variable['Variable'], VM_UPDATE);
+            }
+            // Registriere auch SecondVariable falls vorhanden
+            if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
+                $this->RegisterMessage($variable['SecondVariable'], VM_UPDATE);
             }
         }
 
@@ -510,7 +666,10 @@ class UniversalDeviceTile extends IPSModule
 
         // Schicke eine komplette Update-Nachricht an die Darstellung, da sich ja Parameter geändert haben können
         $fullUpdateMessageJson = $this->GetFullUpdateMessage(); // Gibt bereits JSON-String zurück
-        $fullUpdateMessage = json_decode($fullUpdateMessageJson, true); // In Array umwandeln
+        $fullUpdateMessage = $this->DecodeJsonArray($fullUpdateMessageJson, __FUNCTION__ . ':GetFullUpdateMessage');
+        if (!is_array($fullUpdateMessage)) {
+            $fullUpdateMessage = [];
+        }
         
         // Füge Asset-Update hinzu für Custom Images und Fallback-Assets
         $assets = $this->GenerateAssets();
@@ -519,6 +678,15 @@ class UniversalDeviceTile extends IPSModule
         }
         
         $this->UpdateVisualizationValue(json_encode($fullUpdateMessage));
+    }
+
+    public function Destroy()
+    {
+        if ($this->IsKernelReady()) {
+            $this->UnregisterUDTImageHook('/hook/udtimages/' . $this->InstanceID);
+        }
+
+        parent::Destroy();
     }
 
 
@@ -622,25 +790,30 @@ class UniversalDeviceTile extends IPSModule
 
     private function RegisterUDTImageHook(string $hookPath): void
     {
-        $webhookModuleId = '{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}';
-        $ids = @IPS_GetInstanceListByModuleID($webhookModuleId);
-        if (!is_array($ids) || count($ids) === 0) {
+        $whId = $this->GetWebhookControlInstanceId();
+        if ($whId <= 0) {
             $this->LogMessage('WebHook Control not found. Skipping hook registration.', KL_WARNING);
             return;
         }
-        $whId = $ids[0];
+
         $instToken = $this->ReadAttributeString('HookToken');
         if ($instToken === '') {
             try {
                 $instToken = bin2hex(random_bytes(16));
             } catch (Throwable $e) {
                 $instToken = substr(sha1(uniqid('', true)), 0, 32);
+                $this->LogCaughtThrowable(__FUNCTION__ . ':tokenFallback', $e);
             }
             $this->WriteAttributeString('HookToken', $instToken);
         }
 
-        $hooks = @json_decode(IPS_GetProperty($whId, 'Hooks'), true);
+        $hooksRaw = IPS_GetProperty($whId, 'Hooks');
+        $hooks = $this->DecodeJsonArray($hooksRaw, __FUNCTION__ . ':Hooks');
         if (!is_array($hooks)) {
+            if (trim((string)$hooksRaw) !== '') {
+                $this->LogMessage('Invalid webhook hooks JSON. Registration skipped to avoid overwriting hooks.', KL_ERROR);
+                return;
+            }
             $hooks = [];
         }
         $found = false;
@@ -657,7 +830,45 @@ class UniversalDeviceTile extends IPSModule
                 'TargetID' => $this->InstanceID
             ];
         }
-        IPS_SetProperty($whId, 'Hooks', json_encode($hooks));
+
+        IPS_SetProperty($whId, 'Hooks', json_encode(array_values($hooks)));
+        IPS_ApplyChanges($whId);
+    }
+
+    private function UnregisterUDTImageHook(string $hookPath): void
+    {
+        $whId = $this->GetWebhookControlInstanceId();
+        if ($whId <= 0) {
+            return;
+        }
+
+        $hooksRaw = IPS_GetProperty($whId, 'Hooks');
+        $hooks = $this->DecodeJsonArray($hooksRaw, __FUNCTION__ . ':Hooks');
+        if (!is_array($hooks)) {
+            return;
+        }
+
+        $changed = false;
+        $filteredHooks = [];
+        foreach ($hooks as $hook) {
+            if (!is_array($hook)) {
+                continue;
+            }
+
+            $isCurrentHook = (($hook['Hook'] ?? '') === $hookPath);
+            if ($isCurrentHook) {
+                $changed = true;
+                continue;
+            }
+
+            $filteredHooks[] = $hook;
+        }
+
+        if (!$changed) {
+            return;
+        }
+
+        IPS_SetProperty($whId, 'Hooks', json_encode(array_values($filteredHooks)));
         IPS_ApplyChanges($whId);
     }
 
@@ -705,7 +916,13 @@ class UniversalDeviceTile extends IPSModule
         }
         header('X-Accel-Buffering: no');
         if (function_exists('ignore_user_abort')) { ignore_user_abort(true); }
-        if (function_exists('set_time_limit')) { @set_time_limit(0); }
+        if (function_exists('set_time_limit')) {
+            try {
+                set_time_limit(0);
+            } catch (Throwable $e) {
+                $this->LogCaughtThrowable(__FUNCTION__ . ':set_time_limit', $e);
+            }
+        }
         $MAX_SIZE = 5 * 1024 * 1024;
         $detectMime = function(string $bin) {
             $hdr = substr($bin, 0, 12);
@@ -733,18 +950,18 @@ class UniversalDeviceTile extends IPSModule
         $streamFile = function(string $file, string $mime, bool $longCache = false) use ($MAX_SIZE, $sendNotModified) {
             if (!is_file($file) || !is_readable($file)) {
                 http_response_code(404);
-                IPS_LogMessage('UDTImagesHook', 'File not found or unreadable: ' . $file);
+                $this->LogMessage('UDTImagesHook: File not found or unreadable: ' . $file, KL_ERROR);
                 exit;
             }
             $size = filesize($file);
             if ($size === false) {
                 http_response_code(500);
-                IPS_LogMessage('UDTImagesHook', 'filesize failed: ' . $file);
+                $this->LogMessage('UDTImagesHook: filesize failed: ' . $file, KL_ERROR);
                 exit;
             }
             if ($size > $MAX_SIZE) {
                 http_response_code(413);
-                IPS_LogMessage('UDTImagesHook', 'File too large: ' . $size);
+                $this->LogMessage('UDTImagesHook: File too large: ' . $size, KL_ERROR);
                 exit;
             }
             $mtime = filemtime($file) ?: time();
@@ -762,7 +979,7 @@ class UniversalDeviceTile extends IPSModule
             $fh = fopen($file, 'rb');
             if ($fh === false) {
                 http_response_code(500);
-                IPS_LogMessage('UDTImagesHook', 'fopen failed: ' . $file);
+                $this->LogMessage('UDTImagesHook: fopen failed: ' . $file, KL_ERROR);
                 exit;
             }
             $chunk = 65536;
@@ -791,7 +1008,7 @@ class UniversalDeviceTile extends IPSModule
                 $b64 = IPS_GetMediaContent($mid);
                 if (!is_string($b64) || $b64 === '') {
                     http_response_code(404);
-                    IPS_LogMessage('UDTImagesHook', 'Empty media content mid=' . $mid);
+                    $this->LogMessage('UDTImagesHook: Empty media content mid=' . $mid, KL_ERROR);
                     return;
                 }
                 $prefixSample = base64_decode(substr($b64, 0, 24), true);
@@ -803,7 +1020,7 @@ class UniversalDeviceTile extends IPSModule
                 $decodedLen = (int)floor($len / 4) * 3 - $padding;
                 if ($decodedLen > $MAX_SIZE) {
                     http_response_code(413);
-                    IPS_LogMessage('UDTImagesHook', 'Media too large mid=' . $mid . ' size=' . $decodedLen);
+                    $this->LogMessage('UDTImagesHook: Media too large mid=' . $mid . ' size=' . $decodedLen, KL_ERROR);
                     return;
                 }
                 header('Cache-Control: no-store');
@@ -812,7 +1029,7 @@ class UniversalDeviceTile extends IPSModule
                 $out = fopen('php://output', 'wb');
                 if ($out === false) {
                     http_response_code(500);
-                    IPS_LogMessage('UDTImagesHook', 'open php://output failed');
+                    $this->LogMessage('UDTImagesHook: open php://output failed', KL_ERROR);
                     return;
                 }
                 $filter = stream_filter_append($out, 'convert.base64-decode', STREAM_FILTER_WRITE);
@@ -874,12 +1091,16 @@ class UniversalDeviceTile extends IPSModule
             $streamFile($placeholder, $mime, true);
         }
         http_response_code(404);
-        IPS_LogMessage('UDTImagesHook', 'Not found');
+        $this->LogMessage('UDTImagesHook: Not found', KL_ERROR);
     }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
-        // ...
+        if ($Message === IPS_KERNELSTARTED) {
+            $this->ApplyChanges();
+            return;
+        }
+
         $statusId = $this->ReadPropertyInteger('Status');
         if ($statusId > 0 && $SenderID === $statusId) {
             switch ($Message) {
@@ -1060,7 +1281,11 @@ class UniversalDeviceTile extends IPSModule
         if (is_string($Ident) && strpos($Ident, 'script_') === 0) {
             $scriptId = intval(substr($Ident, 7));
             if ($scriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($scriptId)) {
-                @IPS_RunScript($scriptId);
+                try {
+                    IPS_RunScript($scriptId);
+                } catch (Throwable $e) {
+                    $this->LogCaughtThrowable(__FUNCTION__ . ':RunScriptByPrefix', $e);
+                }
             }
             return;
         }
@@ -1071,7 +1296,11 @@ class UniversalDeviceTile extends IPSModule
         // Falls eine Script-ID direkt gesendet wurde (z. B. numerisch), führe Script aus
         $maybeScriptId = intval($Ident);
         if ($maybeScriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($maybeScriptId)) {
-            @IPS_RunScript($maybeScriptId);
+            try {
+                IPS_RunScript($maybeScriptId);
+            } catch (Throwable $e) {
+                $this->LogCaughtThrowable(__FUNCTION__ . ':RunScriptByIdent', $e);
+            }
         }
         return;
     }
@@ -1316,6 +1545,15 @@ class UniversalDeviceTile extends IPSModule
     // Generiere eine Nachricht, die alle Elemente in der HTML-Darstellung aktualisiert
     private function GetFullUpdateMessage() {
         $result = [];
+
+        // Frontend-Sichttexte zentral aus locale.json (Punkt 7)
+        $result['uiTexts'] = [
+            'on' => $this->Translate('On'),
+            'off' => $this->Translate('Off'),
+            'targetSoc' => $this->Translate('Target SOC'),
+            'deviceImage' => $this->Translate('Device Image'),
+            'image' => $this->Translate('Image')
+        ];
         
        
         
@@ -1364,8 +1602,8 @@ class UniversalDeviceTile extends IPSModule
             
             if (is_array($profilAssoziationen)) {
                 $currentValue = GetValue($statusId);
-                foreach ($profilAssoziationen as $assoziation) {
-                    if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentValue) {
+                $assoziation = $this->FindMatchingAssociation($profilAssoziationen, $currentValue);
+                if ($assoziation !== null) {
                         // Neue erweiterte Bildauswahl-Logik
                         $bildauswahl = $assoziation['Bildauswahl'] ?? 'wm_aus';
                         
@@ -1429,8 +1667,6 @@ class UniversalDeviceTile extends IPSModule
                         $statusColor = $assoziation['StatusColor'] ?? -1;
                         $result['statusColor'] = isset($assoziation['StatusColor']) ? '#' . sprintf('%06X', $assoziation['StatusColor']) : '#000000';
                         $result['isStatusColorTransparent'] = isset($assoziation['StatusColor']) && ($assoziation['StatusColor'] == -1 || $assoziation['StatusColor'] == 16777215);
-                        break;
-                    }
                 }
             }
             
@@ -1556,11 +1792,9 @@ class UniversalDeviceTile extends IPSModule
                         $statusId = $this->ReadPropertyInteger('Status');
                         if ($statusId > 0 && IPS_VariableExists($statusId)) {
                             $currentStatusValue = GetValue($statusId);
-                            foreach ($profilAssoziationen as $assoziation) {
-                                if (isset($assoziation['AssoziationValue']) && $assoziation['AssoziationValue'] == $currentStatusValue) {
-                                    $progressbarActive = $assoziation['ProgressbarActive'] ?? true;
-                                    break;
-                                }
+                            $matchedAssoz = $this->FindMatchingAssociation($profilAssoziationen, $currentStatusValue);
+                            if ($matchedAssoz !== null) {
+                                $progressbarActive = $matchedAssoz['ProgressbarActive'] ?? true;
                             }
                         }
                     }
@@ -1583,7 +1817,7 @@ class UniversalDeviceTile extends IPSModule
                     $finalFormattedValue = GetValueFormatted($variable['Variable']);
                     $finalRawValue = GetValue($variable['Variable']);
                     
-                    if (!$progressbarActive && in_array(($variable['DisplayType'] ?? 'text'), ['progress','slider'])) {
+                    if (!$progressbarActive && (($variable['DisplayType'] ?? 'text') === 'progress')) {
                         // Progressbar deaktiviert: Zeige "-" für alle Werte und mache Text/Icon 50% transparent
                         $finalRawValue = 0;
                         $finalFormattedValue = '-';
@@ -1603,6 +1837,9 @@ class UniversalDeviceTile extends IPSModule
                         'isTextColorTransparent' => isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215),
                         'progressColor1' => isset($variable['ProgressColor1']) ? '#' . sprintf('%06X', $variable['ProgressColor1']) : '#4CAF50',
                         'progressColor2' => isset($variable['ProgressColor2']) ? '#' . sprintf('%06X', $variable['ProgressColor2']) : '#2196F3',
+                        // Slider-spezifische Farben (separat von Progress)
+                        'sliderColor1' => isset($variable['SliderColor1']) ? '#' . sprintf('%06X', $variable['SliderColor1']) : (isset($variable['ProgressColor1']) ? '#' . sprintf('%06X', $variable['ProgressColor1']) : '#4CAF50'),
+                        'sliderColor2' => isset($variable['SliderColor2']) ? '#' . sprintf('%06X', $variable['SliderColor2']) : (isset($variable['ProgressColor2']) ? '#' . sprintf('%06X', $variable['ProgressColor2']) : '#2196F3'),
                         'boolButtonColor' => isset($variable['boolButtonColor']) ? '#' . sprintf('%06X', $variable['boolButtonColor']) : '#CCCCCC',
                         'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
                         'buttonWidth' => $variable['ButtonWidth'] ?? 120,
@@ -1614,10 +1851,11 @@ class UniversalDeviceTile extends IPSModule
                         'rawValue' => $finalRawValue, // Backend-überschriebener Wert
                         'icon' => $icon,
                         'progressbarActive' => $progressbarActive, // Progressbar Active Status
-                        'progressbarInactive' => !$progressbarActive && in_array(($variable['DisplayType'] ?? 'text'), ['progress','slider']), // 50% Transparenz Flag
+                        'progressbarInactive' => (!$progressbarActive && (($variable['DisplayType'] ?? 'text') === 'progress')), // 50% Transparenz Flag nur für Progress
                         'useSecondVariableAsTarget' => (bool)($variable['UseSecondVariableAsTarget'] ?? false),
                         'variableAssociations' => $variableAssociations, // Variable-Associations für Button-Erstellung (Integer + String)
                         'scriptId' => intval($variable['ScriptID'] ?? 0),
+                        'openObjectId' => intval($variable['OpenObjectId'] ?? 0),
                     ];
 
                     // Bild (Symcon Medienobjekt) als eigene Darstellungsart
@@ -1780,6 +2018,51 @@ class UniversalDeviceTile extends IPSModule
                         'progressbarActive' => true,
                         'progressbarInactive' => false,
                         'scriptId' => $scriptId,
+                        'openObjectId' => intval($variable['OpenObjectId'] ?? 0),
+                    ];
+                } else if ((($variable['DisplayType'] ?? 'text') === 'button') && intval($variable['OpenObjectId'] ?? 0) > 1) {
+                    // SUPPORT BUTTON ROWS WITHOUT VARIABLE OR SCRIPT: OpenObject-Button (stateless)
+                    $openObjectId = intval($variable['OpenObjectId']);
+                    $label = $variable['Label'] ?? '';
+                    $objectIcon = '';
+                    try {
+                        if (IPS_ObjectExists($openObjectId)) {
+                            $obj = IPS_GetObject($openObjectId);
+                            if ($label === '' && isset($obj['ObjectName'])) {
+                                $label = $obj['ObjectName'];
+                            }
+                            $objIcon = isset($obj['ObjectIcon']) ? trim($obj['ObjectIcon']) : '';
+                            if ($objIcon !== '') {
+                                $objectIcon = $this->MapIconToFontAwesome($objIcon);
+                            }
+                        }
+                    } catch (Exception $e) { /* ignore */ }
+                    $textColor = isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000';
+                    $isTextColorTransparent = isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215);
+                    $variables[] = [
+                        'id' => 'object_' . $openObjectId,
+                        'label' => $label,
+                        'displayType' => 'button',
+                        'variableType' => 0, // wie Bool-Button rendern
+                        'group' => $variable['Group'] ?? 'keine Gruppe',
+                        'showGroupName' => $variable['ShowGroupName'] ?? false,
+                        'showIcon' => $variable['ShowIcon'] ?? false,
+                        'showLabel' => $variable['ShowLabel'] ?? true,
+                        'showValue' => $variable['ShowValue'] ?? false,
+                        'fontSize' => $variable['FontSize'] ?? 12,
+                        'textColor' => $textColor,
+                        'isTextColorTransparent' => $isTextColorTransparent,
+                        'alignment' => $variable['VerticalAlignment'] ?? 'left',
+                        'formattedValue' => '',
+                        'rawValue' => 1,
+                        'icon' => $objectIcon,
+                        'boolButtonColor' => isset($variable['boolButtonColor']) ? '#' . sprintf('%06X', $variable['boolButtonColor']) : '#CCCCCC',
+                        'isBoolButtonColorTransparent' => isset($variable['boolButtonColor']) && ($variable['boolButtonColor'] == -1 || $variable['boolButtonColor'] == 16777215),
+                        'buttonWidth' => $variable['ButtonWidth'] ?? 120,
+                        'progressbarActive' => true,
+                        'progressbarInactive' => false,
+                        'scriptId' => 0,
+                        'openObjectId' => $openObjectId,
                     ];
                 }
                 
@@ -1887,7 +2170,8 @@ class UniversalDeviceTile extends IPSModule
         try {
             $groupNames = $this->GetAllGroupNames();
             $result['groupNames'] = $groupNames;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            $this->LogCaughtThrowable(__FUNCTION__ . ':GetAllGroupNames', $e);
         }
         
         return json_encode($result);
@@ -1910,48 +2194,19 @@ class UniversalDeviceTile extends IPSModule
         $variable = IPS_GetVariable($id);
         $variableType = $variable['VariableType'];
         
-        $associations = null;
-        
-        // Verwende die existierenden Association-Funktionen basierend auf Variablentyp
-        if ($variableType === VARIABLETYPE_BOOLEAN) {
-            $associations = $this->GetBooleanAssociations($id);
-        } elseif ($variableType === VARIABLETYPE_INTEGER) {
-            $associations = $this->GetIntegerAssociations($id);
-        }
-        
-        // Fallback auf klassische Profile wenn keine Associations gefunden
-        if (empty($associations)) {
-            $profileName = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-            
-            if ($profileName != '') {
-                try {
-                    $profile = IPS_GetVariableProfile($profileName);
-                    if (isset($profile['Associations'])) {
-                        $associations = [];
-                        foreach ($profile['Associations'] as $association) {
-                            $associations[] = [
-                                'name' => $association['Name'],
-                                'value' => $association['Value'],
-                                'icon' => isset($association['Icon']) ? $association['Icon'] : '',
-                                'color' => isset($association['Color']) ? $association['Color'] : null
-                            ];
-                        }
-                    }
-                } catch (Exception $e) {
-                    // Profil existiert nicht oder ist nicht lesbar
-                }
-            }
-        }
+        // Alle Variablentypen über GetVariableAssociations (nutzt IPS_GetVariablePresentation + Profil-Fallback)
+        $associations = $this->GetVariableAssociations($id, $variableType);
         
         // Konvertiere Associations zu ListData Format
         if (!empty($associations)) {
             foreach ($associations as $association) {
+                $hasIcon = isset($association['icon']) && !empty($association['icon']);
                 $listData[] = [
                     'AssoziationName' => $association['name'],
                     'AssoziationValue' => $association['value'],
-                    'Bildauswahl' => 'none',
+                    'Bildauswahl' => $hasIcon ? 'symcon_icon' : 'none',
                     'EigenesBild' => 0,
-                    'SymconIcon' => '',
+                    'SymconIcon' => $hasIcon ? $association['icon'] : '',
                     'IconColor' => -1,
                     'StatusColor' => -1,
                     'ProgressbarActive' => true
@@ -1974,6 +2229,7 @@ class UniversalDeviceTile extends IPSModule
     
     public function UpdateDisplayTypeVisibility(string $displayType, ?int $rowId = null)
     {
+        $supportsSelectObject = ((float)IPS_GetKernelVersion() > 8.1);
         // Basierend auf Display Type verschiedene Felder ein-/ausblenden
         switch ($displayType) {
             case 'text':
@@ -1992,6 +2248,8 @@ class UniversalDeviceTile extends IPSModule
                 // Progress-Felder ausblenden
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
@@ -2005,6 +2263,8 @@ class UniversalDeviceTile extends IPSModule
                 // Text-spezifische Felder
                 $this->UpdateFormField('ShowBorderLine', 'visible', true);
                 $this->UpdateFormField('VerticalAlignment', 'visible', true);
+                // OpenObjectId bei Text ausblenden
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
                 // Image-Felder ausblenden
                 $this->UpdateFormField('ImageMedia', 'visible', false);
                 $this->UpdateFormField('ImageWidth', 'visible', false);
@@ -2029,6 +2289,8 @@ class UniversalDeviceTile extends IPSModule
                 // Progress-Felder ausblenden
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
@@ -2049,6 +2311,8 @@ class UniversalDeviceTile extends IPSModule
                 // Alignment sichtbar, Borderline ausblenden
                 $this->UpdateFormField('VerticalAlignment', 'visible', true);
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
+                // OpenObjectId bei Image ausblenden
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
                 break;
             case 'progress':
                 // Progress: relevante Felder ein-/ausblenden
@@ -2066,6 +2330,8 @@ class UniversalDeviceTile extends IPSModule
                 // Progress-Farben sichtbar
                 $this->UpdateFormField('ProgressColor1', 'visible', true);
                 $this->UpdateFormField('ProgressColor2', 'visible', true);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 // SecondVariable-Block sichtbar
                 $this->UpdateFormField('SecondVariable', 'visible', true);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', true);
@@ -2085,6 +2351,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 // Ausrichtung bei Progress ausblenden
                 $this->UpdateFormField('VerticalAlignment', 'visible', false);
+                // OpenObjectId bei Progress ausblenden
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
                 break;
             case 'slider':
                 // Slider: ähnlich Progress, aber ohne SecondVariable-Block
@@ -2099,9 +2367,11 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('Label', 'visible', true);
                 $this->UpdateFormField('FontSize', 'visible', true);
                 $this->UpdateFormField('TextColor', 'visible', true);
-                // Progress-/Slider-Farben sichtbar
-                $this->UpdateFormField('ProgressColor1', 'visible', true);
-                $this->UpdateFormField('ProgressColor2', 'visible', true);
+                // Progress-Farnen unsichtbarSlider-Farben sichtbar
+                $this->UpdateFormField('ProgressColor1', 'visible', false);
+                $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', true);
+                $this->UpdateFormField('SliderColor2', 'visible', true);
                 // SecondVariable-Block ausblenden (Slider nutzt keinen Marker)
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
@@ -2120,7 +2390,9 @@ class UniversalDeviceTile extends IPSModule
                 // Text-Felder ausblenden
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 // Ausrichtung bei Slider ausblenden (feste horizontale Ausrichtung)
-                $this->UpdateFormField('VerticalAlignment', 'visible', false);
+                $this->UpdateFormField('VerticalAlignment', 'visible', true);
+                // OpenObjectId bei Slider ausblenden
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
                 break;
             case 'button':
                 // Button-Display: relevante Felder steuern
@@ -2132,6 +2404,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('Variable', 'visible', true);
                 // ScriptID sichtbar (optional, ermöglicht Script-Buttons ohne Variable)
                 $this->UpdateFormField('ScriptID', 'visible', true);
+                // OpenObjectId sichtbar (optional, ermöglicht Öffnen von Objekten)
+                $this->UpdateFormField('OpenObjectId', 'visible', $supportsSelectObject);
                 // Button-spezifische Felder sichtbar
                 $this->UpdateFormField('boolButtonColor', 'visible', true);
                 $this->UpdateFormField('ButtonWidth', 'visible', true);
@@ -2144,6 +2418,8 @@ class UniversalDeviceTile extends IPSModule
                 // Progress-Felder ausblenden
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
@@ -2172,6 +2448,8 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowValue', 'visible', false);
                 $this->UpdateFormField('ProgressColor1', 'visible', false);
                 $this->UpdateFormField('ProgressColor2', 'visible', false);
+                $this->UpdateFormField('SliderColor1', 'visible', false);
+                $this->UpdateFormField('SliderColor2', 'visible', false);
                 $this->UpdateFormField('SecondVariable', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowIcon', 'visible', false);
                 $this->UpdateFormField('SecondVariableShowLabel', 'visible', false);
@@ -2187,6 +2465,7 @@ class UniversalDeviceTile extends IPSModule
                 $this->UpdateFormField('ShowBorderLine', 'visible', false);
                 $this->UpdateFormField('ScriptID', 'visible', false);
                 $this->UpdateFormField('Label', 'visible', false);
+                $this->UpdateFormField('OpenObjectId', 'visible', false);
 
                 break;
         }
@@ -2212,23 +2491,27 @@ class UniversalDeviceTile extends IPSModule
             return 'Transparent'; // Fallback bei Fehler
         }
         
-        // Prüfe auf Legacy-Präsentation (GUID) und merke Flag
+        // Präsentation über IPS_GetVariablePresentation laden (löst Vorlagen, GUIDs etc. automatisch auf)
         $legacyGuid = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
         $isLegacyPresentation = false;
-        $presentationArr = [];
-        if (!empty($variable['VariableCustomPresentation'])) {
-            $presentationArr = $variable['VariableCustomPresentation'];
-        } elseif (!empty($variable['VariablePresentation'])) {
-            $presentationArr = $variable['VariablePresentation'];
+        $customPresentation = [];
+        if (function_exists('IPS_GetVariablePresentation')) {
+            try {
+                $resolved = IPS_GetVariablePresentation($id);
+                if (is_array($resolved) && !empty($resolved)) {
+                    $customPresentation = $resolved;
+                }
+            } catch (Throwable $e) {
+                $this->LogCaughtThrowable(__FUNCTION__ . ':GetVariablePresentation', $e);
+            }
         }
-        if (is_array($presentationArr) && isset($presentationArr['PRESENTATION'])) {
-            $presentGuidTrim = trim((string)$presentationArr['PRESENTATION'], '{} ');
+        if (isset($customPresentation['PRESENTATION'])) {
+            $presentGuidTrim = trim((string)$customPresentation['PRESENTATION'], '{} ');
             $isLegacyPresentation = (strcasecmp($presentGuidTrim, $legacyGuid) === 0);
         }
         
-        // Prüfe VariableCustomPresentation für Icon
-        if ($icon == "" && !empty($variable['VariableCustomPresentation']) && !$isLegacyPresentation) {
-            $customPresentation = $variable['VariableCustomPresentation'];
+        // Icon aus aufgelöster Präsentation extrahieren
+        if ($icon == "" && !empty($customPresentation) && !$isLegacyPresentation) {
             
             // Zuerst nach direktem Icon suchen (Standard-Icon)
             if (isset($customPresentation['ICON']) && $customPresentation['ICON'] != "") {
@@ -2242,28 +2525,8 @@ class UniversalDeviceTile extends IPSModule
             if ($icon == "") {
                 // SPECIAL: Für Boolean-Variablen mit ICON_TRUE/ICON_FALSE, prüfe USE_ICON_FALSE
                 if ($variable['VariableType'] == 0 && (isset($customPresentation['ICON_TRUE']) || isset($customPresentation['ICON_FALSE']))) {
-                    // Prüfe USE_ICON_FALSE direkt aus VariableCustomPresentation
-                    $useIconFalse = true; // Default
-                    if (isset($customPresentation['USE_ICON_FALSE'])) {
-                        $useIconFalse = $customPresentation['USE_ICON_FALSE'];
-                    } else {
-                        // Fallback: Prüfe USE_ICON_FALSE aus PRESENTATION GUID falls vorhanden
-                        if (isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
-                            try {
-                                $presentationGuid = trim($customPresentation['PRESENTATION'], '{}');
-                                if (@IPS_PresentationExists($presentationGuid)) {
-                                    $presentationData = IPS_GetPresentation($presentationGuid);
-                                    if ($presentationData && is_string($presentationData)) {
-                                        $presentationArray = json_decode($presentationData, true);
-                                        if (isset($presentationArray['presentationParameters']['USE_ICON_FALSE'])) {
-                                            $useIconFalse = $presentationArray['presentationParameters']['USE_ICON_FALSE'];
-                                        }
-                                    }
-                                }
-                            } catch (Exception $e) {
-                            }
-                        }
-                    }
+                    // USE_ICON_FALSE ist durch IPS_GetVariablePresentation bereits aufgelöst
+                    $useIconFalse = isset($customPresentation['USE_ICON_FALSE']) ? $customPresentation['USE_ICON_FALSE'] : true;
                     
                     // Icon basierend auf USE_ICON_FALSE wählen
                     if ($useIconFalse) {
@@ -2298,7 +2561,7 @@ class UniversalDeviceTile extends IPSModule
                 // 1) INTERVALS direkt aus der CustomPresentation (JSON-String oder Array)
                 $intervals = null;
                 if (isset($customPresentation['INTERVALS'])) {
-                    $intervals = is_string($customPresentation['INTERVALS']) ? @json_decode($customPresentation['INTERVALS'], true) : $customPresentation['INTERVALS'];
+                    $intervals = is_string($customPresentation['INTERVALS']) ? json_decode($customPresentation['INTERVALS'], true) : $customPresentation['INTERVALS'];
                 }
                 // Nur anwenden wenn aktiv oder Flag fehlt
                 $intervalsActive = isset($customPresentation['INTERVALS_ACTIVE']) ? (bool)$customPresentation['INTERVALS_ACTIVE'] : true;
@@ -2319,119 +2582,44 @@ class UniversalDeviceTile extends IPSModule
                         }
                     }
                 }
-                // FALL A: Direkte OPTIONS in der CustomPresentation (kann Array oder JSON-String sein)
+                // OPTIONS aus aufgelöster Präsentation (IPS_GetVariablePresentation hat Vorlagen/GUIDs bereits aufgelöst)
                 if (isset($customPresentation['OPTIONS'])) {
-                    $options = is_string($customPresentation['OPTIONS']) ? @json_decode($customPresentation['OPTIONS'], true) : $customPresentation['OPTIONS'];
+                    $options = is_string($customPresentation['OPTIONS']) ? json_decode($customPresentation['OPTIONS'], true) : $customPresentation['OPTIONS'];
                 }
-                // FALL B: TEMPLATE liefert OPTIONS
-                if (!is_array($options) && isset($customPresentation['TEMPLATE']) && function_exists('IPS_GetTemplate')) {
-                    try {
-                        $templateData = IPS_GetTemplate($customPresentation['TEMPLATE']);
-                        if (isset($templateData['Values']['OPTIONS'])) {
-                            $options = is_string($templateData['Values']['OPTIONS']) ? @json_decode($templateData['Values']['OPTIONS'], true) : $templateData['Values']['OPTIONS'];
+                // Auswertung der OPTIONS (unterstützt Value und Min/Max-Intervalle)
+                if (!$numericIconFound && is_array($options)) {
+                    $current = floatval($Value);
+                    foreach ($options as $option) {
+                        // Icon-Feld ermitteln (IconValue bevorzugt, sonst Icon)
+                        $optIcon = null;
+                        if (isset($option['IconValue']) && trim((string)$option['IconValue']) !== '') {
+                            $optIcon = $option['IconValue'];
+                        } elseif (isset($option['Icon']) && trim((string)$option['Icon']) !== '') {
+                            $optIcon = $option['Icon'];
                         }
-                    } catch (Exception $e) {
-                    }
-                }
-                // FALL B.2: OPTIONS verweist direkt auf eine GUID mit OPTIONS-Definitionen
-                if (!is_array($options) && isset($customPresentation['OPTIONS']) && is_string($customPresentation['OPTIONS'])) {
-                    $optionsGuid = trim($customPresentation['OPTIONS'], '{}');
-                    try {
-                        if (function_exists('IPS_PresentationExists') && @IPS_PresentationExists($optionsGuid)) {
-                            $presentationData = IPS_GetPresentation($optionsGuid);
-                            if ($presentationData) {
-                                $presentationArray = is_string($presentationData) ? json_decode($presentationData, true) : $presentationData;
-                                if (is_array($presentationArray)) {
-                                    // Versuche gängige Stellen für OPTIONS zu finden
-                                    if (isset($presentationArray['Values']['OPTIONS'])) {
-                                        $options = is_string($presentationArray['Values']['OPTIONS']) ? @json_decode($presentationArray['Values']['OPTIONS'], true) : $presentationArray['Values']['OPTIONS'];
-                                    } elseif (isset($presentationArray['presentationParameters']['OPTIONS'])) {
-                                        $options = is_string($presentationArray['presentationParameters']['OPTIONS']) ? @json_decode($presentationArray['presentationParameters']['OPTIONS'], true) : $presentationArray['presentationParameters']['OPTIONS'];
-                                    } elseif (isset($presentationArray['OPTIONS'])) {
-                                        $options = is_string($presentationArray['OPTIONS']) ? @json_decode($presentationArray['OPTIONS'], true) : $presentationArray['OPTIONS'];
-                                    }
-                                }
-                            }
+                        if ($optIcon === null) {
+                            continue;
                         }
-                    } catch (Exception $e) {
-                    }
-                }
-                // FALL C: PRESENTATION GUID -> Gruppe "Numeric" enthält OPTIONS
-                if (!is_array($options) && isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
-                    try {
-                        $presentationGuid = trim($customPresentation['PRESENTATION'], '{}');
                         
-                        // IPS_GetPresentation für GUID-Auflösung verwenden - mit Validation
-                        if (@IPS_PresentationExists($presentationGuid)) {
-                            $presentationData = IPS_GetPresentation($presentationGuid);
-                            if ($presentationData && is_string($presentationData)) {
-                                $presentationArray = json_decode($presentationData, true);
-                                if ($presentationArray && is_array($presentationArray)) {
-                                    
-                                    // Boolean Variable: Icons sind in presentationParameters gespeichert
-                                    if ($variable['VariableType'] == 0) { // Boolean
-                                        if (isset($presentationArray['presentationParameters']) && is_array($presentationArray['presentationParameters'])) {
-                                            $params = $presentationArray['presentationParameters'];
-                                            $currentValue = GetValue($id);
-                                            
-                                            // CORRECT LOGIC: Prüfe USE_ICON_FALSE Flag
-                                            $useIconFalse = isset($params['USE_ICON_FALSE']) ? $params['USE_ICON_FALSE'] : true;
-                                            
-                                            if ($useIconFalse) {
-                                                // Verwende beide Icons basierend auf Wert
-                                                $iconKey = $currentValue ? 'ICON_TRUE' : 'ICON_FALSE';
-                                            } else {
-                                                // Immer ICON_TRUE
-                                                $iconKey = 'ICON_TRUE';
-                                            }
-                                            
-                                            if (isset($params[$iconKey]) && !empty($params[$iconKey])) {
-                                                $icon = $params[$iconKey];
-                                            }
-                                        }
-                                    }
-                                }
+                        $hasRange = (isset($option['Min']) || isset($option['Max']) || isset($option['MinValue']) || isset($option['MaxValue']));
+                        if ($hasRange) {
+                            $min = isset($option['Min']) ? floatval($option['Min']) : (isset($option['MinValue']) ? floatval($option['MinValue']) : -INF);
+                            $max = isset($option['Max']) ? floatval($option['Max']) : (isset($option['MaxValue']) ? floatval($option['MaxValue']) : INF);
+                            if ($current >= $min && $current <= $max) {
+                                $icon = $optIcon;
+                                break;
                             }
-                        }
-                    } catch (Exception $e) {
-                    }
-                    
-                    // Auswertung der Optionen (unterstützt Value und Min/Max-Intervalle)
-                    if (!$numericIconFound && is_array($options)) {
-                        $current = floatval($Value);
-                        foreach ($options as $option) {
-                            // Icon-Feld ermitteln (IconValue bevorzugt, sonst Icon)
-                            $optIcon = null;
-                            if (isset($option['IconValue']) && trim((string)$option['IconValue']) !== '') {
-                                $optIcon = $option['IconValue'];
-                            } elseif (isset($option['Icon']) && trim((string)$option['Icon']) !== '') {
-                                $optIcon = $option['Icon'];
-                            }
-                            if ($optIcon === null) {
-                                continue; // Kein Icon definiert
-                            }
-                            
-                            $hasRange = (isset($option['Min']) || isset($option['Max']) || isset($option['MinValue']) || isset($option['MaxValue']));
-                            if ($hasRange) {
-                                $min = isset($option['Min']) ? floatval($option['Min']) : (isset($option['MinValue']) ? floatval($option['MinValue']) : -INF);
-                                $max = isset($option['Max']) ? floatval($option['Max']) : (isset($option['MaxValue']) ? floatval($option['MaxValue']) : INF);
-                                if ($current >= $min && $current <= $max) {
+                        } elseif (isset($option['Value'])) {
+                            $optVal = $option['Value'];
+                            if (is_numeric($optVal)) {
+                                if (abs(floatval($optVal) - $current) < 1e-9) {
                                     $icon = $optIcon;
                                     break;
                                 }
-                            } elseif (isset($option['Value'])) {
-                                // Diskreter Vergleich (Float-Toleranz)
-                                $optVal = $option['Value'];
-                                if (is_numeric($optVal)) {
-                                    if (abs(floatval($optVal) - $current) < 1e-9) {
-                                        $icon = $optIcon;
-                                        break;
-                                    }
-                                } else {
-                                    if ($optVal == $Value) { // String-Vergleich für gemischte Optionen
-                                        $icon = $optIcon;
-                                        break;
-                                    }
+                            } else {
+                                if ($optVal == $Value) {
+                                    $icon = $optIcon;
+                                    break;
                                 }
                             }
                         }
@@ -2439,6 +2627,14 @@ class UniversalDeviceTile extends IPSModule
                 }
             }
             
+            // Zusätzlicher Fallback: Icon über Associations (Profile/OPTIONS/TEMPLATE/PRESENTATION) ermitteln
+            if ($icon == "") {
+                $associationIcon = $this->GetAssociationIconForCurrentValue($id, $variable['VariableType'], $Value);
+                if ($associationIcon !== '') {
+                    $icon = $associationIcon;
+                }
+            }
+
             // Nur wenn noch kein Standard-Icon gefunden wurde, prüfe PRESENTATION GUID und Associations
             if ($icon == "") {
                 // Zuerst prüfen ob die Variable eine neue Darstellung/Visualisierung hat
@@ -2474,7 +2670,8 @@ class UniversalDeviceTile extends IPSModule
                                 $icon = $visualization['Icon'];
                             }
                         }
-                    } catch (Exception $e) {
+                    } catch (Throwable $e) {
+                        $this->LogCaughtThrowable(__FUNCTION__ . ':GetVariableVisualization', $e);
                     }
                 }
                 
@@ -2508,7 +2705,6 @@ class UniversalDeviceTile extends IPSModule
             return $mappedIcon;
         }
         
-        // Schließe VariableCustomPresentation if-Block (Zeile 1110)
         
         // Wenn noch kein Icon gefunden wurde, prüfe Darstellung/Visualisierung und Profile
         if ($icon == "" && !$isLegacyPresentation) {
@@ -2545,7 +2741,8 @@ class UniversalDeviceTile extends IPSModule
                             $icon = $visualization['Icon'];
                         }
                     }
-                } catch (Exception $e) {
+                } catch (Throwable $e) {
+                    $this->LogCaughtThrowable(__FUNCTION__ . ':GetVariableVisualizationFallback', $e);
                 }
                 
                 // ALTERNATIVE: Prüfe ob GetBooleanAssociations bereits Icons extrahiert hat
@@ -2564,65 +2761,24 @@ class UniversalDeviceTile extends IPSModule
                     }
                 }
             }
-            
-            // Nur wenn noch kein Standard-Icon gefunden wurde, prüfe PRESENTATION GUID und Associations
-            if ($icon == "" && isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
-                // PRESENTATION GUID Auflösung für Icons - REAKTIVIERT für Variable 37220
-                $presentationGuid = trim($customPresentation['PRESENTATION'], '{}');
-                
-                // IPS_GetPresentation für GUID-Auflösung verwenden - mit Validation
-                try {
-                    
-                    // GUID VALIDATION: Prüfe ob GUID im System existiert
-                    if (@IPS_PresentationExists($presentationGuid)) {
-                        $presentationData = IPS_GetPresentation($presentationGuid);
-                    } else {
-                        throw new Exception('GUID not registered in system');
-                    }
-                    
-                    if ($presentationData && is_string($presentationData)) {
-                        $presentationArray = json_decode($presentationData, true);
-                        if ($presentationArray && is_array($presentationArray)) {
-                            
-                            // Boolean Variable: Icons sind in presentationParameters gespeichert
-                            if ($variable['VariableType'] == 0) { // Boolean
-                                if (isset($presentationArray['presentationParameters']) && is_array($presentationArray['presentationParameters'])) {
-                                    $params = $presentationArray['presentationParameters'];
-                                    $currentValue = GetValue($id);
-                                    
-                                    // CORRECT LOGIC: Prüfe USE_ICON_FALSE Flag
-                                    $useIconFalse = isset($params['USE_ICON_FALSE']) ? $params['USE_ICON_FALSE'] : true;
-                                    
-                                    if ($useIconFalse) {
-                                        // Verwende beide Icons basierend auf Wert
-                                        $iconKey = $currentValue ? 'ICON_TRUE' : 'ICON_FALSE';
-                                    } else {
-                                        // Verwende immer ICON_TRUE
-                                        $iconKey = 'ICON_TRUE';
-                                    }
-                                    
-                                    if (isset($params[$iconKey]) && !empty($params[$iconKey])) {
-                                        $icon = $params[$iconKey];
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (Exception $e) {
+
+            // Zusätzlicher Fallback: Icon über Associations (Profile/OPTIONS/TEMPLATE/PRESENTATION) ermitteln
+            if ($icon == "") {
+                $associationIcon = $this->GetAssociationIconForCurrentValue($id, $variable['VariableType'], $Value);
+                if ($associationIcon !== '') {
+                    $icon = $associationIcon;
                 }
-                
-                // ALTERNATIVE: Prüfe ob GetBooleanAssociations bereits Icons extrahiert hat
-                if ($variable['VariableType'] == 0) { // Boolean Variable
-                    $associations = $this->GetBooleanAssociations($id);
-                    if (is_array($associations) && count($associations) > 0) {
-                        $currentValue = GetValue($id);
-                        foreach ($associations as $assoc) {
-                            if (isset($assoc['value']) && $assoc['value'] == $currentValue && isset($assoc['icon']) && !empty($assoc['icon'])) {
-                                $icon = $assoc['icon'];
-                                break;
-                            }
-                        }
-                        if ($icon == "") {
+            }
+            
+            // Boolean-Fallback: Prüfe ob GetBooleanAssociations Icons liefert
+            if ($icon == "" && $variable['VariableType'] == 0) {
+                $associations = $this->GetBooleanAssociations($id);
+                if (is_array($associations) && count($associations) > 0) {
+                    $currentValue = GetValue($id);
+                    foreach ($associations as $assoc) {
+                        if (isset($assoc['value']) && $assoc['value'] == $currentValue && isset($assoc['icon']) && !empty($assoc['icon'])) {
+                            $icon = $assoc['icon'];
+                            break;
                         }
                     }
                 }
@@ -2655,14 +2811,8 @@ class UniversalDeviceTile extends IPSModule
         // Unterstützt zusätzlich das Profil aus PRESENTATION ([PROFILE]) falls VariableProfile leer ist
         if ($icon === '' || $icon === 'Transparent') {
             $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-            if (empty($profile)) {
-                $pres1 = (isset($variable['VariableCustomPresentation']) && is_array($variable['VariableCustomPresentation'])) ? $variable['VariableCustomPresentation'] : [];
-                $pres2 = (isset($variable['VariablePresentation']) && is_array($variable['VariablePresentation'])) ? $variable['VariablePresentation'] : [];
-                if (isset($pres1['PROFILE']) && !empty($pres1['PROFILE'])) {
-                    $profile = $pres1['PROFILE'];
-                } elseif (isset($pres2['PROFILE']) && !empty($pres2['PROFILE'])) {
-                    $profile = $pres2['PROFILE'];
-                }
+            if (empty($profile) && isset($customPresentation['PROFILE']) && !empty($customPresentation['PROFILE'])) {
+                $profile = $customPresentation['PROFILE'];
             }
             if (!empty($profile) && IPS_VariableProfileExists($profile)) {
                 $p = IPS_GetVariableProfile($profile);
@@ -2684,6 +2834,39 @@ class UniversalDeviceTile extends IPSModule
         $mappedIcon = $this->MapIconToFontAwesome($icon);
         
         return $mappedIcon;
+    }
+
+    /**
+     * Ermittelt das Icon der aktuell aktiven Association für Bool/Integer/String Variablen.
+     * Nutzt die bestehende Association-Auflösung (Profile/OPTIONS/TEMPLATE/PRESENTATION).
+     */
+    private function GetAssociationIconForCurrentValue($variableId, $variableType, $currentValue)
+    {
+        if (!in_array($variableType, [VARIABLETYPE_BOOLEAN, VARIABLETYPE_INTEGER, VARIABLETYPE_STRING], true)) {
+            return '';
+        }
+
+        $associations = $this->GetVariableAssociations($variableId, $variableType);
+        if (!is_array($associations)) {
+            return '';
+        }
+
+        foreach ($associations as $association) {
+            if (!array_key_exists('value', $association)) {
+                continue;
+            }
+            if ($association['value'] == $currentValue) {
+                $icon = $association['icon'] ?? '';
+                if (is_string($icon)) {
+                    $icon = trim($icon);
+                }
+                if (!empty($icon)) {
+                    return $icon;
+                }
+            }
+        }
+
+        return '';
     }
     
     /**
@@ -2781,11 +2964,6 @@ class UniversalDeviceTile extends IPSModule
         // Extrahiere Variable-Info
         $variable = IPS_GetVariable($variableId);
         
-
-        $profileName = $variable['VariableProfile'] ?? 'NONE';
-        $customPresentation = is_array($variable['VariableCustomPresentation'] ?? null) ? json_encode($variable['VariableCustomPresentation']) : ($variable['VariableCustomPresentation'] ?? 'NONE');
-
-        
         // Nur für Bool-Variablen
         if ($variable['VariableType'] !== VARIABLETYPE_BOOLEAN) {
             return $defaultColors;
@@ -2855,6 +3033,7 @@ class UniversalDeviceTile extends IPSModule
             'min' => 0,
             'max' => 100
         ];
+        $profileMinMax = null; // Profil-Werte nur als Fallback verwenden
         
         if (!IPS_VariableExists($variableId)) {
             return $defaultMinMax;
@@ -2868,122 +3047,87 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // **PRESENTATION-HIERARCHIE wie bei Icons: Gleiche Taktik für konsistente Behandlung**
+
+        // Hilfsfunktion: Min/Max rekursiv aus beliebigen Strukturen extrahieren
+        $extractMinMax = function($arr) use (&$extractMinMax) {
+            if (!is_array($arr)) return null;
+            $minKeys = ['MinValue','MinimalerWert','Minimum','Min','minValue','min'];
+            $maxKeys = ['MaxValue','MaximalerWert','Maximum','Max','maxValue','max'];
+            $foundMin = null; $foundMax = null;
+            foreach ($minKeys as $k) { if (isset($arr[$k]) && is_numeric($arr[$k])) { $foundMin = (float)$arr[$k]; break; } }
+            foreach ($maxKeys as $k) { if (isset($arr[$k]) && is_numeric($arr[$k])) { $foundMax = (float)$arr[$k]; break; } }
+            if ($foundMin !== null && $foundMax !== null) {
+                return ['min' => $foundMin, 'max' => $foundMax];
+            }
+            // Rekursiv in Unterstrukturen suchen (einschließlich JSON-Strings)
+            foreach ($arr as $v) {
+                if (is_array($v)) {
+                    $res = $extractMinMax($v);
+                    if (is_array($res)) return $res;
+                } elseif (is_string($v)) {
+                    $decoded = json_decode($v, true);
+                    if (is_array($decoded)) {
+                        $res = $extractMinMax($decoded);
+                        if (is_array($res)) return $res;
+                    }
+                }
+            }
+            return null;
+        };
         
-        // **FALL 1: Alte Variablenprofile (höchste Priorität wie bei Icons)**
+        // **FALL 1: Alte Variablenprofile (nun nur noch Fallback, Präsentationen haben Vorrang)**
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
         if (!empty($profile) && IPS_VariableProfileExists($profile)) {
             $profileData = IPS_GetVariableProfile($profile);
             
             if (isset($profileData['MinValue']) && isset($profileData['MaxValue'])) {
-                $minMax = [
+                $profileMinMax = [
                     'min' => floatval($profileData['MinValue']),
                     'max' => floatval($profileData['MaxValue'])
                 ];
-                
-                return $minMax;
             }
         }
         
-        // **FALL 2: CustomPresentation mit direkten MIN/MAX Parametern**
-        // Presentation source: prefer CustomPresentation, fallback to standard VariablePresentation (Option B)
-        // This enables button rendering for standard (non-custom) presentations with OPTIONS/PRESENTATION/TEMPLATE
+        // **FALL 2: Präsentation über IPS_GetVariablePresentation laden (löst Vorlagen, GUIDs etc. automatisch auf)**
         $customPresentation = [];
-        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
-            $customPresentation = $variable['VariableCustomPresentation'];
-        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
-            $customPresentation = $variable['VariablePresentation'];
+        if (function_exists('IPS_GetVariablePresentation')) {
+            try {
+                $resolved = IPS_GetVariablePresentation($variableId);
+                if (is_array($resolved) && !empty($resolved)) {
+                    $customPresentation = $resolved;
+                }
+            } catch (Throwable $e) {
+                $this->LogCaughtThrowable(__FUNCTION__ . ':GetVariablePresentation', $e);
+            }
         }
         
         if (!empty($customPresentation)) {
             // Direkte MIN/MAX Parameter
-            if (isset($customPresentation['MIN']) && isset($customPresentation['MAX'])) {
-                if (is_numeric($customPresentation['MIN']) && is_numeric($customPresentation['MAX'])) {
-                    $minMax = [
-                        'min' => floatval($customPresentation['MIN']),
-                        'max' => floatval($customPresentation['MAX'])
-                    ];
-                    
-                    return $minMax;
+            $directMinMax = null;
+            if ((isset($customPresentation['MIN']) && isset($customPresentation['MAX'])) || (isset($customPresentation['Min']) && isset($customPresentation['Max']))) {
+                $minVal = isset($customPresentation['MIN']) ? $customPresentation['MIN'] : $customPresentation['Min'];
+                $maxVal = isset($customPresentation['MAX']) ? $customPresentation['MAX'] : $customPresentation['Max'];
+                if (is_numeric($minVal) && is_numeric($maxVal)) {
+                    $directMinMax = ['min' => (float)$minVal, 'max' => (float)$maxVal];
                 }
             }
-            
-            // **FALL 3: GUID-basierte Presentations (PRESENTATION)**
-            if (isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
-                $presentationGuid = $customPresentation['PRESENTATION'];
-                
-                try {
-                    // GUID VALIDATION: Prüfe ob GUID im System existiert
-                    if (@IPS_PresentationExists($presentationGuid)) {
-                        $presentationData = IPS_GetPresentation($presentationGuid);
-                    } else {
-                        throw new Exception('GUID not registered in system');
-                    }
-                    
-                    if ($presentationData && is_string($presentationData)) {
-                        $presentationArray = json_decode($presentationData, true);
-                        
-                        if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
-                            $minMax = [
-                                'min' => floatval($presentationArray['MinValue']),
-                                'max' => floatval($presentationArray['MaxValue'])
-                            ];
-                            
-                            return $minMax;
-                        }
-                    }
-                } catch (Exception $e) {
-                }
+            if (!$directMinMax) {
+                $directMinMax = $extractMinMax($customPresentation);
             }
+            if (is_array($directMinMax)) return $directMinMax;
             
-            // **FALL 4: OPTIONS-basierte Presentations**
+            // OPTIONS durchsuchen (bereits durch IPS_GetVariablePresentation aufgelöst)
             if (isset($customPresentation['OPTIONS']) && !empty($customPresentation['OPTIONS'])) {
-                $optionsGuid = $customPresentation['OPTIONS'];
-                
-                try {
-                    if (@IPS_PresentationExists($optionsGuid)) {
-                        $presentationData = IPS_GetPresentation($optionsGuid);
-                        
-                        if ($presentationData && is_string($presentationData)) {
-                            $presentationArray = json_decode($presentationData, true);
-                            
-                            if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
-                                $minMax = [
-                                    'min' => floatval($presentationArray['MinValue']),
-                                    'max' => floatval($presentationArray['MaxValue'])
-                                ];
-                                
-                                return $minMax;
-                            }
-                        }
+                $opt = $customPresentation['OPTIONS'];
+                if (is_string($opt)) {
+                    $decoded = json_decode($opt, true);
+                    if (is_array($decoded)) {
+                        $mm = $extractMinMax($decoded);
+                        if (is_array($mm)) return $mm;
                     }
-                } catch (Exception $e) {
-                    
-                }
-            }
-            
-            // **FALL 5: TEMPLATE-basierte Presentations**
-            if (isset($customPresentation['TEMPLATE']) && !empty($customPresentation['TEMPLATE'])) {
-                $templateGuid = $customPresentation['TEMPLATE'];
-                
-                try {
-                    if (@IPS_PresentationExists($templateGuid)) {
-                        $presentationData = IPS_GetPresentation($templateGuid);
-                        
-                        if ($presentationData && is_string($presentationData)) {
-                            $presentationArray = json_decode($presentationData, true);
-                            
-                            if ($presentationArray && isset($presentationArray['MinValue']) && isset($presentationArray['MaxValue'])) {
-                                $minMax = [
-                                    'min' => floatval($presentationArray['MinValue']),
-                                    'max' => floatval($presentationArray['MaxValue'])
-                                ];
-                                
-                                return $minMax;
-                            }
-                        }
-                    }
-                } catch (Exception $e) {
-                    
+                } elseif (is_array($opt)) {
+                    $mm = $extractMinMax($opt);
+                    if (is_array($mm)) return $mm;
                 }
             }
         }
@@ -3051,6 +3195,10 @@ class UniversalDeviceTile extends IPSModule
             }
         }
         
+        // **Falls noch nichts gefunden: Profil-Werte verwenden (Fallback)**
+        if (is_array($profileMinMax)) {
+            return $profileMinMax;
+        }
         // **LETZTER FALLBACK: Standard Min/Max verwenden**
         return $defaultMinMax;
     }
@@ -3061,6 +3209,7 @@ class UniversalDeviceTile extends IPSModule
             return $res;
         }
         $variable = IPS_GetVariable($variableId);
+        // 1) Profil-Werte (falls vorhanden)
         $profileName = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
         if (!empty($profileName) && IPS_VariableProfileExists($profileName)) {
             $profileData = IPS_GetVariableProfile($profileName);
@@ -3071,7 +3220,52 @@ class UniversalDeviceTile extends IPSModule
                 $res['step'] = (float)$profileData['StepSize'];
             }
         }
-        if ($res['step'] === null) {
+
+        // Helper: extrahiere Step/Digits rekursiv aus beliebigen Präsentations-Strukturen
+        $extractStepDigits = function ($arr) use (&$res, &$extractStepDigits) {
+            if (!is_array($arr)) return;
+            $keysStep = [
+                'step','stepsize','STEP','Step','StepSize','STEP_SIZE','stepSize',
+                'INCREMENT','Increment','increment','StepValue','STEPVALUE','step_value','StepWidth',
+                // Häufige Varianten in Präsentationen
+                'smallestStep','SmallestStep','SMALLESTSTEP','SMALLEST_STEP','smallStep','SmallStep','small_step'
+            ];
+            $keysDigits = ['digits','DIGITS','Digits'];
+            foreach ($keysStep as $k) {
+                if (isset($arr[$k]) && is_numeric($arr[$k])) { $res['step'] = (float)$arr[$k]; break; }
+            }
+            foreach ($keysDigits as $k) {
+                if (isset($arr[$k]) && is_numeric($arr[$k])) { $res['digits'] = (int)$arr[$k]; break; }
+            }
+            // Rekursiv in alle Unterstrukturen (PARAMETERS, Values, OPTIONS, usw.)
+            foreach ($arr as $k => $v) {
+                if (is_array($v)) {
+                    $extractStepDigits($v);
+                } elseif (is_string($v)) {
+                    $decoded = json_decode($v, true);
+                    if (is_array($decoded)) $extractStepDigits($decoded);
+                }
+            }
+        };
+
+        // 2) Präsentation über IPS_GetVariablePresentation laden (löst Vorlagen, GUIDs etc. automatisch auf)
+        $presentation = [];
+        if (function_exists('IPS_GetVariablePresentation')) {
+            try {
+                $fullPresentation = IPS_GetVariablePresentation($variableId);
+                if (is_array($fullPresentation) && !empty($fullPresentation)) {
+                    $presentation = $fullPresentation;
+                }
+            } catch (Throwable $e) {
+                $this->LogCaughtThrowable(__FUNCTION__ . ':GetVariablePresentation', $e);
+            }
+        }
+        if (!empty($presentation)) {
+            $extractStepDigits($presentation);
+        }
+
+        // 3) Fallbacks falls Step nicht gefunden
+        if ($res['step'] === null || $res['step'] <= 0) {
             $digits = max(0, (int)$res['digits']);
             if ($variable['VariableType'] === VARIABLETYPE_INTEGER) {
                 $res['step'] = 1;
@@ -3107,8 +3301,8 @@ class UniversalDeviceTile extends IPSModule
     }
     
     /**
-     * Generische Funktion zum Extrahieren von Associations für Boolean-, Integer- und String-Variablen
-     * Unterstützt 4 Fälle: Alte Variablenprofile, CustomPresentation mit OPTIONS/TEMPLATE/PRESENTATION GUID
+     * Generische Funktion zum Extrahieren von Associations für Boolean-, Integer- und String-Variablen.
+     * Nutzt IPS_GetVariablePresentation für die vollständige Auflösung von Vorlagen und GUIDs.
      */
     private function GetVariableAssociations($variableId, $expectedVariableType) {
         if (!IPS_VariableExists($variableId)) {
@@ -3122,44 +3316,42 @@ class UniversalDeviceTile extends IPSModule
             return null;
         }
         
-        // Präsentation früh bestimmen (Custom bevorzugt, sonst Standard)
-        $customPresentation = [];
-        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
-            $customPresentation = $variable['VariableCustomPresentation'];
-        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
-            $customPresentation = $variable['VariablePresentation'];
-        }
-        
-        // Sonderfall: VARIABLE_PRESENTATION_LEGACY -> Profil verwenden, Präsentation ignorieren
-        // GUID: {4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C}
-        if (is_array($customPresentation) && isset($customPresentation['PRESENTATION'])) {
-            $legacyGuid = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
-            $presentGuidRaw = (string)$customPresentation['PRESENTATION'];
-            $presentGuidTrim = trim($presentGuidRaw, "{} ");
-            if (strcasecmp($presentGuidTrim, $legacyGuid) === 0) {
-                // Präsentation als nicht vorhanden behandeln, damit Profil greift
-                $customPresentation = [];
+        // Präsentation über IPS_GetVariablePresentation laden (löst Vorlagen, GUIDs etc. automatisch auf)
+        $presentation = [];
+        if (function_exists('IPS_GetVariablePresentation')) {
+            try {
+                $resolved = IPS_GetVariablePresentation($variableId);
+                if (is_array($resolved) && !empty($resolved)) {
+                    $presentation = $resolved;
+                }
+            } catch (Throwable $e) {
+                $this->LogCaughtThrowable(__FUNCTION__ . ':GetVariablePresentation', $e);
             }
         }
         
-        // Bestimme den Gruppennamen für FALL 4 basierend auf Variablentyp
+        // Sonderfall: VARIABLE_PRESENTATION_LEGACY -> Profil verwenden, Präsentation ignorieren
+        $legacyGuid = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
+        $isLegacy = false;
+        if (isset($presentation['PRESENTATION'])) {
+            $presentGuidTrim = trim((string)$presentation['PRESENTATION'], '{} ');
+            $isLegacy = (strcasecmp($presentGuidTrim, $legacyGuid) === 0);
+        }
+        
+        // Bestimme den Gruppennamen basierend auf Variablentyp
         $groupName = ($expectedVariableType === VARIABLETYPE_INTEGER) ? 'Numeric' : 
                      (($expectedVariableType === VARIABLETYPE_BOOLEAN) ? 'Boolean' : 'String');
         
-        // **FALL 1: Alte Variablenprofile**
+        // **Profil-Fallback** (wenn keine Präsentation oder Legacy)
         $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
-        // Wenn sowohl Profil als auch Präsentation vorhanden sind, bevorzugen wir die Präsentation
-        if (!empty($profile) && IPS_VariableProfileExists($profile) && empty($customPresentation)) {
+        if (!empty($profile) && IPS_VariableProfileExists($profile) && ($isLegacy || empty($presentation))) {
             $profileData = IPS_GetVariableProfile($profile);
             
             if (isset($profileData['Associations']) && is_array($profileData['Associations'])) {
                 $associations = [];
                 foreach ($profileData['Associations'] as $association) {
                     if (isset($association['Value']) && isset($association['Name'])) {
-                        // SPECIAL: Boolean-Wert-Normalisierung für korrektes Association-Matching
                         $normalizedValue = $association['Value'];
                         if ($expectedVariableType === VARIABLETYPE_BOOLEAN) {
-                            // Normalisiere Boolean-Werte: false kann als "" oder 0 kommen, true als 1 oder true
                             if ($association['Value'] === '' || $association['Value'] === 0 || $association['Value'] === false) {
                                 $normalizedValue = false;
                             } elseif ($association['Value'] === 1 || $association['Value'] === true) {
@@ -3168,10 +3360,9 @@ class UniversalDeviceTile extends IPSModule
                         }
                         
                         $associations[] = [
-                            'value' => $normalizedValue, // Normalisierte Werte für Boolean-Variablen
+                            'value' => $normalizedValue,
                             'name' => $association['Name'],
                             'color' => isset($association['Color']) && $association['Color'] !== -1 ? '#' . sprintf('%06X', $association['Color']) : null,
-                            // Mappe Icon-Namen (z. B. "Climate" -> "arrows-spin") bevor das Frontend rendert
                             'icon' => (isset($association['Icon']) && $association['Icon'] !== '') ? $this->MapIconToFontAwesome($association['Icon']) : null
                         ];
                     }
@@ -3180,194 +3371,146 @@ class UniversalDeviceTile extends IPSModule
             }
         }
         
-        // Presentation source for associations: prefer VariableCustomPresentation, fallback to VariablePresentation (Option B)
-        // Enables buttons for standard (non-custom) presentations that define OPTIONS/PRESENTATION/TEMPLATE
-        $customPresentation = [];
-        if (isset($variable['VariableCustomPresentation']) && !empty($variable['VariableCustomPresentation'])) {
-            $customPresentation = $variable['VariableCustomPresentation'];
-        } elseif (isset($variable['VariablePresentation']) && !empty($variable['VariablePresentation'])) {
-            $customPresentation = $variable['VariablePresentation'];
-        }
-// **FALL 1.5: Boolean-Präsentationen mit direkten ICON_TRUE/ICON_FALSE Parametern**
+        // **Boolean: ICON_TRUE/ICON_FALSE aus aufgelöster Präsentation**
         if ($expectedVariableType === VARIABLETYPE_BOOLEAN) {
-            // **KRITISCHER FIX: Baue ASSOCIATIONS aus ICON_TRUE/ICON_FALSE auf**
-            // Prüfe, ob ICON_TRUE oder ICON_FALSE wirklich gesetzt und nicht leer sind
-            $iconTrueSet = isset($customPresentation['ICON_TRUE']) && trim($customPresentation['ICON_TRUE']) !== '';
-            $iconFalseSet = isset($customPresentation['ICON_FALSE']) && trim($customPresentation['ICON_FALSE']) !== '';
+            $iconTrueSet = isset($presentation['ICON_TRUE']) && trim($presentation['ICON_TRUE']) !== '';
+            $iconFalseSet = isset($presentation['ICON_FALSE']) && trim($presentation['ICON_FALSE']) !== '';
             if ($iconTrueSet || $iconFalseSet) {
-                
-                // Check USE_ICON_FALSE flag to determine icon behavior
-                $useIconFalse = isset($customPresentation['USE_ICON_FALSE']) ? $customPresentation['USE_ICON_FALSE'] : true;
+                $useIconFalse = isset($presentation['USE_ICON_FALSE']) ? $presentation['USE_ICON_FALSE'] : true;
                 
                 $associations = [];
-                // FALSE Association (Wert 0/false)
                 if ($iconFalseSet) {
                     $associations[] = [
                         'value' => false,
                         'name' => 'Aus',
                         'color' => null,
-                        'icon' => $useIconFalse ? $customPresentation['ICON_FALSE'] : null // Kein Icon wenn USE_ICON_FALSE=false
+                        'icon' => $useIconFalse ? $presentation['ICON_FALSE'] : null
                     ];
-                    $iconUsed = $useIconFalse ? $customPresentation['ICON_FALSE'] : 'NULL (USE_ICON_FALSE=false)';
                 }
-                // TRUE Association (Wert 1/true)
                 if ($iconTrueSet) {
                     $associations[] = [
                         'value' => true,
                         'name' => 'An',
                         'color' => null,
-                        'icon' => $useIconFalse ? $customPresentation['ICON_TRUE'] : null // Kein Icon wenn USE_ICON_FALSE=false
+                        'icon' => $useIconFalse ? $presentation['ICON_TRUE'] : null
                     ];
-                    $iconUsed = $useIconFalse ? $customPresentation['ICON_TRUE'] : 'NULL (USE_ICON_FALSE=false)';
                 }
                 if (!empty($associations)) {
                     return $associations;
                 }
             }
-            
-                    
-            // Prüfe auf presentationParameters in der customPresentation (beide Strukturen unterstützen)
-            $params = null;
-            
-            // Prüfe zuerst auf direktes VariableProfile
-            if (empty($customPresentation) && isset($variable['VariableProfile']) && !empty($variable['VariableProfile'])) {
-                $profileName = $variable['VariableProfile'];
-                $profile = @IPS_GetVariableProfile($profileName);
-                if ($profile !== false && isset($profile['Associations'])) {
-                    return $profile['Associations'];
-                }
-            }
         }
         
-        // **STRING/INTEGER PRESENTATION GUID AUFLÖSUNG für Profile ohne direkte OPTIONS**
-        if (($expectedVariableType === VARIABLETYPE_STRING || $expectedVariableType === VARIABLETYPE_INTEGER) && 
-            isset($customPresentation['PRESENTATION']) && !empty($customPresentation['PRESENTATION'])) {
-            $presentationGuid = trim($customPresentation['PRESENTATION'], '{}');
-            
-            try {
-                if (function_exists('IPS_GetPresentation')) {
-                    $presentationData = @IPS_GetPresentation($presentationGuid);
-                    if ($presentationData !== false && !empty($presentationData)) {
-                        if (isset($presentationData['Associations']) && is_array($presentationData['Associations'])) {
-                            return $presentationData['Associations'];
-                        }
-                    }
-                }
-            } catch (Exception $e) {
-            }
+        // **Associations direkt aus aufgelöster Präsentation**
+        if (isset($presentation['Associations']) && is_array($presentation['Associations'])) {
+            return $presentation['Associations'];
         }
         
-        // **FALL 2: CustomPresentation mit direkten OPTIONS**
-        if (isset($customPresentation['OPTIONS'])) {
-            $options = is_string($customPresentation['OPTIONS']) ? json_decode($customPresentation['OPTIONS'], true) : $customPresentation['OPTIONS'];
-            if (is_array($options)) {
+        // **OPTIONS aus aufgelöster Präsentation extrahieren**
+        // Helper: OPTIONS-Array in unser Association-Format konvertieren
+        $mapOptions = function($options) {
+            if (!is_array($options)) return null;
+            $associations = [];
+            foreach ($options as $option) {
+                // Diskrete OPTIONS: Value + Caption
+                // Intervall-OPTIONS: Min + Max + Caption (Min als Startwert = Value-Äquivalent)
+                $value = $option['Value'] ?? $option['Min'] ?? null;
+                if ($value !== null && isset($option['Caption'])) {
+                    $associations[] = [
+                        'value' => $value,
+                        'name' => $option['Caption'],
+                        'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
+                        'icon' => (isset($option['IconValue']) && !empty($option['IconValue'])) ? $this->MapIconToFontAwesome($option['IconValue']) : null
+                    ];
+                }
+            }
+            return !empty($associations) ? $associations : null;
+        };
+        
+        // Direkte OPTIONS
+        if (isset($presentation['OPTIONS'])) {
+            $options = is_string($presentation['OPTIONS']) ? json_decode($presentation['OPTIONS'], true) : $presentation['OPTIONS'];
+            $result = $mapOptions($options);
+            if ($result !== null) return $result;
+        }
+        
+        // **INTERVALS aus aufgelöster Präsentation extrahieren**
+        if (!empty($presentation['INTERVALS_ACTIVE']) && isset($presentation['INTERVALS'])) {
+            $intervals = is_string($presentation['INTERVALS']) ? json_decode($presentation['INTERVALS'], true) : $presentation['INTERVALS'];
+            if (is_array($intervals)) {
                 $associations = [];
-                foreach ($options as $option) {
-                    if (isset($option['Value']) && isset($option['Caption'])) {
+                foreach ($intervals as $interval) {
+                    if (isset($interval['IntervalMinValue']) && !empty($interval['ConstantActive'])) {
+                        $color = null;
+                        if (!empty($interval['ColorActive']) && isset($interval['ColorValue']) && $interval['ColorValue'] !== -1) {
+                            $color = '#' . sprintf('%06X', $interval['ColorValue']);
+                        }
+                        $icon = null;
+                        if (!empty($interval['IconActive']) && isset($interval['IconValue']) && !empty($interval['IconValue'])) {
+                            $icon = $this->MapIconToFontAwesome($interval['IconValue']);
+                        }
                         $associations[] = [
-                            'value' => $option['Value'], // Kann Integer oder String sein
-                            'name' => $option['Caption'],
-                            'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
-                            // Mappe IconValue über die zentrale Mapping-Funktion
-                            'icon' => (isset($option['IconValue']) && !empty($option['IconValue'])) ? $this->MapIconToFontAwesome($option['IconValue']) : null
+                            'value' => $interval['IntervalMinValue'],
+                            'name' => $interval['ConstantValue'] ?? '',
+                            'color' => $color,
+                            'icon' => $icon
                         ];
                     }
                 }
-                return $associations;
+                if (!empty($associations)) return $associations;
             }
         }
         
-        // **FALL 3: CustomPresentation mit TEMPLATE**
-        if (isset($customPresentation['TEMPLATE'])) {
-            try {
-                if (function_exists('IPS_GetTemplate')) {
-                    $templateData = IPS_GetTemplate($customPresentation['TEMPLATE']);
-                    
-                    if (isset($templateData['Values']['OPTIONS'])) {
-                        $options = is_string($templateData['Values']['OPTIONS']) ? json_decode($templateData['Values']['OPTIONS'], true) : $templateData['Values']['OPTIONS'];
-                        if (is_array($options)) {
-                            $associations = [];
-                            foreach ($options as $option) {
-                                if (isset($option['Value']) && isset($option['Caption'])) {
-                                    $associations[] = [
-                                        'value' => $option['Value'], // Kann Integer oder String sein
-                                        'name' => $option['Caption'],
-                                        'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
-                                        // Mappe IconValue aus Template-Optionen
-                                        'icon' => (isset($option['IconValue']) && !empty($option['IconValue'])) ? $this->MapIconToFontAwesome($option['IconValue']) : null
-                                    ];
+        // Fallback: groups → presentationParameters → OPTIONS (z. B. bei Numeric/String/Boolean-Gruppen)
+        if (isset($presentation['groups']) && is_array($presentation['groups'])) {
+            foreach ($presentation['groups'] as $group) {
+                if (isset($group['name']) && $group['name'] === $groupName) {
+                    if (isset($group['presentationParameters']['OPTIONS'])) {
+                        $optData = $group['presentationParameters']['OPTIONS'];
+                        $options = is_string($optData) ? json_decode($optData, true) : $optData;
+                        
+                        // Prüfe auf deutsche Übersetzungen in locale.de
+                        if (is_array($options) && isset($presentation['locale']['de'])) {
+                            $originalOptionsString = $group['presentationParameters']['OPTIONS'];
+                            if (is_string($originalOptionsString) && isset($presentation['locale']['de'][$originalOptionsString])) {
+                                $germanOptions = json_decode($presentation['locale']['de'][$originalOptionsString], true);
+                                if (is_array($germanOptions)) {
+                                    $options = $germanOptions;
                                 }
                             }
-                            return $associations;
                         }
+                        
+                        $result = $mapOptions($options);
+                        if ($result !== null) return $result;
                     }
+                    break;
                 }
-            } catch (Exception $e) {
-                // Template-Fehler ignorieren und mit nächstem Fall fortfahren
-            }
-        }
-        
-        // **FALL 4: CustomPresentation mit PRESENTATION GUID (Fallback)**
-        if (isset($customPresentation['PRESENTATION'])) {
-            try {
-                if (function_exists('IPS_GetPresentation')) {
-                    $presentationData = IPS_GetPresentation($customPresentation['PRESENTATION']);
-                    
-                    // Falls es ein JSON-String ist, dekodieren
-                    if (is_string($presentationData)) {
-                        $presentationData = json_decode($presentationData, true);
-                        if (json_last_error() !== JSON_ERROR_NONE) {
-                            return null;
-                        }
-                    }
-                    
-                    // Suche nach der entsprechenden Gruppe ("Numeric" für Integer, "String" für String)
-                    if (isset($presentationData['groups']) && is_array($presentationData['groups'])) {
-                        foreach ($presentationData['groups'] as $group) {
-                            if (isset($group['name']) && $group['name'] === $groupName) {
-                                if (isset($group['presentationParameters']['OPTIONS'])) {
-                                    $options = is_string($group['presentationParameters']['OPTIONS']) ? json_decode($group['presentationParameters']['OPTIONS'], true) : $group['presentationParameters']['OPTIONS'];
-                                    if (is_array($options)) {
-                                        // Prüfe auf deutsche Übersetzungen in locale.de
-                                        if (isset($presentationData['locale']['de'])) {
-                                            $originalOptionsString = $group['presentationParameters']['OPTIONS'];
-                                            if (isset($presentationData['locale']['de'][$originalOptionsString])) {
-                                                $germanOptionsString = $presentationData['locale']['de'][$originalOptionsString];
-                                                $germanOptions = json_decode($germanOptionsString, true);
-                                                if (is_array($germanOptions)) {
-                                                    $options = $germanOptions; // Verwende deutsche Übersetzungen
-                                                }
-                                            }
-                                        }
-                                        
-                                        $associations = [];
-                                        foreach ($options as $option) {
-                                            if (isset($option['Value']) && isset($option['Caption'])) {
-                                                $associations[] = [
-                                                    'value' => $option['Value'], // Kann Integer oder String sein
-                                                    'name' => $option['Caption'],
-                                                    'color' => isset($option['Color']) && $option['Color'] !== -1 ? '#' . sprintf('%06X', $option['Color']) : null,
-                                                    // Mappe IconValue aus Presentation-Optionen
-                                                    'icon' => (isset($option['IconValue']) && !empty($option['IconValue'])) ? $this->MapIconToFontAwesome($option['IconValue']) : null
-                                                ];
-                                            }
-                                        }
-                                        return $associations;
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-            } catch (Exception $e) {
-                // Presentation-Fehler ignorieren und fortfahren
             }
         }
         
         return null;
     }
     
+    /**
+     * Findet die passende Assoziation für einen Wert (Intervall-Logik wie Symcon-Profile).
+     * Gibt die Assoziation mit dem höchsten AssoziationValue <= $currentValue zurück.
+     * @param array $associations Array von Assoziationen mit 'AssoziationValue'
+     * @param mixed $currentValue Aktueller Variablenwert
+     * @return array|null Passende Assoziation oder null
+     */
+    private function FindMatchingAssociation(array $associations, $currentValue) {
+        $match = null;
+        foreach ($associations as $assoziation) {
+            if (!isset($assoziation['AssoziationValue'])) continue;
+            $av = $assoziation['AssoziationValue'];
+            if ($av == $currentValue) return $assoziation;
+            if ($av <= $currentValue && ($match === null || $av > $match['AssoziationValue'])) {
+                $match = $assoziation;
+            }
+        }
+        return $match;
+    }
+
     /**
      * Hilfsfunktion: Gibt das konfigurierte Standard-Bild zurück oder 'none' wenn nicht konfiguriert
      * @return string Asset-Name für das Standard-Bild oder 'none'
