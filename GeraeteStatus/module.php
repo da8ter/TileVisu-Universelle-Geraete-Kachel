@@ -1148,6 +1148,11 @@ class UniversalDeviceTile extends IPSModule
             return;
         }
 
+        // Volles Update-Payload höchstens einmal pro MessageSink-Lauf bauen
+        // (Status-Zweig und Variablenliste können beide zutreffen, die Werte
+        // ändern sich dazwischen nicht).
+        $fullMessage = null;
+
         // Status-Variable: minimalen Status-Payload senden.
         // Achtung: bewusst kein return — die Status-Variable kann zusätzlich
         // in der Variablenliste konfiguriert sein (Dedup verhindert Doppel-Updates).
@@ -1182,7 +1187,9 @@ class UniversalDeviceTile extends IPSModule
                     if (!$this->hasValueChangedAndRemember($SenderID)) {
                         continue;
                     }
-                    $fullMessage = $this->GetFullUpdateMessage();
+                    if ($fullMessage === null) {
+                        $fullMessage = $this->GetFullUpdateMessage();
+                    }
                     $fullArray = json_decode($fullMessage, true);
                     $minimal = $isMain
                         ? $this->buildMinimalVarUpdateForVariable($fullArray, $SenderID)
