@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UDT;
 
 /**
@@ -25,7 +27,7 @@ trait ImageHookTrait
     }
 
     // Hilfsmethode zur Asset-Generierung für Custom Images und Fallback-Assets
-    private function GenerateAssets() {
+    private function GenerateAssets(): array {
         $assets = [];
         
         // Prüfe ob keine Statusvariable konfiguriert ist - dann brauchen wir Fallback-Assets
@@ -175,7 +177,7 @@ trait ImageHookTrait
         return $base . '?' . $q;
     }
 
-    protected function ProcessHookData()
+    protected function ProcessHookData(): void
     {
         // Pfade relativ zum Modulordner (diese Datei liegt in libs/)
         $assetsDir = __DIR__ . '/../assets';

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UDT;
 
 /**
@@ -382,7 +384,7 @@ trait PayloadTrait
      * Hilfsfunktion: Gibt das konfigurierte Standard-Bild zurück oder 'none' wenn nicht konfiguriert
      * @return string Asset-Name für das Standard-Bild oder 'none'
      */
-    private function getDefaultImageOrNone() {
+    private function getDefaultImageOrNone(): string {
         $defaultImageId = $this->ReadPropertyInteger('DefaultImage');
         if ($defaultImageId > 0 && IPS_MediaExists($defaultImageId)) {
             return 'img_default_' . $defaultImageId;

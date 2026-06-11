@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UDT;
 
 /**
@@ -15,7 +17,7 @@ trait FormTrait
      * Gibt alle Gruppennamen und ShowAbove/Line Konfiguration als Array zurück für Frontend-Verwendung
      * @return array Assoziatives Array mit Gruppennummer als Key und Konfiguration als Value
      */
-    public function GetAllGroupNames()
+    public function GetAllGroupNames(): array
     {
         $groupNamesList = json_decode($this->ReadPropertyString('GroupNamesList'), true);
         
@@ -186,7 +188,7 @@ trait FormTrait
      * @param array &$form Das Form-Array (per Referenz)
      * @param array $groupNames Die konfigurierten Gruppennamen
      */
-    private function populateGroupNameColumn(&$form, $groupNames)
+    private function populateGroupNameColumn(&$form, $groupNames): void
     {
         // Lade die aktuellen VariablesList-Daten
         $currentVariables = json_decode($this->ReadPropertyString('VariablesList'), true);
@@ -211,7 +213,7 @@ trait FormTrait
      * @param array &$form Das Form-Array (per Referenz)
      * @param array $updatedVariables Die aktualisierten Variablen-Daten
      */
-    private function updateVariablesListInForm(&$form, $updatedVariables)
+    private function updateVariablesListInForm(&$form, $updatedVariables): void
     {
         $this->findAndUpdateVariablesList($form, $updatedVariables);
     }
@@ -221,7 +223,7 @@ trait FormTrait
      * @param array &$element Das aktuelle Element (per Referenz)
      * @param array $updatedVariables Die aktualisierten Variablen-Daten
      */
-    private function findAndUpdateVariablesList(&$element, $updatedVariables)
+    private function findAndUpdateVariablesList(&$element, $updatedVariables): void
     {
         if (is_array($element)) {
             // Prüfe, ob dies die VariablesList ist
@@ -243,7 +245,7 @@ trait FormTrait
      * @param array $groupNames Die konfigurierten Gruppennamen
      * @return string Der Anzeigename
      */
-    private function getGroupDisplayName($technicalGroup, $groupNames)
+    private function getGroupDisplayName($technicalGroup, $groupNames): string
     {
         if ($technicalGroup === 'keine Gruppe') {
             return 'keine Gruppe';
@@ -263,7 +265,7 @@ trait FormTrait
         return $technicalGroup;
     }
 
-    private function getObjectDisplayForVariableRow($row)
+    private function getObjectDisplayForVariableRow(array $row): string
     {
         $displayType = $row['DisplayType'] ?? 'text';
         if ($displayType === 'image') {
@@ -317,7 +319,7 @@ trait FormTrait
         return $name;
     }
 
-    public function UpdateList(int $StatusID)
+    public function UpdateList(int $StatusID): void
     {
         $listData = []; // Hier sammeln Sie die Daten für Ihre Liste
     
@@ -354,7 +356,7 @@ trait FormTrait
     $this->UpdateFormField('ProfilAssoziazionen', 'values', $jsonListData);
     }
 
-    public function UpdateDisplayTypeVisibility(string $displayType, ?int $rowId = null)
+    public function UpdateDisplayTypeVisibility(string $displayType, ?int $rowId = null): void
     {
         $fields = self::DISPLAY_TYPE_FIELD_VISIBILITY[$displayType] ?? self::DISPLAY_TYPE_FIELD_VISIBILITY['default'];
         foreach ($fields as $field => $visible) {

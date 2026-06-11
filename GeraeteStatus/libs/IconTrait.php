@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UDT;
 
 /**
@@ -15,7 +17,7 @@ trait IconTrait
      */
     protected $iconMapping = null;
 
-    private function GetIcon($id) {
+    private function GetIcon(int $id): string {
         try {
             $variable = IPS_GetVariable($id);
             $Value = GetValue($id);
@@ -57,7 +59,7 @@ trait IconTrait
             if ($icon == "") {
                 $icon = "Transparent";
             }
-            return $this->MapIconToFontAwesome($icon);
+            return $this->MapIconToFontAwesome((string)$icon);
         }
 
         // PFAD B: keine (nutzbare) Präsentation → Darstellung/Visualisierung, Associations, Profil
@@ -125,7 +127,7 @@ trait IconTrait
         }
 
         // Icon-Mapping zu FontAwesome durchführen
-        return $this->MapIconToFontAwesome($icon);
+        return $this->MapIconToFontAwesome((string)$icon);
     }
 
     /**
@@ -349,7 +351,7 @@ trait IconTrait
      * Ermittelt das Icon der aktuell aktiven Association für Bool/Integer/String Variablen.
      * Nutzt die bestehende Association-Auflösung (Profile/OPTIONS/TEMPLATE/PRESENTATION).
      */
-    private function GetAssociationIconForCurrentValue($variableId, $variableType, $currentValue)
+    private function GetAssociationIconForCurrentValue(int $variableId, int $variableType, $currentValue): string
     {
         if (!in_array($variableType, [VARIABLETYPE_BOOLEAN, VARIABLETYPE_INTEGER, VARIABLETYPE_STRING], true)) {
             return '';
@@ -381,7 +383,7 @@ trait IconTrait
     /**
      * Lädt das Icon-Mapping aus der JSON-Datei
      */
-    private function LoadIconMapping() {
+    private function LoadIconMapping(): void {
         $mappingFile = __DIR__ . '/../assets/iconMapping.json';
         
         if (file_exists($mappingFile)) {
@@ -402,7 +404,7 @@ trait IconTrait
      * @param string $iconName Der Original-Icon-Name
      * @return string Der gemappte FontAwesome-Name oder der Original-Name falls kein Mapping gefunden
      */
-    private function MapIconToFontAwesome($iconName) {
+    private function MapIconToFontAwesome(string $iconName): string {
         // Vorverarbeitung: Whitespace entfernen und Normalisieren
         // Entferne führende/trailing Whitespaces inkl. Unicode-Leerzeichen (NBSP, NNBSP, etc.)
         $iconName = preg_replace('/^[\p{Z}\s\x{00A0}]+|[\p{Z}\s\x{00A0}]+$/u', '', $iconName);
