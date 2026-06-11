@@ -1328,6 +1328,340 @@
             root.style.setProperty('--button-height', config.height + 'px');
         }
 
+        // === handleMessage-Teilverarbeiter =================================
+
+        // Status-Schlüssel: Snapshot-Vergleich, Status-Render und Alignment-Restore
+        function applyStatusKeys(decodedData) {
+            // Set global currentBildauswahl for updateImageVisibility
+            if (decodedData.hasOwnProperty('statusBildauswahl')) {
+                state.currentBildauswahl = decodedData.statusBildauswahl;
+            }
+
+            // Build a minimal comparable snapshot of all status-relevant props
+            const currentStatusSnapshot = {
+                status: decodedData.status,
+                statusValue: decodedData.statusValue,
+                statusFontSize: decodedData.statusFontSize,
+                statusAlignment: decodedData.statusAlignment,
+                statusShowIcon: decodedData.statusShowIcon,
+                statusShowLabel: decodedData.statusShowLabel,
+                statusShowValue: decodedData.statusShowValue,
+                statusLabel: decodedData.statusLabel,
+                statusIcon: decodedData.statusIcon,
+                statusBildauswahl: decodedData.statusBildauswahl,
+                statusIconColor: decodedData.statusIconColor,
+                isStatusIconColorTransparent: decodedData.isStatusIconColorTransparent,
+                statusColor: decodedData.statusColor,
+                isStatusColorTransparent: decodedData.isStatusColorTransparent,
+                statusHidden: decodedData.statusHidden,
+                hideImageColumn: decodedData.hideImageColumn,
+                imageAlignment: state.currentImageAlignment || null
+            };
+
+            const lastStatusSnapshotJson = state._lastStatusSnapshotJson || null;
+            const currentStatusSnapshotJson = JSON.stringify(currentStatusSnapshot);
+
+            if (lastStatusSnapshotJson !== currentStatusSnapshotJson) {
+                // Only re-render if something relevant changed
+                renderStatus(decodedData);
+                updateImageVisibility();
+                state._lastStatusSnapshotJson = currentStatusSnapshotJson;
+            }
+            
+            // Re-apply gespeicherte Bild-/Icon-Ausrichtung nach dem Rendering (Persistenz)
+            if (state.currentImageAlignment) {
+                applyImageAlignment(state.currentImageAlignment);
+            }
+        }
+
+        // Vollständiges variables-Payload; liefert true, wenn ein Full-Re-Render nötig ist
+        function applyVariablesUpdate(value) {
+            // Skip processing if incoming variables payload is IDENTICAL to the previous one
+            if (state.lastVariablesData && JSON.stringify(value) === JSON.stringify(state.lastVariablesData)) {
+                return false; // Nothing changed at all
+            }
+
+            if (state.lastVariablesData && state.variableDataCache) {
+                let hasMinimalUpdates = false;
+                let hasOtherChanges = false;
+                
+
+                
+                // 🔧 FIX DATA STRUCTURE MISMATCH + DUPLICATE VARIABLE HANDLING: 
+                // Incoming value is array-indexed (0,1,2,3...) 
+                // Cache is variable-ID indexed (33670, 27157...)
+                // Same variable can appear multiple times with different displayTypes!
+                
+                const processedEntries = new Set(); // Track processed (id + displayType) combinations
+                const minimalUpdates = []; // Collect variables that can be updated minimally
+                
+                for (const arrayIndex in value) {
+                    const newVariable = value[arrayIndex];
+                    
+                    // Find matching variable in cache by variable ID, not array index
+                    const actualVariableId = newVariable?.variableId || newVariable?.id;
+                    // Find matching old variable from previous payload by same id and displayType
+                    let oldVariable = null;
+                    try {
+                        if (state.lastVariablesData && actualVariableId) {
+                            const prev = state.lastVariablesData.find(v => (v?.variableId || v?.id) === actualVariableId && (v?.displayType || 'text') === (newVariable?.displayType || 'text'));
+                            if (prev) oldVariable = prev;
+                        }
+                    } catch (_) { oldVariable = null; }
+                    
+
+                    
+                    // 🎯 Handle duplicates by display type: process each (id + displayType) separately
+                    const displayType = newVariable?.displayType || 'text';
+                    const compositeKey = `${actualVariableId}::${displayType}`;
+                    if (processedEntries.has(compositeKey)) {
+                        continue;
+                    }
+                    processedEntries.add(compositeKey);
+
+                    // Always force a full re-render when image variables are present/updated
+                    if (displayType === 'image') {
+                        hasOtherChanges = true;
+                    }
+                    
+                    if (oldVariable && newVariable && actualVariableId) {
+                        // Prüfe ob sich nur rawValue oder formattedValue geändert hat
+                        const valueChanged = newVariable.rawValue !== oldVariable.rawValue;
+                        const formattedValueChanged = newVariable.formattedValue !== oldVariable.formattedValue;
+                        
+                        if (valueChanged || formattedValueChanged) {
+                            // Check display type and determine if minimal update is possible
+                            if (displayType === 'progress' || displayType === 'button' || displayType === 'text' || displayType === 'slider') {
+                                hasMinimalUpdates = true;
+                                minimalUpdates.push({ variableId: actualVariableId, type: displayType, variable: newVariable });
+                            } else {
+                                hasOtherChanges = true;
+                            }
+                        }
+                        // Prüfe andere Eigenschaften (but be less strict to avoid false positives)
+                        else if (JSON.stringify(newVariable) !== JSON.stringify(oldVariable)) {
+
+                            
+                            // Only mark as hasOtherChanges if it's a significant change (not just object reference)
+                            const significantChange = (
+                                newVariable.displayValue !== oldVariable.displayValue ||
+                                newVariable.unit !== oldVariable.unit ||
+                                newVariable.minValue !== oldVariable.minValue ||
+                                newVariable.maxValue !== oldVariable.maxValue
+                            );
+                            
+                            if (significantChange) {
+                                hasOtherChanges = true;
+                            }
+                        }
+                    } else {
+                        hasOtherChanges = true; // Neue oder gelöschte Variable oder missing ID
+                    }
+                }
+                
+                // Wenn nur Variable-Werte geändert haben (alle Typen), skip Full-Re-Render
+                if (hasMinimalUpdates && !hasOtherChanges) {
+                    
+                    // Führe Mini-Updates für alle geänderten Variablen durch
+                    minimalUpdates.forEach((updateData) => {
+                        const { variableId, type, variable } = updateData;
+                        
+                        // Ensure cache reflects latest values for this variable before rendering
+                        try {
+                            if (!state.variableDataCache) state.variableDataCache = {};
+                            state.variableDataCache[variableId] = variable;
+                        } catch (_) {}
+
+                        switch (type) {
+                            case 'progress':
+                                updateProgressBarValue(variableId, variable.rawValue);
+                                break;
+                            case 'button':
+                                updateButtonValue(variableId, variable);
+                                break;
+                            case 'text':
+                                updateTextValue(variableId, variable);
+                                break;
+                            case 'slider':
+                                updateSliderValue(variableId, variable.rawValue);
+                                break;
+                        }
+                    });
+                    
+                    // Update cache mit korrekter Datenstruktur
+                    updateVariableCache(value);
+                    state.lastVariablesData = value;
+                    return false; // 🚀 SKIP FULL RE-RENDER!
+                }
+            }
+            
+            // Store latest variables and rebuild the ID-indexed cache for correct diffing next time
+            state.lastVariablesData = value;
+            updateVariableCache(value);
+            return true;
+        }
+
+        // assets-Payload mergen und Statusbild ggf. neu rendern
+        function applyAssets(value) {
+            // Aktualisiere Assets (Bilder) sofort
+            if (typeof value === 'object') {
+                window.assets = window.assets || {};
+                Object.assign(window.assets, value);
+                // Wichtig: Wenn sich Medieninhalte geändert haben, muss das Statusbild neu gerendert werden,
+                // da das <img>-src bereits auf den alten base64-String gesetzt wurde.
+                // Re-render mit dem zuletzt bekannten Status-Payload.
+                try {
+                    if (state._lastStatusPayload) {
+                        renderStatus(state._lastStatusPayload);
+                        updateImageVisibility();
+                    } else if (state.currentBildauswahl) {
+                        // Fallback: Kein gespeicherter Payload vorhanden -> Bild direkt aktualisieren
+                        const key = state.currentBildauswahl;
+                        let imageUrl = '';
+                        if (key && (key.startsWith('img_custom_') || key.startsWith('img_default_'))) {
+                            imageUrl = window.assets[key] || '';
+                        } else if (key && key !== 'none') {
+                            imageUrl = window.assets[`img_${key}`] || '';
+                        }
+                        const deviceImg = document.getElementById('image');
+                        if (deviceImg && imageUrl) {
+                            deviceImg.style.display = 'none';
+                            deviceImg.onload = function() { this.style.display = ''; };
+                            deviceImg.onerror = function() { this.style.display = 'none'; };
+                            deviceImg.src = imageUrl;
+                        }
+                    }
+                } catch (_) {}
+            }
+        }
+
+        // Backend-Minimal-Update für Bild-Variablen (imageVarUpdate)
+        function applyImageVarUpdates(value) {
+            // Minimal-Update vom Backend für Variablen mit displayType 'image'
+            try {
+                const updates = Array.isArray(value) ? value : [];
+                for (const u of updates) {
+                    const id = u?.id;
+                    const hookUrl = u?.imageUrl || '';
+                    if (!id) continue;
+                    const wrapper = document.querySelector(`.variable-item[data-variable-id="${CSS.escape(String(id))}"]`);
+                    if (!wrapper) continue;
+                    const img = wrapper.querySelector('img.variable-inline-image');
+                    if (!img) continue;
+                    img.style.display = 'none';
+                    img.onload = function() { this.style.display = ''; };
+                    img.onerror = function() { this.style.display = 'none'; };
+                    try { img.decoding = 'async'; } catch (_) {}
+                    try { img.loading = 'eager'; } catch (_) {}
+                    if (hookUrl) { img.src = hookUrl; }
+                    try {
+                        if (img.complete && img.naturalWidth > 0) {
+                            img.style.display = '';
+                        }
+                    } catch (_) {}
+                }
+            } catch (_) {}
+        }
+
+        // Dynamische var_<i>-Schlüssel (Minimal-Updates für Werte, Icons und SecondVariable)
+        function applyMinimalVarKey(parameter, value) {
+            // Handle minimal updates for SecondVariable (var_X_second*, var_X_second_value, var_X_second_icon)
+            if (parameter.startsWith('var_') && parameter.includes('_second')) {
+                const baseVarKey = parameter.split('_second')[0];
+                const targetVariableId = state.varKeyToIdMapping?.[baseVarKey];
+                if (targetVariableId && state.variableDataCache && state.variableDataCache[targetVariableId]) {
+                    const variable = state.variableDataCache[targetVariableId];
+                    variable.secondVariable = variable.secondVariable || {};
+                    if (parameter.endsWith('_second_value')) {
+                        variable.secondVariable.rawValue = value;
+                    } else if (parameter.endsWith('_second_icon')) {
+                        variable.secondVariable.icon = value;
+                    } else {
+                        // formatted value update: 'var_X_second'
+                        variable.secondVariable.formattedValue = value;
+                    }
+
+                    // Wenn Marker aus SecondVariable verwendet wird, spiegle minimal Updates in progressTarget
+                    try {
+                        if (variable.displayType === 'progress' && variable.useSecondVariableAsTarget) {
+                            variable.progressTarget = variable.progressTarget || {};
+                            if (parameter.endsWith('_second_value')) {
+                                variable.progressTarget.rawValue = value;
+                            } else if (!parameter.endsWith('_second_icon')) {
+                                // formatted text update
+                                variable.progressTarget.formattedValue = value;
+                            }
+                            // label aus secondVariable übernehmen, falls vorhanden
+                            if (variable.secondVariable && variable.secondVariable.label) {
+                                variable.progressTarget.label = variable.secondVariable.label;
+                            }
+                        }
+                    } catch(_) {}
+
+                    // For progress bars, update text and marker immediately (first update), width is based on main rawValue
+                    if (variable.displayType === 'progress') {
+                        const progressContainers = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`);
+                        progressContainers.forEach((progressContainer) => {
+                            const progressTextContainer = progressContainer.querySelector('.progress-text');
+                            if (progressTextContainer) {
+                                updateProgressText(progressTextContainer, variable);
+                            }
+                            updateTargetMarkerDisplay(progressContainer, variable);
+                        });
+                    }
+                }
+                return; // handled in this branch
+            }
+            
+            // Prüfe auf Variable-Updates (Parameter endet mit '_value')
+            if (parameter.endsWith('_value')) {
+                // Extrahiere Variable-ID aus Parameter (z.B. 'var_3_value' -> 'var_3')
+                const varKey = parameter.replace('_value', '');
+                
+                // Aktualisiere rawValue im Cache
+                if (state.variableDataCache) {
+                    const targetVariableId = state.varKeyToIdMapping[varKey];
+                    if (targetVariableId) {
+                        if (state.variableDataCache[targetVariableId]) {
+                            state.variableDataCache[targetVariableId].rawValue = value;
+                        }
+                        // Direkt-Updates nach DOM-Präsenz, nicht nach Cache-DisplayType
+                        try {
+                            const hasProgress = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`).length > 0;
+                            if (hasProgress) {
+                                updateProgressBarValue(targetVariableId, value);
+                            }
+                        } catch (_) {}
+                        try {
+                            const hasSlider = document.querySelectorAll(`.slider-container[data-variable-id="${CSS.escape(String(targetVariableId))}"]`).length > 0;
+                            if (hasSlider) {
+                                updateSliderValue(targetVariableId, value);
+                            }
+                        } catch (_) {}
+                    }
+                }
+                
+                // Aktualisiere die entsprechende Variable (Button oder Text)
+                updateVariable(varKey, value, 'rawValue');
+            }
+            // Prüfe auf formatierte Werte (Parameter ist z.B. 'var_3')
+            else {
+                if (parameter.startsWith('var_') && !parameter.endsWith('_value')) {
+                
+                // Aktualisiere formatierte Werte im Cache
+                if (state.variableDataCache) {
+                    const targetVariableId = state.varKeyToIdMapping?.[parameter];
+                    if (targetVariableId && state.variableDataCache[targetVariableId]) {
+                        state.variableDataCache[targetVariableId].formattedValue = value;
+                        
+                        // Aktualisiere Variable-Darstellung mit neuem formatiertem Wert
+                        updateVariable(parameter, value, 'formattedValue');
+                    }
+                }
+                }
+            }
+        }
+
         function handleMessage(data) {
             let decodedData;
             if (typeof data === 'string') {
@@ -1413,46 +1747,7 @@
                     case 'statuscolor':
                     case 'statusalignment':
                     case 'statusBildauswahl':  
-                        // Set global currentBildauswahl for updateImageVisibility
-                        if (decodedData.hasOwnProperty('statusBildauswahl')) {
-                            state.currentBildauswahl = decodedData.statusBildauswahl;
-                        }
-
-                        // Build a minimal comparable snapshot of all status-relevant props
-                        const currentStatusSnapshot = {
-                            status: decodedData.status,
-                            statusValue: decodedData.statusValue,
-                            statusFontSize: decodedData.statusFontSize,
-                            statusAlignment: decodedData.statusAlignment,
-                            statusShowIcon: decodedData.statusShowIcon,
-                            statusShowLabel: decodedData.statusShowLabel,
-                            statusShowValue: decodedData.statusShowValue,
-                            statusLabel: decodedData.statusLabel,
-                            statusIcon: decodedData.statusIcon,
-                            statusBildauswahl: decodedData.statusBildauswahl,
-                            statusIconColor: decodedData.statusIconColor,
-                            isStatusIconColorTransparent: decodedData.isStatusIconColorTransparent,
-                            statusColor: decodedData.statusColor,
-                            isStatusColorTransparent: decodedData.isStatusColorTransparent,
-                            statusHidden: decodedData.statusHidden,
-                            hideImageColumn: decodedData.hideImageColumn,
-                            imageAlignment: state.currentImageAlignment || null
-                        };
-
-                        const lastStatusSnapshotJson = state._lastStatusSnapshotJson || null;
-                        const currentStatusSnapshotJson = JSON.stringify(currentStatusSnapshot);
-
-                        if (lastStatusSnapshotJson !== currentStatusSnapshotJson) {
-                            // Only re-render if something relevant changed
-                            renderStatus(decodedData);
-                            updateImageVisibility();
-                            state._lastStatusSnapshotJson = currentStatusSnapshotJson;
-                        }
-                        
-                        // Re-apply gespeicherte Bild-/Icon-Ausrichtung nach dem Rendering (Persistenz)
-                        if (state.currentImageAlignment) {
-                            applyImageAlignment(state.currentImageAlignment);
-                        }
+                        applyStatusKeys(decodedData);
                         break;
                     case 'hideimagecolumn':
                         // NEW: Handle hideImageColumn flag for complete image column visibility
@@ -1469,132 +1764,7 @@
                         renderStatus(decodedData);
                         break;
                     case 'variables':
-                        // Skip processing if incoming variables payload is IDENTICAL to the previous one
-                        if (state.lastVariablesData && JSON.stringify(value) === JSON.stringify(state.lastVariablesData)) {
-                            needsRerender = false; // Nothing changed at all
-                            break;
-                        }
-
-                        if (state.lastVariablesData && state.variableDataCache) {
-                            let hasMinimalUpdates = false;
-                            let hasOtherChanges = false;
-                            
-
-                            
-                            // 🔧 FIX DATA STRUCTURE MISMATCH + DUPLICATE VARIABLE HANDLING: 
-                            // Incoming value is array-indexed (0,1,2,3...) 
-                            // Cache is variable-ID indexed (33670, 27157...)
-                            // Same variable can appear multiple times with different displayTypes!
-                            
-                            const processedEntries = new Set(); // Track processed (id + displayType) combinations
-                            const minimalUpdates = []; // Collect variables that can be updated minimally
-                            
-                            for (const arrayIndex in value) {
-                                const newVariable = value[arrayIndex];
-                                
-                                // Find matching variable in cache by variable ID, not array index
-                                const actualVariableId = newVariable?.variableId || newVariable?.id;
-                                // Find matching old variable from previous payload by same id and displayType
-                                let oldVariable = null;
-                                try {
-                                    if (state.lastVariablesData && actualVariableId) {
-                                        const prev = state.lastVariablesData.find(v => (v?.variableId || v?.id) === actualVariableId && (v?.displayType || 'text') === (newVariable?.displayType || 'text'));
-                                        if (prev) oldVariable = prev;
-                                    }
-                                } catch (_) { oldVariable = null; }
-                                
-
-                                
-                                // 🎯 Handle duplicates by display type: process each (id + displayType) separately
-                                const displayType = newVariable?.displayType || 'text';
-                                const compositeKey = `${actualVariableId}::${displayType}`;
-                                if (processedEntries.has(compositeKey)) {
-                                    continue;
-                                }
-                                processedEntries.add(compositeKey);
-
-                                // Always force a full re-render when image variables are present/updated
-                                if (displayType === 'image') {
-                                    hasOtherChanges = true;
-                                }
-                                
-                                if (oldVariable && newVariable && actualVariableId) {
-                                    // Prüfe ob sich nur rawValue oder formattedValue geändert hat
-                                    const valueChanged = newVariable.rawValue !== oldVariable.rawValue;
-                                    const formattedValueChanged = newVariable.formattedValue !== oldVariable.formattedValue;
-                                    
-                                    if (valueChanged || formattedValueChanged) {
-                                        // Check display type and determine if minimal update is possible
-                                        if (displayType === 'progress' || displayType === 'button' || displayType === 'text' || displayType === 'slider') {
-                                            hasMinimalUpdates = true;
-                                            minimalUpdates.push({ variableId: actualVariableId, type: displayType, variable: newVariable });
-                                        } else {
-                                            hasOtherChanges = true;
-                                        }
-                                    }
-                                    // Prüfe andere Eigenschaften (but be less strict to avoid false positives)
-                                    else if (JSON.stringify(newVariable) !== JSON.stringify(oldVariable)) {
-
-                                        
-                                        // Only mark as hasOtherChanges if it's a significant change (not just object reference)
-                                        const significantChange = (
-                                            newVariable.displayValue !== oldVariable.displayValue ||
-                                            newVariable.unit !== oldVariable.unit ||
-                                            newVariable.minValue !== oldVariable.minValue ||
-                                            newVariable.maxValue !== oldVariable.maxValue
-                                        );
-                                        
-                                        if (significantChange) {
-                                            hasOtherChanges = true;
-                                        }
-                                    }
-                                } else {
-                                    hasOtherChanges = true; // Neue oder gelöschte Variable oder missing ID
-                                }
-                            }
-                            
-                            // Wenn nur Variable-Werte geändert haben (alle Typen), skip Full-Re-Render
-                            if (hasMinimalUpdates && !hasOtherChanges) {
-                                
-                                // Führe Mini-Updates für alle geänderten Variablen durch
-                                minimalUpdates.forEach((updateData) => {
-                                    const { variableId, type, variable } = updateData;
-                                    
-                                    // Ensure cache reflects latest values for this variable before rendering
-                                    try {
-                                        if (!state.variableDataCache) state.variableDataCache = {};
-                                        state.variableDataCache[variableId] = variable;
-                                    } catch (_) {}
-
-                                    switch (type) {
-                                        case 'progress':
-                                            updateProgressBarValue(variableId, variable.rawValue);
-                                            break;
-                                        case 'button':
-                                            updateButtonValue(variableId, variable);
-                                            break;
-                                        case 'text':
-                                            updateTextValue(variableId, variable);
-                                            break;
-                                        case 'slider':
-                                            updateSliderValue(variableId, variable.rawValue);
-                                            break;
-                                    }
-                                });
-                                
-                                // Update cache mit korrekter Datenstruktur
-                                updateVariableCache(value);
-                                state.lastVariablesData = value;
-                                needsRerender = false; // 🚀 SKIP FULL RE-RENDER!
-                                break;
-                            }
-                        } else {
-                        }
-                        
-                        // Store latest variables and rebuild the ID-indexed cache for correct diffing next time
-                        state.lastVariablesData = value;
-                        updateVariableCache(value);
-                        needsRerender = true;
+                        needsRerender = applyVariablesUpdate(value);
                         break;
                     case 'progressbarconfig':
                         // Re-render nur, wenn sich die Konfiguration wirklich geändert hat
@@ -1621,62 +1791,10 @@
                         }
                         break;
                     case 'assets':
-                        // Aktualisiere Assets (Bilder) sofort
-                        if (typeof value === 'object') {
-                            window.assets = window.assets || {};
-                            Object.assign(window.assets, value);
-                            // Wichtig: Wenn sich Medieninhalte geändert haben, muss das Statusbild neu gerendert werden,
-                            // da das <img>-src bereits auf den alten base64-String gesetzt wurde.
-                            // Re-render mit dem zuletzt bekannten Status-Payload.
-                            try {
-                                if (state._lastStatusPayload) {
-                                    renderStatus(state._lastStatusPayload);
-                                    updateImageVisibility();
-                                } else if (state.currentBildauswahl) {
-                                    // Fallback: Kein gespeicherter Payload vorhanden -> Bild direkt aktualisieren
-                                    const key = state.currentBildauswahl;
-                                    let imageUrl = '';
-                                    if (key && (key.startsWith('img_custom_') || key.startsWith('img_default_'))) {
-                                        imageUrl = window.assets[key] || '';
-                                    } else if (key && key !== 'none') {
-                                        imageUrl = window.assets[`img_${key}`] || '';
-                                    }
-                                    const deviceImg = document.getElementById('image');
-                                    if (deviceImg && imageUrl) {
-                                        deviceImg.style.display = 'none';
-                                        deviceImg.onload = function() { this.style.display = ''; };
-                                        deviceImg.onerror = function() { this.style.display = 'none'; };
-                                        deviceImg.src = imageUrl;
-                                    }
-                                }
-                            } catch (_) {}
-                        }
+                        applyAssets(value);
                         break;
                     case 'imageVarUpdate':
-                        // Minimal-Update vom Backend für Variablen mit displayType 'image'
-                        try {
-                            const updates = Array.isArray(value) ? value : [];
-                            for (const u of updates) {
-                                const id = u?.id;
-                                const hookUrl = u?.imageUrl || '';
-                                if (!id) continue;
-                                const wrapper = document.querySelector(`.variable-item[data-variable-id="${CSS.escape(String(id))}"]`);
-                                if (!wrapper) continue;
-                                const img = wrapper.querySelector('img.variable-inline-image');
-                                if (!img) continue;
-                                img.style.display = 'none';
-                                img.onload = function() { this.style.display = ''; };
-                                img.onerror = function() { this.style.display = 'none'; };
-                                try { img.decoding = 'async'; } catch (_) {}
-                                try { img.loading = 'eager'; } catch (_) {}
-                                if (hookUrl) { img.src = hookUrl; }
-                                try {
-                                    if (img.complete && img.naturalWidth > 0) {
-                                        img.style.display = '';
-                                    }
-                                } catch (_) {}
-                            }
-                        } catch (_) {}
+                        applyImageVarUpdates(value);
                         break;
                     case 'groupnames':
                         // Nur aktualisieren und re-rendern, wenn sich die Gruppennamen geändert haben
@@ -1706,101 +1824,7 @@
                         break;
                     
                     default:
-                        // Handle minimal updates for SecondVariable (var_X_second*, var_X_second_value, var_X_second_icon)
-                        if (parameter.startsWith('var_') && parameter.includes('_second')) {
-                            const baseVarKey = parameter.split('_second')[0];
-                            const targetVariableId = state.varKeyToIdMapping?.[baseVarKey];
-                            if (targetVariableId && state.variableDataCache && state.variableDataCache[targetVariableId]) {
-                                const variable = state.variableDataCache[targetVariableId];
-                                variable.secondVariable = variable.secondVariable || {};
-                                if (parameter.endsWith('_second_value')) {
-                                    variable.secondVariable.rawValue = value;
-                                } else if (parameter.endsWith('_second_icon')) {
-                                    variable.secondVariable.icon = value;
-                                } else {
-                                    // formatted value update: 'var_X_second'
-                                    variable.secondVariable.formattedValue = value;
-                                }
-
-                                // Wenn Marker aus SecondVariable verwendet wird, spiegle minimal Updates in progressTarget
-                                try {
-                                    if (variable.displayType === 'progress' && variable.useSecondVariableAsTarget) {
-                                        variable.progressTarget = variable.progressTarget || {};
-                                        if (parameter.endsWith('_second_value')) {
-                                            variable.progressTarget.rawValue = value;
-                                        } else if (!parameter.endsWith('_second_icon')) {
-                                            // formatted text update
-                                            variable.progressTarget.formattedValue = value;
-                                        }
-                                        // label aus secondVariable übernehmen, falls vorhanden
-                                        if (variable.secondVariable && variable.secondVariable.label) {
-                                            variable.progressTarget.label = variable.secondVariable.label;
-                                        }
-                                    }
-                                } catch(_) {}
-
-                                // For progress bars, update text and marker immediately (first update), width is based on main rawValue
-                                if (variable.displayType === 'progress') {
-                                    const progressContainers = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`);
-                                    progressContainers.forEach((progressContainer) => {
-                                        const progressTextContainer = progressContainer.querySelector('.progress-text');
-                                        if (progressTextContainer) {
-                                            updateProgressText(progressTextContainer, variable);
-                                        }
-                                        updateTargetMarkerDisplay(progressContainer, variable);
-                                    });
-                                }
-                            }
-                            break; // handled in this branch
-                        }
-                        
-                        // Prüfe auf Variable-Updates (Parameter endet mit '_value')
-                        if (parameter.endsWith('_value')) {
-                            // Extrahiere Variable-ID aus Parameter (z.B. 'var_3_value' -> 'var_3')
-                            const varKey = parameter.replace('_value', '');
-                            
-                            // Aktualisiere rawValue im Cache
-                            if (state.variableDataCache) {
-                                const targetVariableId = state.varKeyToIdMapping[varKey];
-                                if (targetVariableId) {
-                                    if (state.variableDataCache[targetVariableId]) {
-                                        state.variableDataCache[targetVariableId].rawValue = value;
-                                    }
-                                    // Direkt-Updates nach DOM-Präsenz, nicht nach Cache-DisplayType
-                                    try {
-                                        const hasProgress = document.querySelectorAll(`.progress-container[data-variable-id="${targetVariableId}"]`).length > 0;
-                                        if (hasProgress) {
-                                            updateProgressBarValue(targetVariableId, value);
-                                        }
-                                    } catch (_) {}
-                                    try {
-                                        const hasSlider = document.querySelectorAll(`.slider-container[data-variable-id="${CSS.escape(String(targetVariableId))}"]`).length > 0;
-                                        if (hasSlider) {
-                                            updateSliderValue(targetVariableId, value);
-                                        }
-                                    } catch (_) {}
-                                }
-                            }
-                            
-                            // Aktualisiere die entsprechende Variable (Button oder Text)
-                            updateVariable(varKey, value, 'rawValue');
-                        }
-                        // Prüfe auf formatierte Werte (Parameter ist z.B. 'var_3')
-                        else {
-                            if (parameter.startsWith('var_') && !parameter.endsWith('_value')) {
-                            
-                            // Aktualisiere formatierte Werte im Cache
-                            if (state.variableDataCache) {
-                                const targetVariableId = state.varKeyToIdMapping?.[parameter];
-                                if (targetVariableId && state.variableDataCache[targetVariableId]) {
-                                    state.variableDataCache[targetVariableId].formattedValue = value;
-                                    
-                                    // Aktualisiere Variable-Darstellung mit neuem formatiertem Wert
-                                    updateVariable(parameter, value, 'formattedValue');
-                                }
-                            }
-                            }
-                        }
+                        applyMinimalVarKey(parameter, value);
                         break;
                 }
             }
