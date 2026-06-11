@@ -557,35 +557,13 @@ class UniversalDeviceTile extends IPSModule
         
         // Script-Tag schließen für das vereinheitlichte Asset-System
         $assets .= '</script>';
-        
-
-
-         // Formulardaten lesen und Statusmapping Array für Bild und Farbe erstellen
-        $assoziationsArray = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
-        $statusMappingImage = [];
-        $statusMappingColor = [];
-        foreach ($assoziationsArray as $item) {
-            $statusMappingImage[$item['AssoziationValue']] = $item['Bildauswahl'];
-                      
-            $statusMappingColor[$item['AssoziationValue']] = $item['StatusColor'] === -1 ? "" : sprintf('%06X', $item['StatusColor']);
-        }
-
-        $statusImagesJson = json_encode($statusMappingImage);
-        $statusColorJson = json_encode($statusMappingColor);
-        $images = '<script type="text/javascript">';
-        $images .= 'var statusImages = ' . $statusImagesJson . ';';
-        $images .= 'var statusColor = ' . $statusColorJson . ';';
-        $images .= '</script>';
-
-
-
 
         // Füge statisches HTML aus Datei hinzu
         $module = file_get_contents(__DIR__ . '/module.html');
 
         // Gebe alles zurück.
         // Wichtig: $initialHandling nach hinten, da die Funktion handleMessage erst im HTML definiert wird
-        return $module . $images . $assets . $initialHandling;
+        return $module . $assets . $initialHandling;
     }
 
 
