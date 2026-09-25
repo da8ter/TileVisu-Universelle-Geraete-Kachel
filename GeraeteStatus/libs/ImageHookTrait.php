@@ -172,6 +172,39 @@ trait ImageHookTrait
         return array_values(array_unique(array_filter($ids, static fn(int $id): bool => $id > 0 && IPS_MediaExists($id))));
     }
 
+    /**
+     * Größte Bild-Antwort, die Symcon unverändert ausliefert: die Summe der Ausgabe einer Anfrage darf
+     * ScriptOutputBufferLimit (ab Werk 1 MiB) nicht überschreiten, sonst ersetzt Symcon die Antwort
+     * durch einen Fehlertext (bei HTTP 200). 1 KiB Reserve für unerwartete Ausgaben.
+     */
+    private function GetHookBodyLimit(): int
+    {
+        $limit = 1048576;
+        try {
+            $option = IPS_GetOption('ScriptOutputBufferLimit');
+            if (is_numeric($option) && (int)$option > 0) {
+                $limit = (int)$option;
+            }
+        } catch (\Throwable $e) {
+            $this->LogCaughtThrowable(__FUNCTION__, $e);
+        }
+        return max(0, $limit - 1024);
+    }
+
+    /** Meldet ein Bild über der Ausgabegrenze einmal je Medium (bis zum nächsten Kernelstart), nicht bei jedem Abruf. */
+    private function ReportOversizeImage(int $mediaId, int $size, int $limit): void
+    {
+        $reported = json_decode($this->GetBuffer('OversizeImages'), true);
+        $reported = is_array($reported) ? $reported : [];
+        if (in_array($mediaId, $reported, true)) {
+            return;
+        }
+        $reported[] = $mediaId;
+        $this->SetBuffer('OversizeImages', json_encode($reported));
+        $this->LogMessage(sprintf($this->Translate('Image #%d is too large for the tile (%d bytes, limit %d bytes) and is shown as a placeholder. Use a smaller image or raise ScriptOutputBufferLimit.'),
+            $mediaId, $size, $limit), KL_WARNING);
+    }
+
     private function BuildImageHookUrl(int $mediaId): string
     {
         $base = '/hook/udtimages/' . $this->InstanceID;
@@ -228,7 +261,7 @@ trait ImageHookTrait
                 $this->LogCaughtThrowable(__FUNCTION__ . ':set_time_limit', $e);
             }
         }
-        $MAX_SIZE = 5 * 1024 * 1024;
+        $MAX_SIZE = $this->GetHookBodyLimit();
         $detectMime = function(string $bin) {
             return Helpers::detectMimeFromBinary($bin);
         };
@@ -246,7 +279,7 @@ trait ImageHookTrait
                 exit;
             }
         };
-        $streamFile = function(string $file, string $mime, bool $longCache = false) use ($MAX_SIZE, $sendNotModified) {
+        $streamFile = function(string $file, string $mime, bool $longCache = false) use ($MAX_SIZE, $sendNotModified, $placeholder, $detectMime) {
             if (!is_file($file) || !is_readable($file)) {
                 http_response_code(404);
                 $this->LogMessage('UDTImagesHook: File not found or unreadable: ' . $file, KL_ERROR);
@@ -259,9 +292,16 @@ trait ImageHookTrait
                 exit;
             }
             if ($size > $MAX_SIZE) {
-                http_response_code(413);
-                $this->LogMessage('UDTImagesHook: File too large: ' . $size, KL_ERROR);
-                exit;
+                if ($file === $placeholder || !is_file($placeholder)) {
+                    http_response_code(413);
+                    $this->LogMessage('UDTImagesHook: File too large: ' . $size, KL_ERROR);
+                    exit;
+                }
+                // über der Ausgabegrenze: Platzhalter statt einer von Symcon ersetzten Antwort
+                $file = $placeholder;
+                $size = (int)filesize($placeholder);
+                $mime = $detectMime((string)file_get_contents($placeholder, false, null, 0, 12));
+                $longCache = false;
             }
             $mtime = filemtime($file) ?: time();
             $etag = 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
@@ -295,6 +335,10 @@ trait ImageHookTrait
             $m = IPS_GetMedia($mid);
             if ($m['MediaType'] === MEDIATYPE_IMAGE) {
                 if (!empty($m['MediaFile']) && is_file($m['MediaFile'])) {
+                    $fileSize = (int)filesize($m['MediaFile']);
+                    if ($fileSize > $MAX_SIZE) {
+                        $this->ReportOversizeImage($mid, $fileSize, $MAX_SIZE); // $streamFile liefert den Platzhalter
+                    }
                     $fh = fopen($m['MediaFile'], 'rb');
                     if ($fh !== false) {
                         $hdr = fread($fh, 12);
@@ -317,9 +361,8 @@ trait ImageHookTrait
                 elseif ($len >= 1 && substr($b64, -1) === '=') { $padding = 1; }
                 $decodedLen = (int)floor($len / 4) * 3 - $padding;
                 if ($decodedLen > $MAX_SIZE) {
-                    http_response_code(413);
-                    $this->LogMessage('UDTImagesHook: Media too large mid=' . $mid . ' size=' . $decodedLen, KL_ERROR);
-                    return;
+                    $this->ReportOversizeImage($mid, $decodedLen, $MAX_SIZE);
+                    $streamFile($placeholder, 'image/webp', false);
                 }
                 header('Cache-Control: no-store');
                 header('Content-Type: ' . $mime);
