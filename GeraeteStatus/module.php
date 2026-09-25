@@ -440,10 +440,16 @@ class UniversalDeviceTile extends IPSModule
             return;
         }
         
-        // Script-Buttons unterstützen: Ident kann 'script_<ID>' sein → Script ausführen
-        if (is_string($Ident) && strpos($Ident, 'script_') === 0) {
-            $scriptId = intval(substr($Ident, 7));
-            if ($scriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($scriptId)) {
+        // Nur Bedienelemente dieser Kachel: fremde Variablen und Scripts sind über die Kachel nicht erreichbar
+        if (!isset($this->GetRequestableIdents()[(string)$Ident])) {
+            $this->SendDebug(__FUNCTION__, 'Abgelehnt, keine Zeile dieser Kachel: ' . $Ident, 0);
+            return;
+        }
+
+        // Script-Buttons: Ident 'script_<ID>' → Script ausführen
+        if (strpos((string)$Ident, 'script_') === 0) {
+            $scriptId = intval(substr((string)$Ident, 7));
+            if (IPS_ScriptExists($scriptId)) {
                 try {
                     IPS_RunScript($scriptId);
                 } catch (Throwable $e) {
@@ -456,15 +462,6 @@ class UniversalDeviceTile extends IPSModule
         // Nachrichten von der HTML-Darstellung schicken immer den Ident passend zur Eigenschaft und im Wert die Differenz, welche auf die Variable gerechnet werden soll
         $variableID = (int)$Ident;
         if (!IPS_VariableExists($variableID)) {
-            // Falls eine Script-ID direkt gesendet wurde (z. B. numerisch), führe Script aus
-            $maybeScriptId = intval($Ident);
-            if ($maybeScriptId > 0 && function_exists('IPS_ScriptExists') && IPS_ScriptExists($maybeScriptId)) {
-                try {
-                    IPS_RunScript($maybeScriptId);
-                } catch (Throwable $e) {
-                    $this->LogCaughtThrowable(__FUNCTION__ . ':RunScriptByIdent', $e);
-                }
-            }
             return;
         }
 
@@ -514,6 +511,32 @@ class UniversalDeviceTile extends IPSModule
             $newValue = !GetValue($variableID);
             RequestAction($variableID, $newValue);
         }
+    }
+
+    /**
+     * Idents, die das Frontend per requestAction senden darf: die Variable jeder Button- und
+     * Regler-Zeile, 'script_<ID>' jedes Script-Buttons (Zeile ohne Variable).
+     */
+    private function GetRequestableIdents(): array
+    {
+        $idents = [];
+        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $displayType = $row['DisplayType'] ?? 'text';
+            $variableID = (int)($row['Variable'] ?? 0);
+            $scriptID = (int)($row['ScriptID'] ?? 0);
+            if ($variableID > 0 && IPS_VariableExists($variableID)) {
+                if ($displayType === 'button' || $displayType === 'slider') {
+                    $idents[(string)$variableID] = true;
+                }
+            } elseif ($displayType === 'button' && $scriptID > 0) {
+                $idents['script_' . $scriptID] = true;
+            }
+        }
+        return $idents;
     }
 
 
