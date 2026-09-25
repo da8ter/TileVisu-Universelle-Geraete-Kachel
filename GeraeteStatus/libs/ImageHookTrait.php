@@ -150,6 +150,28 @@ trait ImageHookTrait
         IPS_ApplyChanges($whId);
     }
 
+    /**
+     * Die Bildmedien, die diese Kachel zeigt: Standardbild, Hintergrundbild, eigene Bilder der
+     * Status-Zuordnungen und Bildzeilen. Nur diese liefert der Bild-Hook aus.
+     */
+    private function GetConfiguredMediaIds(): array
+    {
+        $ids = [$this->ReadPropertyInteger('DefaultImage'), $this->ReadPropertyInteger('bgImage')];
+        $associations = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+        foreach (is_array($associations) ? $associations : [] as $association) {
+            if (is_array($association) && ($association['Bildauswahl'] ?? '') === 'custom') {
+                $ids[] = (int)($association['EigenesBild'] ?? 0);
+            }
+        }
+        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            if (is_array($row) && ($row['DisplayType'] ?? 'text') === 'image') {
+                $ids[] = (int)($row['ImageMedia'] ?? 0);
+            }
+        }
+        return array_values(array_unique(array_filter($ids, static fn(int $id): bool => $id > 0 && IPS_MediaExists($id))));
+    }
+
     private function BuildImageHookUrl(int $mediaId): string
     {
         $base = '/hook/udtimages/' . $this->InstanceID;
@@ -186,6 +208,12 @@ trait ImageHookTrait
         $token = isset($_GET['token']) ? (string)$_GET['token'] : '';
         if (!is_string($token) || $token === '' || $instT === '' || !hash_equals($instT, $token)) {
             http_response_code(403);
+            return;
+        }
+        $mid = isset($_GET['mid']) ? (int)$_GET['mid'] : 0;
+        if ($mid > 0 && !in_array($mid, $this->GetConfiguredMediaIds(), true)) {
+            http_response_code(404);
+            $this->SendDebug(__FUNCTION__, 'Medium ' . $mid . ' ist in dieser Kachel nicht konfiguriert', 0);
             return;
         }
         if (function_exists('ob_get_level')) {
@@ -263,7 +291,6 @@ trait ImageHookTrait
             fclose($fh);
             exit;
         };
-        $mid = isset($_GET['mid']) ? (int)$_GET['mid'] : 0;
         if ($mid > 0 && IPS_MediaExists($mid)) {
             $m = IPS_GetMedia($mid);
             if ($m['MediaType'] === MEDIATYPE_IMAGE) {
