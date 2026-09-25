@@ -948,6 +948,12 @@
             }
         };
 
+        // Werte, Beschriftungen, Zuordnungen und Namen aus Symcon kommen nur als Text ins HTML, nie als Markup
+        const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        function esc(value) {
+            return String(value ?? '').replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
+        }
+
         function getUiText(key, fallback) {
             if (state.uiTexts && typeof state.uiTexts[key] === 'string' && state.uiTexts[key] !== '') {
                 return state.uiTexts[key];
@@ -1954,7 +1960,7 @@
                         const iconClass = prepareIconForDisplay(association.icon);
                         if (iconClass) {
                             const iconMargin = (!variable.showLabel && !variable.showValue) ? '' : 'margin-right: 4px;';
-                            buttonContentParts.push(`<i class="${iconClass}" style="${iconMargin}"></i>`);
+                            buttonContentParts.push(`<i class="${esc(iconClass)}" style="${iconMargin}"></i>`);
                             hasIcon = true;
                         }
                     }
@@ -1965,10 +1971,10 @@
                         if (lbl) {
                             if (variable.showValue) {
                                 // Label mit Doppelpunkt wenn auch Value gezeigt wird
-                                buttonContentParts.push(`<span style="font-weight: 700;">${lbl}:&nbsp;</span>`);
+                                buttonContentParts.push(`<span style="font-weight: 700;">${esc(lbl)}:&nbsp;</span>`);
                             } else {
                                 // Nur Label ohne Doppelpunkt
-                                buttonContentParts.push(`<span style="font-weight: 700;">${lbl}</span>`);
+                                buttonContentParts.push(`<span style="font-weight: 700;">${esc(lbl)}</span>`);
                             }
                         }
                     }
@@ -1976,12 +1982,12 @@
                     if (variable.showValue) {
                         // Bei aktiven Buttons: aktueller Wert, bei inaktiven: Association-Name als Value
                         const displayValue = isActive ? variable.formattedValue : association?.name;
-                        buttonContentParts.push(`<span style="font-weight: normal;">${displayValue}</span>`);
+                        buttonContentParts.push(`<span style="font-weight: normal;">${esc(displayValue)}</span>`);
                     }
                     
                     // Falls keine Checkbox aktiviert ist, zeige Association-Name als Fallback
                     if (!variable.showIcon && !variable.showLabel && !variable.showValue && association?.name) {
-                        buttonContentParts.push(`<span>${association.name}</span>`);
+                        buttonContentParts.push(`<span>${esc(association.name)}</span>`);
                     }
                     
                     // icon-only Klasse toggeln
@@ -2077,7 +2083,7 @@
                 
                     
                     if (iconClass) {
-                        iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                        iconHtml = `<i class="${esc(iconClass)}" style="margin-right: 6px;"></i>`;
                     }
                 }
                 let textParts = [];
@@ -2089,20 +2095,20 @@
                     const displayLabel = variable.label || associationName || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off'));
                     if (variable.showValue) {
                         // Doppelpunkt nur wenn auch Value angezeigt wird - Label fett
-                        textParts.push(`<span style="font-weight: 700;">${displayLabel}:&nbsp;</span>`);
+                        textParts.push(`<span style="font-weight: 700;">${esc(displayLabel)}:&nbsp;</span>`);
                     } else {
                         // Kein Doppelpunkt wenn nur Label - Label fett
-                        textParts.push(`<span style="font-weight: 700;">${displayLabel}</span>`);
+                        textParts.push(`<span style="font-weight: 700;">${esc(displayLabel)}</span>`);
                     }
                 }
                 
                 if (variable.showValue) {
-                    textParts.push(`<span style="font-weight: normal;">${variable.formattedValue}</span>`);
+                    textParts.push(`<span style="font-weight: normal;">${esc(variable.formattedValue)}</span>`);
                 }
                 
                 // Falls keine Checkbox aktiviert ist, zeige Label als Fallback (ohne Doppelpunkt) - fett
                 if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                    textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off'))}</span>`);
+                    textParts.push(`<span style="font-weight: 700;">${esc(variable.label || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off')))}</span>`);
                 }
                 
                 buttonText = textParts.join(' ');
@@ -2464,7 +2470,7 @@
             if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
                 const iconClass = prepareIconForDisplay(variable.icon);
                 if (iconClass) {
-                    progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`;
+                    progressIconHtml = `<i class="${esc(iconClass)} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`;
                 }
             }
             
@@ -2475,16 +2481,16 @@
             }
             
             if (variable.showLabel && variable.label) {
-                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.label}:&nbsp;</span>`);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${esc(variable.label)}:&nbsp;</span>`);
             }
             
             if (variable.showValue) {
-                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.formattedValue}</span>`);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(variable.formattedValue)}</span>`);
             }
             
             // Falls nichts konfiguriert ist, zeige Wert als Fallback
             if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.formattedValue}</span>`);
+                progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(variable.formattedValue)}</span>`);
             }
             
             const progressText = progressTextParts.join('');
@@ -2505,23 +2511,23 @@
                     if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
                         const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
                         if (secondIconClass) {
-                            secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
+                            secondVariableParts.push(`<i class="${esc(secondIconClass)} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
                         }
                     }
                     
                     // Label für zweite Variable
                     if (variable.secondVariable.showLabel && variable.secondVariable.label) {
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.secondVariable.label}:&nbsp;</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${esc(variable.secondVariable.label)}:&nbsp;</span>`);
                     }
                     
                     // Wert für zweite Variable (Backend-Wert direkt verwenden)
                     if (variable.secondVariable.showValue) {
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(variable.secondVariable.formattedValue)}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
                     if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
-                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
+                        secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(variable.secondVariable.formattedValue)}</span>`);
                     }
 
                     secondVariableSpan.innerHTML = secondVariableParts.join('');
@@ -2593,27 +2599,27 @@
                     if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
                         const iconClass = prepareIconForDisplay(variable.secondVariable.icon);
                         if (iconClass) {
-                            parts.push(`<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
+                            parts.push(`<i class="${esc(iconClass)} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
                         }
                     }
                     // Label
                     if (variable.secondVariable.showLabel && label) {
                         const colon = variable.secondVariable.showValue ? ':&nbsp;' : '';
-                        parts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${label}${colon}</span>`);
+                        parts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${esc(label)}${colon}</span>`);
                     }
                     // Value
                     if (variable.secondVariable.showValue) {
-                        parts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayVal}</span>`);
+                        parts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(displayVal)}</span>`);
                     }
                     // Fallback: wenn nichts angezeigt werden soll, dann nur Wert
                     if (parts.length === 0) {
-                        parts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayVal}</span>`);
+                        parts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(displayVal)}</span>`);
                     }
                     markerHtml = parts.join('');
                 } else {
                     // Standard: Label: Wert
-                    markerHtml = `<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${label}:&nbsp;</span>` +
-                                 `<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayVal}</span>`;
+                    markerHtml = `<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${esc(label)}:&nbsp;</span>` +
+                                 `<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(displayVal)}</span>`;
                 }
                 textEl.innerHTML = markerHtml;
                 textEl.classList.remove('position-before-bar');
@@ -2742,7 +2748,7 @@
                 if (data.statusShowIcon && data.statusIcon && data.statusIcon !== 'Transparent') {
                     const iconClass = prepareIconForDisplay(data.statusIcon);
                     if (iconClass) {
-                        statusParts.push(`<i class="${iconClass}" style="color: var(--status-color); margin-right: 4px;"></i>`);
+                        statusParts.push(`<i class="${esc(iconClass)}" style="color: var(--status-color); margin-right: 4px;"></i>`);
                     }
                 }
                 
@@ -2751,17 +2757,17 @@
                     const label = data.statusLabel || 'Status'; // Fallback zu "Status" wenn kein Custom Label
                     // Füge ein geschütztes Leerzeichen NUR hinzu, wenn auch ein Wert angezeigt wird
                     const trailingSpace = data.statusShowValue ? '&nbsp;' : '';
-                    statusParts.push(`<span class="status-label" style="color: var(--status-color);">${label}:${trailingSpace}</span>`);
+                    statusParts.push(`<span class="status-label" style="color: var(--status-color);">${esc(label)}:${trailingSpace}</span>`);
                 }
                 
                 // Wert für Status-Bereich (wenn konfiguriert)
                 if (data.statusShowValue) {
-                    statusParts.push(`<span class="status-value" style="color: var(--status-color);">${data.status}</span>`);
+                    statusParts.push(`<span class="status-value" style="color: var(--status-color);">${esc(data.status)}</span>`);
                 }
                 
                 // Fallback: Falls nichts konfiguriert ist, zeige Wert
                 if (!data.statusShowIcon && !data.statusShowLabel && !data.statusShowValue) {
-                    statusParts.push(`<span class="status-value" style="color: var(--status-color);">${data.status}</span>`);
+                    statusParts.push(`<span class="status-value" style="color: var(--status-color);">${esc(data.status)}</span>`);
                 }
                 
                 // Keine zusätzlichen Text-Knoten zwischen Flex-Items erzeugen
@@ -2811,7 +2817,7 @@
                         const iconClass = prepareIconForDisplay(iconName);
                         
                         // Setze das FontAwesome Icon
-                        iconContainer.innerHTML = `<i class="${iconClass}"></i>`;
+                        iconContainer.innerHTML = `<i class="${esc(iconClass)}"></i>`;
                         // Farbwahl: individuelle Icon-Farbe oder Fallback auf --accent-color
                         const chosenIconColor = (data.statusIconColor && data.statusIconColor !== '')
                             ? data.statusIconColor
@@ -3137,13 +3143,13 @@
                             if (groupConfig?.groupIcon && groupConfig.groupIcon !== '') {
                                 const iconClass = prepareIconForDisplay(groupConfig.groupIcon);
                                 if (iconClass) {
-                                    groupIconHtml = `<i class="${iconClass}" style="margin-right: 8px; color: var(--accent-color);"></i>`;
+                                    groupIconHtml = `<i class="${esc(iconClass)}" style="margin-right: 8px; color: var(--accent-color);"></i>`;
                                 }
                             }
                             
                             content += `
                                 <div class="group-name-above" style="font-weight: bold; color: var(--content-color); ${fontSizeStyle} margin-bottom: 0px; margin-top: 10px; text-align: left; opacity: 0.5; display: flex; align-items: center;">
-                                    ${groupIconHtml}${displayGroupName}:
+                                    ${groupIconHtml}${esc(displayGroupName)}:
                                 </div>
                             `;
                             
@@ -3176,13 +3182,13 @@
                             if (groupConfig?.groupIcon && groupConfig.groupIcon !== '') {
                                 const iconClass = prepareIconForDisplay(groupConfig.groupIcon);
                                 if (iconClass) {
-                                    groupIconHtml = `<i class="${iconClass}" style="margin-right: 8px; color: var(--accent-color);"></i>`;
+                                    groupIconHtml = `<i class="${esc(iconClass)}" style="margin-right: 8px; color: var(--accent-color);"></i>`;
                                 }
                             }
                             
                             content += `
                                 <div class="group-name-label" style="font-weight: bold; color: var(--content-color); ${labelFontSizeStyle} white-space: nowrap; align-self: center; margin-right: 8px; width: ${groupNameWidth}; display: flex; align-items: center; text-align: left;">
-                                    ${groupIconHtml}${displayGroupName}:
+                                    ${groupIconHtml}${esc(displayGroupName)}:
                                 </div>
                             `;
                             
@@ -3291,7 +3297,7 @@
                     if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
                         const iconClass = prepareIconForDisplay(variable.icon);
                         if (iconClass) {
-                            progressIconHtml = `<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`;
+                            progressIconHtml = `<i class="${esc(iconClass)} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`;
                         }
                     }
                     
@@ -3302,16 +3308,16 @@
                     }
                     
                     if (variable.showLabel && variable.label) {
-                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.label}:&nbsp;</span>`);
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${esc(variable.label)}:&nbsp;</span>`);
                     }
                     
                     if (variable.showValue) {
-                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayValue}</span>`);
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(displayValue)}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
                     if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${displayValue}</span>`);
+                        progressTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(displayValue)}</span>`);
                     }
                     
                     const progressText = progressTextParts.join('');
@@ -3325,23 +3331,23 @@
                         if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
                             const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
                             if (secondIconClass) {
-                                secondVariableParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
+                                secondVariableParts.push(`<i class="${esc(secondIconClass)} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
                             }
                         }
                         
                         // Label für zweite Variable
                         if (variable.secondVariable.showLabel && variable.secondVariable.label) {
-                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${variable.secondVariable.label}:&nbsp;</span>`);
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${esc(variable.secondVariable.label)}:&nbsp;</span>`);
                         }
                         
                         // Wert für zweite Variable (Backend-Wert direkt verwenden)
                         if (variable.secondVariable.showValue) {
-                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(variable.secondVariable.formattedValue)}</span>`);
                         }
                         
                         // Falls nichts konfiguriert ist, zeige Wert als Fallback
                         if (!variable.secondVariable.showIcon && !variable.secondVariable.showLabel && !variable.secondVariable.showValue) {
-                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${variable.secondVariable.formattedValue}</span>`);
+                            secondVariableParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(variable.secondVariable.formattedValue)}</span>`);
                         }
                         
                         if (secondVariableParts.length > 0) {
@@ -3396,26 +3402,26 @@
                             if (variable.secondVariable.showIcon && variable.secondVariable.icon && variable.secondVariable.icon !== 'Transparent') {
                                 const secondIconClass = prepareIconForDisplay(variable.secondVariable.icon);
                                 if (secondIconClass) {
-                                    markerTextParts.push(`<i class="${secondIconClass} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
+                                    markerTextParts.push(`<i class="${esc(secondIconClass)} variable-icon" style="color: ${getTextColor(variable)}; ${inactiveOpacity}"></i>`);
                                 }
                             }
                             // Label
                             if (variable.secondVariable.showLabel && tgtLabel) {
                                 const colon = variable.secondVariable.showValue ? ':&nbsp;' : '';
-                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${tgtLabel}${colon}</span>`);
+                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${esc(tgtLabel)}${colon}</span>`);
                             }
                             // Value
                             if (variable.secondVariable.showValue) {
-                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${tgtText}</span>`);
+                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(tgtText)}</span>`);
                             }
                             if (markerTextParts.length === 0) {
                                 // Fallback: nur Wert
-                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${tgtText}</span>`);
+                                markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(tgtText)}</span>`);
                             }
                         } else {
                             // Fallback: Standarddarstellung Label: Value
-                            markerTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${tgtLabel}:&nbsp;</span>`);
-                            markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${tgtText}</span>`);
+                            markerTextParts.push(`<span style="color: ${getTextColor(variable)}; font-weight: 700; ${inactiveOpacity}">${esc(tgtLabel)}:&nbsp;</span>`);
+                            markerTextParts.push(`<span style="color: ${getTextColor(variable)}; ${inactiveOpacity}">${esc(tgtText)}</span>`);
                         }
                         const markerTextHtml = markerTextParts.join('');
                         targetMarkerHtml = `
@@ -3435,7 +3441,7 @@
 
                     content += `
                         <div class="variable-progress">
-                            <div class="progress-container" data-variable-id="${variable.id}" data-new-width="${progressValue}" style="--progress-color1: ${color1p}; --progress-color2: ${color2p}; --progress-bar-text-padding: ${individualPadding}px;${targetPercentStyle}${markerFontSizeVar}">
+                            <div class="progress-container" data-variable-id="${esc(variable.id)}" data-new-width="${progressValue}" style="--progress-color1: ${color1p}; --progress-color2: ${color2p}; --progress-bar-text-padding: ${individualPadding}px;${targetPercentStyle}${markerFontSizeVar}">
                                 <div class="progress-bar" style="width: ${widthForDOM}%;"></div>
                                 ${targetMarkerHtml}
                                 <div class="progress-text">
@@ -3458,9 +3464,9 @@
                     const percent = Math.max(0, Math.min(100, ((cur - min) / range) * 100));
                     const step = Number.isFinite(Number(variable.sliderStep)) ? Number(variable.sliderStep) : null;
                     const digits = Number.isFinite(Number(variable.sliderDigits)) ? Number(variable.sliderDigits) : 0;
-                    const iconHtml = (variable.showIcon && variable.icon && variable.icon !== 'Transparent') ? (()=>{ const c = prepareIconForDisplay(variable.icon); return c ? `<i class="${c} variable-icon" style="color: var(--accent-color);"></i>` : ''; })() : '';
-                    const labelHtml = (variable.showLabel && variable.label) ? `<span class="variable-label" style="font-weight: 700;">${variable.label}${variable.showValue ? ':&nbsp;' : ''}</span>` : '';
-                    const valueHtml = (variable.showValue && typeof variable.formattedValue !== 'undefined') ? `<span class="slider-value">${variable.formattedValue}</span>` : `<span class="slider-value"></span>`;
+                    const iconHtml = (variable.showIcon && variable.icon && variable.icon !== 'Transparent') ? (()=>{ const c = prepareIconForDisplay(variable.icon); return c ? `<i class="${esc(c)} variable-icon" style="color: var(--accent-color);"></i>` : ''; })() : '';
+                    const labelHtml = (variable.showLabel && variable.label) ? `<span class="variable-label" style="font-weight: 700;">${esc(variable.label)}${variable.showValue ? ':&nbsp;' : ''}</span>` : '';
+                    const valueHtml = (variable.showValue && typeof variable.formattedValue !== 'undefined') ? `<span class="slider-value">${esc(variable.formattedValue)}</span>` : `<span class="slider-value"></span>`;
                     const individualPadding = 0;
                     const color1s = normalizeColor(variable.sliderColor1);
                     const color2s = normalizeColor(variable.sliderColor2);
@@ -3480,10 +3486,10 @@
                     }
                     const decimalChars = (digits > 0) ? (1 + digits) : 0; // Komma/Punkt + Nachkommastellen
                     const valueWidthCh = Math.max(4, signChars + intDigits + decimalChars + (suffixGuess ? suffixGuess.length : 0));
-                    const suffixAttr = String(suffixGuess).replace(/"/g, '&quot;');
+                    const suffixAttr = esc(suffixGuess);
 
                     content += `
-                        <div class="slider-container" data-variable-id="${variable.id}" data-min="${min}" data-max="${max}" data-step="${step !== null ? step : ''}" data-digits="${digits}" data-suffix="${suffixAttr}" data-show-value="${variable.showValue ? '1' : '0'}" data-current-value="${cur}" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --slider-value-width: ${valueWidthCh}ch; ${inactiveStyle}">
+                        <div class="slider-container" data-variable-id="${esc(variable.id)}" data-min="${min}" data-max="${max}" data-step="${step !== null ? step : ''}" data-digits="${digits}" data-suffix="${suffixAttr}" data-show-value="${variable.showValue ? '1' : '0'}" data-current-value="${cur}" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --slider-value-width: ${valueWidthCh}ch; ${inactiveStyle}">
                             ${iconHtml}${labelHtml}
                             <button class="slider-step-btn" data-dir="-1">−</button>
                             <div class="slider-track" style="--progress-color1: ${color1s}; --progress-color2: ${color2s}; --slider-dots-color: ${color1s}; --progress-bar-text-padding: ${individualPadding}px;">
@@ -3515,24 +3521,24 @@
                     if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
                         const iconClass = prepareIconForDisplay(variable.icon);
                         if (iconClass) {
-                            parts.push(`<i class="${iconClass} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
+                            parts.push(`<i class="${esc(iconClass)} variable-icon" style="color: ${getTextColor(variable)};"></i>`);
                         }
                     }
 
                     // Label optional anzeigen (mit Doppelpunkt, wenn Value ebenfalls angezeigt wird)
                     if (variable.showLabel && variable.label) {
-                        const labelText = variable.showValue ? `${variable.label}:&nbsp;` : variable.label;
+                        const labelText = variable.showValue ? `${esc(variable.label)}:&nbsp;` : esc(variable.label);
                         parts.push(`<span class="variable-label" style="color: ${getTextColor(variable)}; font-weight: 700; ${textAlignStyle}">${labelText}</span>`);
                     }
 
-                    const imgAlt = variable.label ? String(variable.label).replace(/"/g, '&quot;') : getUiText('image', 'Image');
+                    const imgAlt = esc(variable.label ? variable.label : getUiText('image', 'Image'));
                     const imgWidthCss = isGrouped ? '100%' : `${imgWidthForDOM}%`;
                     const primarySrc = (typeof variable.imageUrl === 'string') ? variable.imageUrl : '';
-                    parts.push(`<img class="variable-inline-image" ${primarySrc ? `src=\"${primarySrc}\"` : ''} alt="${imgAlt}" style="display: none; width: ${imgWidthCss}; height: auto; border-radius: ${imgRadius}px; flex: ${imgFlex};" onload="this.style.display='';" onerror="this.style.display='none';">`);
+                    parts.push(`<img class="variable-inline-image" ${primarySrc ? `src=\"${esc(primarySrc)}\"` : ''} alt="${imgAlt}" style="display: none; width: ${imgWidthCss}; height: auto; border-radius: ${imgRadius}px; flex: ${imgFlex};" onload="this.style.display='';" onerror="this.style.display='none';">`);
 
                     // Value optional anzeigen
                     if (variable.showValue && typeof variable.formattedValue !== 'undefined') {
-                        parts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto; ${textAlignStyle}">${variable.formattedValue}</span>`);
+                        parts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto; ${textAlignStyle}">${esc(variable.formattedValue)}</span>`);
                     }
 
                     content += parts.join(' ');
@@ -3610,7 +3616,7 @@
                             const baseClass = prepareIconForDisplay(finalIcon);
                             if (baseClass) {
                                 const iconClass = spinActive ? `${baseClass} fa-spin` : baseClass; // nur fa-spin hinzufügen
-                                iconHtml = `<i class="${iconClass}" style="margin-right: 6px;"></i>`;
+                                iconHtml = `<i class="${esc(iconClass)}" style="margin-right: 6px;"></i>`;
                             }
                         } else if (spinActive) {
                             // Kein Icon konfiguriert, aber Spin aktiv → temporären Spinner darstellen
@@ -3628,20 +3634,20 @@
                             const displayLabel = variable.label || associationName || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off'));
                             if (variable.showValue) {
                                 // Doppelpunkt nur wenn auch Value angezeigt wird - Label fett
-                                textParts.push(`<span style="font-weight: 700;">${displayLabel}:&nbsp;</span>`);
+                                textParts.push(`<span style="font-weight: 700;">${esc(displayLabel)}:&nbsp;</span>`);
                             } else {
                                 // Kein Doppelpunkt wenn nur Label - Label fett
-                                textParts.push(`<span style="font-weight: 700;">${displayLabel}</span>`);
+                                textParts.push(`<span style="font-weight: 700;">${esc(displayLabel)}</span>`);
                             }
                         }
                         
                         if (variable.showValue) {
-                            textParts.push(`<span style="font-weight: normal;">${variable.formattedValue}</span>`);
+                            textParts.push(`<span style="font-weight: normal;">${esc(variable.formattedValue)}</span>`);
                         }
                         
                         // Falls keine Checkbox aktiviert ist, zeige Label als Fallback (ohne Doppelpunkt) - fett
                         if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                            textParts.push(`<span style="font-weight: 700;">${variable.label || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off'))}</span>`);
+                            textParts.push(`<span style="font-weight: 700;">${esc(variable.label || (isActive ? getUiText('on', 'On') : getUiText('off', 'Off')))}</span>`);
                         }
                         
                         buttonText = textParts.join(' ');
@@ -3660,11 +3666,11 @@
                         content += `
                             <div class="variable-button-container" style="${buttonContainerJustify}">
                                 <div class="variable-button ${isActive ? '' : 'inactive'} ${isIconOnly ? 'icon-only' : ''}" role="button" tabindex="0"
-                                        onclick="handleButtonClick(this, '${variable.id}', 1);" 
-                                        data-variable-id="${variable.id}"
+                                        data-request-value="1" 
+                                        data-variable-id="${esc(variable.id)}"
                                         data-script-button="${isScriptButton ? '1' : '0'}"
                                         data-open-object-id="${(variable.openObjectId && variable.openObjectId > 1) ? variable.openObjectId : 0}"
-                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${buttonStyleExtras}">
+                                        style="background-color: ${esc(buttonColor)} !important; color: ${getTextColor(variable)} !important; ${buttonStyleExtras}">
                                     ${buttonText}
                                 </div>
                             </div>
@@ -3728,7 +3734,7 @@
                                     const iconClass = prepareIconForDisplay(iconToUse);
                                     if (iconClass) {
                                         const iconMargin = (!variable.showLabel && !variable.showValue) ? '' : 'margin-right: 4px;';
-                                        buttonContentParts.push(`<i class="${iconClass}" style="${iconMargin}"></i>`);
+                                        buttonContentParts.push(`<i class="${esc(iconClass)}" style="${iconMargin}"></i>`);
                                         hasIconInt = true;
                                     }
                                 }
@@ -3741,10 +3747,10 @@
                                 if (lbl) {
                                     if (variable.showValue) {
                                         // Label mit Doppelpunkt wenn auch Value gezeigt wird
-                                        buttonContentParts.push(`<span style="font-weight: 700;">${lbl}:&nbsp;</span>`);
+                                        buttonContentParts.push(`<span style="font-weight: 700;">${esc(lbl)}:&nbsp;</span>`);
                                     } else {
                                         // Nur Label ohne Doppelpunkt
-                                        buttonContentParts.push(`<span style="font-weight: 700;">${lbl}</span>`);
+                                        buttonContentParts.push(`<span style="font-weight: 700;">${esc(lbl)}</span>`);
                                     }
                                 }
                             }
@@ -3753,12 +3759,12 @@
                             if (variable.showValue) {
                                 // Bei aktiven Buttons: aktueller Wert, bei inaktiven: Association-Name als Value
                                 const displayValue = isActive ? variable.formattedValue : association.name;
-                                buttonContentParts.push(`<span style="font-weight: normal;">${displayValue}</span>`);
+                                buttonContentParts.push(`<span style="font-weight: normal;">${esc(displayValue)}</span>`);
                             }
                             
                             // Falls keine Checkbox aktiviert ist, zeige Association-Name als Fallback
                             if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                                buttonContentParts.push(`<span>${association.name || 'Wert ' + association.value}</span>`);
+                                buttonContentParts.push(`<span>${esc(association.name || 'Wert ' + association.value)}</span>`);
                             }
                             
                             const isMultiIconOnly = variable.showIcon && !variable.showLabel && !variable.showValue && hasIconInt;
@@ -3766,10 +3772,10 @@
                             
                             buttonsHtml += `
                                 <div class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''} ${isActive ? '' : 'inactive'} ${isMultiIconOnly ? 'icon-only' : ''}" role="button" tabindex="0"
-                                        onclick="handleButtonClick(this, '${variable.id}', ${variable.variableType === 1 ? association.value : "'" + association.value + "'"});" 
-                                        data-variable-id="${variable.id}"
-                                        data-association-value="${association.value}"
-                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${isGroupStretched ? '' : `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`}">
+                                        data-request-value="${esc(JSON.stringify(variable.variableType === 1 ? Number(association.value) : String(association.value)))}" 
+                                        data-variable-id="${esc(variable.id)}"
+                                        data-association-value="${esc(association.value)}"
+                                        style="background-color: ${esc(buttonColor)} !important; color: ${getTextColor(variable)} !important; ${isGroupStretched ? '' : `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`}">
                                     ${buttonText}
                                 </div>`;
                         });
@@ -3813,7 +3819,7 @@
                             }
                             
                             // Button-Text: Beschriftung (variable.label) hat Vorrang, sonst Association-Name/Value
-                            let buttonText = ((typeof variable.label === 'string' && variable.label.trim() !== '') ? variable.label : (association.name || String(association.value)));
+                            let buttonText = esc((typeof variable.label === 'string' && variable.label.trim() !== '') ? variable.label : (association.name || String(association.value)));
                             
                             // Icon hinzufügen falls vorhanden, mit Fallback auf Standard-Icon
                             let iconToUse = association.icon;
@@ -3826,17 +3832,17 @@
                                 const iconClass = prepareIconForDisplay(iconToUse);
                                 if (iconClass) {
                                     const iconMargin = (!variable.showLabel && !variable.showValue) ? '' : 'margin-right: 4px;';
-                                    buttonText = `<i class="${iconClass}" style="${iconMargin}"></i>${(!variable.showLabel && !variable.showValue) ? '' : buttonText}`;
+                                    buttonText = `<i class="${esc(iconClass)}" style="${iconMargin}"></i>${(!variable.showLabel && !variable.showValue) ? '' : buttonText}`;
                                     isStrIconOnly = variable.showIcon && !variable.showLabel && !variable.showValue;
                                 }
                             }
                             
                             buttonsHtml += `
                                 <div class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''} ${isActive ? '' : 'inactive'} ${isStrIconOnly ? 'icon-only' : ''}" role="button" tabindex="0"
-                                        onclick="handleButtonClick(this, '${variable.id}', '${association.value}');" 
-                                        data-variable-id="${variable.id}"
-                                        data-association-value="${association.value}"
-                                        style="background-color: ${buttonColor} !important; color: ${getTextColor(variable)} !important; ${isGroupStretched ? '' : `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`}">
+                                        data-request-value="${esc(JSON.stringify(String(association.value)))}" 
+                                        data-variable-id="${esc(variable.id)}"
+                                        data-association-value="${esc(association.value)}"
+                                        style="background-color: ${esc(buttonColor)} !important; color: ${getTextColor(variable)} !important; ${isGroupStretched ? '' : `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`}">
                                     ${buttonText}
                                 </div>`;
                         });
@@ -3857,17 +3863,17 @@
                         
                         if (variable.showLabel && variable.label) {
                             // Doppelpunkt nur hinzufügen wenn auch Value angezeigt wird
-                            const labelText = variable.showValue ? `${variable.label}:&nbsp;` : variable.label;
+                            const labelText = variable.showValue ? `${esc(variable.label)}:&nbsp;` : esc(variable.label);
                             textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${labelText}</span>`);
                         }
                         
                         if (variable.showValue) {
-                            textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
+                            textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${esc(variable.formattedValue)}</span>`);
                         }
                         
                         // Falls nichts konfiguriert ist, zeige Wert als Fallback
                         if (!variable.showLabel && !variable.showValue) {
-                            textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
+                            textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${esc(variable.formattedValue)}</span>`);
                         }
                         
                         content += `<div class="variable-item">
@@ -3932,7 +3938,7 @@
             }
                 
             // Add data-variable-id to outer wrapper for minimal updates (text/button/image)
-            content += `<div class="${cssClasses}" style="${wrapperStyle}" data-variable-id="${variable.id}">`;
+            content += `<div class="${cssClasses}" style="${wrapperStyle}" data-variable-id="${esc(variable.id)}">`;
 
                 // Wert je nach Darstellungstyp hinzufügen
                 if (variable.displayType === 'progress') {
@@ -3951,23 +3957,23 @@
                     if (variable.showIcon && variable.icon && variable.icon !== 'Transparent') {
                         const iconClass = prepareIconForDisplay(variable.icon);
                         if (iconClass) {
-                            textParts.push(`<i class="${iconClass} variable-icon" style="color: var(--accent-color);"></i>`);
+                            textParts.push(`<i class="${esc(iconClass)} variable-icon" style="color: var(--accent-color);"></i>`);
                         }
                     }
                     
                     if (variable.showLabel && variable.label) {
                         // Doppelpunkt nur hinzufügen wenn auch Value angezeigt wird
-                        const labelText = variable.showValue ? `${variable.label}:&nbsp;` : variable.label;
+                        const labelText = variable.showValue ? `${esc(variable.label)}:&nbsp;` : esc(variable.label);
                         textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${labelText}</span>`);
                     }
                     
                     if (variable.showValue) {
-                        textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
+                        textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${esc(variable.formattedValue)}</span>`);
                     }
                     
                     // Falls nichts konfiguriert ist, zeige Wert als Fallback
                     if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                        textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${variable.formattedValue}</span>`);
+                        textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${esc(variable.formattedValue)}</span>`);
                     }
                     
                     // Für ungruppierte Text-Variablen: Container richtet bereits aus
@@ -4011,7 +4017,7 @@
                     const labelEl = node.querySelector('.variable-label');
                     if (labelEl) {
                         const labelText = variable.showValue ? `${variable.label}:\u00A0` : (variable.label || '');
-                        labelEl.innerHTML = labelText;
+                        labelEl.textContent = labelText;
                         labelEl.style.color = color;
                     }
 
@@ -4194,10 +4200,23 @@
         
         // Hilfsfunktion für Progress-Bar-Update
 
-        // Globale Verträge: handleMessage wird vom PHP-injizierten Initial-Skript aufgerufen,
-        // handleButtonClick aus inline-onclick im generierten HTML.
+        // Buttons der Kachel: ein Listener für alle; Ziel (data-variable-id) und Wert (data-request-value, JSON) stehen am Button
+        document.addEventListener('click', function (event) {
+            const button = (event.target && event.target.closest) ? event.target.closest('.variable-button[data-request-value], .variable-multi-button[data-request-value]') : null;
+            if (!button || !button.closest('#variables-container')) {
+                return;
+            }
+            let value;
+            try {
+                value = JSON.parse(button.dataset.requestValue);
+            } catch (_) {
+                return;
+            }
+            handleButtonClick(button, button.dataset.variableId, value);
+        });
+
+        // Globaler Vertrag: handleMessage wird vom PHP-injizierten Initial-Skript aufgerufen.
         window.handleMessage = handleMessage;
-        window.handleButtonClick = handleButtonClick;
         })();
     </script>
 
