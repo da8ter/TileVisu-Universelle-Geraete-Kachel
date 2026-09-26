@@ -57,6 +57,53 @@ trait UpdateTrait
     }
 
     /**
+     * Neuer Inhalt oder neue Datei eines Mediums: die Bildzeilen, die es zeigen; ist es Standardbild oder
+     * eigenes Statusbild, der Statusteil samt Assets; ist es das Hintergrundbild, image1Url. Eine Nachricht;
+     * die neue Inhaltsversion in der URL lässt den Browser das Bild neu laden.
+     */
+    private function HandleMediaUpdate(int $mediaID): void
+    {
+        $message = [];
+        if ($this->IsStatusMedia($mediaID)) {
+            $message['assets'] = $this->GenerateAssets();
+            $this->appendStatusPayload($message);
+        }
+        if ($mediaID === $this->ReadPropertyInteger('bgImage')) {
+            $message['image1Url'] = $this->BuildImageHookUrl($mediaID);
+        }
+        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
+        $progressbarActive = $this->IsProgressbarActive();
+        $built = [];
+        foreach (is_array($rows) ? $rows : [] as $key => $row) {
+            if (is_array($row) && ($row['DisplayType'] ?? 'text') === 'image' && (int)($row['ImageMedia'] ?? 0) === $mediaID) {
+                $built[] = $this->buildRow((int)$key, $row, $progressbarActive);
+            }
+        }
+        $built = $this->DropUnchangedRows(array_values(array_filter($built)));
+        if ($built !== []) {
+            $message['rows'] = $built;
+        }
+        if ($message !== []) {
+            $this->UpdateVisualizationValue(json_encode($message));
+        }
+    }
+
+    /** Standardbild oder eigenes Bild einer Status-Zuordnung. */
+    private function IsStatusMedia(int $mediaID): bool
+    {
+        if ($mediaID === $this->ReadPropertyInteger('DefaultImage')) {
+            return true;
+        }
+        $associations = json_decode($this->ReadPropertyString('ProfilAssoziazionen'), true);
+        foreach (is_array($associations) ? $associations : [] as $association) {
+            if (is_array($association) && ($association['Bildauswahl'] ?? '') === 'custom' && (int)($association['EigenesBild'] ?? 0) === $mediaID) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Zeilen, die genau so schon beim Frontend sind, entfallen. Der Puffer merkt je Zeilen-Schlüssel den
      * Fingerabdruck des zuletzt gesendeten Stands (Buffer: nur im Speicher, nicht in settings.json).
      */

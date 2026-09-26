@@ -311,60 +311,9 @@ class UniversalDeviceTile extends IPSModule
             return;
         }
 
-        // Medien-Änderungen (DefaultImage, Custom Images aus Assoziationen, Hintergrundbild)
+        // Medien-Änderungen: Bildzeilen, Statusbild, Hintergrund (Zeilen-Protokoll)
         if ($Message === MM_UPDATE || $Message === MM_CHANGEFILE) {
-            // Aktualisiere Assets (img_custom_*, img_default_* sowie vorkonfigurierte Assets)
-            try {
-                $assets = $this->GenerateAssets();
-                if (!empty($assets)) {
-                    $this->UpdateVisualizationValue(json_encode(['assets' => $assets]));
-                }
-            } catch (Exception $e) {
-                // ignore
-            } catch (Error $e) {
-                // ignore
-            }
-
-            // Minimal-Updates für Variablen mit DisplayType=image, deren ImageMedia dieses Media ist
-            try {
-                $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
-                if (is_array($variablesList) && $SenderID > 0) {
-                    $imageVarUpdates = [];
-                    foreach ($variablesList as $idx => $variable) {
-                        if ((($variable['DisplayType'] ?? 'text') === 'image')) {
-                            $imageId = intval($variable['ImageMedia'] ?? 0);
-                            if ($imageId === $SenderID) {
-                                // Bestimme DOM-ID: mit Variable-ID falls vorhanden, sonst 'image_<index>'
-                                $domId = isset($variable['Variable']) && $variable['Variable'] > 0
-                                    ? strval($variable['Variable'])
-                                    : ('image_' . $idx);
-
-                                $imageVarUpdates[] = [
-                                    'id' => $domId,
-                                    'imageUrl' => $this->BuildImageHookUrl($imageId)
-                                ];
-                            }
-                        }
-                    }
-                    if (!empty($imageVarUpdates)) {
-                        $this->UpdateVisualizationValue(json_encode(['imageVarUpdate' => $imageVarUpdates]));
-                    }
-                }
-            } catch (Exception $e) {
-                // ignore
-            } catch (Error $e) {
-                // ignore
-            }
-
-            // Falls das Hintergrundbild betroffen ist: Aktualisiere image1Url separat
-            $bgImageId = $this->ReadPropertyInteger('bgImage');
-            if ($SenderID === $bgImageId && $bgImageId > 0 && IPS_MediaExists($bgImageId)) {
-                $image = IPS_GetMedia($bgImageId);
-                if ($image['MediaType'] === MEDIATYPE_IMAGE) {
-                    $this->UpdateVisualizationValue(json_encode(['image1Url' => $this->BuildImageHookUrl($bgImageId)]));
-                }
-            }
-            return; // nichts weiter zu tun
+            $this->HandleMediaUpdate((int)$SenderID);
         }
 }
 
