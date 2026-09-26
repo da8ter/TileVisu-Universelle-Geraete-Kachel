@@ -10,6 +10,35 @@ namespace UDT;
  */
 trait PayloadTrait
 {
+    /**
+     * Die Variablenliste mit festen Typen: Objekt-IDs als int, Texte als string. Ältere oder per Skript
+     * gesetzte Listen tragen IDs auch als String oder Float, unter strict_types würde das werfen. Die
+     * Schlüssel (Zeilen-Schlüssel) bleiben erhalten; unlesbare Einträge werden zu leeren Zeilen.
+     */
+    private function ReadVariablesList(): array
+    {
+        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
+        $list = [];
+        foreach (is_array($rows) ? $rows : [] as $key => $row) {
+            if (!is_array($row)) {
+                $list[$key] = [];
+                continue;
+            }
+            foreach (['Variable', 'SecondVariable', 'ScriptID', 'OpenObjectId', 'ImageMedia'] as $field) {
+                if (isset($row[$field]) && is_numeric($row[$field])) {
+                    $row[$field] = (int)$row[$field];
+                }
+            }
+            foreach (['DisplayType', 'Group', 'Label', 'SecondVariableLabel'] as $field) {
+                if (isset($row[$field]) && is_scalar($row[$field])) {
+                    $row[$field] = (string)$row[$field];
+                }
+            }
+            $list[$key] = $row;
+        }
+        return $list;
+    }
+
     /** Das vollständige Payload als JSON (Erstaufbau in GetVisualizationTile). */
     private function GetFullUpdateMessage(): string
     {

@@ -191,8 +191,8 @@ trait FormTrait
     private function populateGroupNameColumn(&$form, $groupNames): void
     {
         // Lade die aktuellen VariablesList-Daten
-        $currentVariables = json_decode($this->ReadPropertyString('VariablesList'), true);
-        if (!is_array($currentVariables)) {
+        $currentVariables = $this->ReadVariablesList();
+        if ($currentVariables === []) {
             return;
         }
         
@@ -247,6 +247,7 @@ trait FormTrait
      */
     private function getGroupDisplayName($technicalGroup, $groupNames): string
     {
+        $technicalGroup = (string)$technicalGroup;
         if ($technicalGroup === 'keine Gruppe') {
             return 'keine Gruppe';
         }

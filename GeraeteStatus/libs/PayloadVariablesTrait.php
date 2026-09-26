@@ -16,10 +16,10 @@ trait PayloadVariablesTrait
      */
     private function appendVariablesPayload(array &$result): void
     {
-        $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
-        if (!is_array($variablesList)) {
+        if (!is_array(json_decode($this->ReadPropertyString('VariablesList'), true))) {
             return;
         }
+        $variablesList = $this->ReadVariablesList();
         $progressbarActive = $this->IsProgressbarActive();
         $variables = [];
         foreach ($variablesList as $index => $variable) {
