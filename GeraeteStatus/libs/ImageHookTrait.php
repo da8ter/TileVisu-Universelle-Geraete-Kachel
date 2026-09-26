@@ -17,7 +17,7 @@ trait ImageHookTrait
             return 0;
         }
 
-        $webhookModuleId = '{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}';
+        $webhookModuleId = self::WEBHOOK_CONTROL_GUID;
         $ids = IPS_GetInstanceListByModuleID($webhookModuleId);
         if (!is_array($ids) || count($ids) === 0) {
             return 0;

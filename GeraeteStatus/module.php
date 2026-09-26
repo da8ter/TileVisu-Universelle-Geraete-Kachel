@@ -47,6 +47,10 @@ class UniversalDeviceTile extends IPSModule
     use \UDT\ActionTrait;
     use \UDT\UpdateTrait;
 
+    // Darstellung „Legacy“: Symcon verweist damit auf das klassische Variablenprofil
+    private const LEGACY_PRESENTATION_GUID = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
+    private const WEBHOOK_CONTROL_GUID = '{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}';
+
     // Variablen-Zugriff und Status-Variable-ID
     
     

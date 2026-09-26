@@ -28,7 +28,7 @@ trait IconTrait
         }
 
         // Präsentation über IPS_GetVariablePresentation laden (löst Vorlagen, GUIDs etc. automatisch auf)
-        $legacyGuid = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
+        $legacyGuid = self::LEGACY_PRESENTATION_GUID;
         $isLegacyPresentation = false;
         $customPresentation = $this->resolvePresentationArray($id, __FUNCTION__ . ':GetVariablePresentation');
         if (isset($customPresentation['PRESENTATION'])) {
