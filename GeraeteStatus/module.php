@@ -148,7 +148,10 @@ class UniversalDeviceTile extends IPSModule
         $this->UpdateGroupOptionsInDynamicFormScript($form, $groupOptions);
         $this->populateGroupNameColumn($form, $groupNames);
 
-        return json_encode($form);
+        // Sichtbarkeiten des Zeilendialogs aus der Matrix einsetzen (als PHP-Stringliteral mit JSON)
+        $matrix = var_export((string)json_encode(self::DISPLAY_TYPE_FIELD_VISIBILITY), true);
+        $inner = static fn(string $text): string => substr((string)json_encode($text), 1, -1); // Inhalt eines JSON-Strings
+        return str_replace($inner("'__UDT_ROW_VISIBILITY__'"), $inner($matrix), (string)json_encode($form));
     }
 
     private function LogCaughtThrowable(string $context, Throwable $e): void
@@ -358,11 +361,10 @@ class UniversalDeviceTile extends IPSModule
 
 
     /**
-     * Feld-Sichtbarkeiten je Darstellungsart für die VariablesList-Bearbeitung.
-     * Bewusste Eigenheiten des bisherigen Verhaltens bleiben erhalten:
-     * - 'button' setzt UseSecondVariableAsTarget nicht (bleibt im zuletzt gesetzten Zustand)
-     * - 'default' lässt Variable, FontSize und TextColor unangetastet
-     * - OpenObjectId wird bei 'button' dynamisch gesetzt (SelectObject erst ab Kernel > 8.1)
+     * Feld-Sichtbarkeiten je Darstellungsart für den Zeilendialog der VariablesList: die eine Quelle für
+     * das Öffnen (das Formularskript bekommt die Matrix eingesetzt) und für das Umschalten
+     * (UpdateDisplayTypeVisibility). 'default' (unbekannte Darstellungsart) lässt Variable, FontSize und
+     * TextColor unangetastet; OpenObjectId braucht zusätzlich Kernel > 8.1 (SelectObject).
      */
     private const DISPLAY_TYPE_FIELD_VISIBILITY = [
         'text' => [
@@ -374,7 +376,7 @@ class UniversalDeviceTile extends IPSModule
             'SecondVariable' => false, 'SecondVariableShowIcon' => false,
             'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
             'SecondVariableLabel' => false, 'UseSecondVariableAsTarget' => false,
-            'SecondVariablePopupButton' => false,
+            'SecondVariableHeading' => false, 'SecondVariablePopupButton' => false,
             'ButtonWidth' => false, 'boolButtonColor' => false,
             'ShowBorderLine' => true, 'VerticalAlignment' => true,
             'OpenObjectId' => false,
@@ -389,7 +391,7 @@ class UniversalDeviceTile extends IPSModule
             'SecondVariable' => false, 'SecondVariableShowIcon' => false,
             'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
             'SecondVariableLabel' => false, 'UseSecondVariableAsTarget' => false,
-            'SecondVariablePopupButton' => false,
+            'SecondVariableHeading' => false, 'SecondVariablePopupButton' => false,
             'ButtonWidth' => false, 'boolButtonColor' => false,
             'ShowBorderLine' => false, 'VerticalAlignment' => true,
             'OpenObjectId' => false,
@@ -404,7 +406,7 @@ class UniversalDeviceTile extends IPSModule
             'SecondVariable' => true, 'SecondVariableShowIcon' => true,
             'SecondVariableShowLabel' => true, 'SecondVariableShowValue' => true,
             'SecondVariableLabel' => true, 'UseSecondVariableAsTarget' => true,
-            'SecondVariablePopupButton' => true,
+            'SecondVariableHeading' => true, 'SecondVariablePopupButton' => true,
             'ButtonWidth' => false, 'boolButtonColor' => false,
             'ShowBorderLine' => false, 'VerticalAlignment' => false,
             'OpenObjectId' => false,
@@ -419,7 +421,7 @@ class UniversalDeviceTile extends IPSModule
             'SecondVariable' => false, 'SecondVariableShowIcon' => false,
             'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
             'SecondVariableLabel' => false, 'UseSecondVariableAsTarget' => false,
-            'SecondVariablePopupButton' => false,
+            'SecondVariableHeading' => false, 'SecondVariablePopupButton' => false,
             'ButtonWidth' => false, 'boolButtonColor' => false,
             'ShowBorderLine' => false, 'VerticalAlignment' => true,
             'OpenObjectId' => false,
@@ -433,10 +435,11 @@ class UniversalDeviceTile extends IPSModule
             'SliderColor1' => false, 'SliderColor2' => false,
             'SecondVariable' => false, 'SecondVariableShowIcon' => false,
             'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
-            'SecondVariableLabel' => false,
-            'SecondVariablePopupButton' => false,
+            'SecondVariableLabel' => false, 'UseSecondVariableAsTarget' => false,
+            'SecondVariableHeading' => false, 'SecondVariablePopupButton' => false,
             'ButtonWidth' => true, 'boolButtonColor' => true,
             'ShowBorderLine' => false, 'VerticalAlignment' => true,
+            'OpenObjectId' => true,
             'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
         ],
         'default' => [
@@ -447,7 +450,7 @@ class UniversalDeviceTile extends IPSModule
             'SecondVariable' => false, 'SecondVariableShowIcon' => false,
             'SecondVariableShowLabel' => false, 'SecondVariableShowValue' => false,
             'SecondVariableLabel' => false,
-            'SecondVariablePopupButton' => false,
+            'SecondVariableHeading' => false, 'SecondVariablePopupButton' => false,
             'ButtonWidth' => false, 'boolButtonColor' => false,
             'ShowBorderLine' => false, 'VerticalAlignment' => false,
             'OpenObjectId' => false,
