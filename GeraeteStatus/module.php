@@ -441,7 +441,8 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // Nur Bedienelemente dieser Kachel: fremde Variablen und Scripts sind über die Kachel nicht erreichbar
-        if (!isset($this->GetRequestableIdents()[(string)$Ident])) {
+        $rowKinds = $this->GetRequestableIdents()[(string)$Ident] ?? null;
+        if ($rowKinds === null) {
             $this->SendDebug(__FUNCTION__, 'Abgelehnt, keine Zeile dieser Kachel: ' . $Ident, 0);
             return;
         }
@@ -474,34 +475,12 @@ class UniversalDeviceTile extends IPSModule
             $newValue = !GetValue($variableID);
             RequestAction($variableID, $newValue);
         } else if ($variableType === VARIABLETYPE_INTEGER) {
-            // Integer-Variable: Verwende den übergebenen Wert direkt (für Multi-Button-Interface)
-            $newValue = intval($value);
+            // Regler: gerastet und begrenzt; Multi-Buttons senden Zuordnungswerte, die bleiben unangetastet
+            // (zeigt eine Variable beides, entscheidet erst der Zeilen-Schlüssel des neuen Protokolls)
+            $newValue = ($rowKinds['slider'] && !$rowKinds['button']) ? $this->NormalizeSliderValue($variableID, $value, true) : intval($value);
             RequestAction($variableID, $newValue);
         } else if ($variableType === VARIABLETYPE_FLOAT) {
-            $newValue = floatval($value);
-            $bounds = $this->GetProgressMinMax($variableID);
-            $minV = isset($bounds['min']) ? floatval($bounds['min']) : 0.0;
-            $maxV = isset($bounds['max']) ? floatval($bounds['max']) : 100.0;
-            if ($maxV < $minV) { $tmp = $minV; $minV = $maxV; $maxV = $tmp; }
-            $cfg = $this->GetSliderStepAndDigits($variableID);
-            $step = isset($cfg['step']) ? floatval($cfg['step']) : 0.0;
-            $digits = isset($cfg['digits']) ? intval($cfg['digits']) : 0;
-            $range = $maxV - $minV;
-            if ($range <= 0) { $minV = 0.0; $maxV = 100.0; $range = 100.0; }
-            if ($step <= 0) {
-                if ($digits > 0) {
-                    $step = pow(10, -$digits);
-                } else {
-                    $step = $range / 100.0;
-                }
-            }
-            $ratio = ($newValue - $minV) / $step;
-            $rounded = round($ratio);
-            $newValue = $minV + ($rounded * $step);
-            if ($digits >= 0) { $newValue = floatval(number_format($newValue, $digits, '.', '')); }
-            if ($newValue < $minV) $newValue = $minV;
-            if ($newValue > $maxV) $newValue = $maxV;
-            RequestAction($variableID, $newValue);
+            RequestAction($variableID, $this->NormalizeSliderValue($variableID, $value, false));
         } else if ($variableType === VARIABLETYPE_STRING) {
             // String-Variable: Verwende den übergebenen String-Wert direkt (für Multi-Button-Interface)
             $newValue = strval($value);
@@ -515,7 +494,8 @@ class UniversalDeviceTile extends IPSModule
 
     /**
      * Idents, die das Frontend per requestAction senden darf: die Variable jeder Button- und
-     * Regler-Zeile, 'script_<ID>' jedes Script-Buttons (Zeile ohne Variable).
+     * Regler-Zeile, 'script_<ID>' jedes Script-Buttons (Zeile ohne Variable); je Ident, ob er
+     * als Regler und/oder als Button in der Kachel steht.
      */
     private function GetRequestableIdents(): array
     {
@@ -530,13 +510,44 @@ class UniversalDeviceTile extends IPSModule
             $scriptID = (int)($row['ScriptID'] ?? 0);
             if ($variableID > 0 && IPS_VariableExists($variableID)) {
                 if ($displayType === 'button' || $displayType === 'slider') {
-                    $idents[(string)$variableID] = true;
+                    $kinds = $idents[(string)$variableID] ?? ['slider' => false, 'button' => false];
+                    $kinds[$displayType] = true;
+                    $idents[(string)$variableID] = $kinds;
                 }
             } elseif ($displayType === 'button' && $scriptID > 0) {
-                $idents['script_' . $scriptID] = true;
+                $idents['script_' . $scriptID] = ['slider' => false, 'button' => true];
             }
         }
         return $idents;
+    }
+
+    /**
+     * Wert eines Reglers für $variableID: auf die Schrittweite gerastet und auf den Bereich begrenzt.
+     * Ein Maximum von 0 ist ein Maximum (-80..0); nur ohne gültigen Bereich (max <= min, etwa 0..0)
+     * gilt 0..100 wie im Frontend.
+     */
+    private function NormalizeSliderValue(int $variableID, $value, bool $integer)
+    {
+        $bounds = $this->GetProgressMinMax($variableID);
+        $min = (float)($bounds['min'] ?? 0);
+        $max = (float)($bounds['max'] ?? 100);
+        if ($max <= $min) {
+            $min = 0.0;
+            $max = 100.0;
+        }
+        $cfg = $this->GetSliderStepAndDigits($variableID);
+        $step = (float)($cfg['step'] ?? 0);
+        $digits = (int)($cfg['digits'] ?? 0);
+        if ($step <= 0) {
+            $step = $integer ? 1.0 : ($digits > 0 ? 10 ** -$digits : ($max - $min) / 100);
+        }
+        $number = is_numeric($value) ? (float)$value : $min;
+        $number = $min + round(($number - $min) / $step) * $step;
+        if (!$integer && $digits >= 0) {
+            $number = (float)number_format($number, $digits, '.', '');
+        }
+        $number = min($max, max($min, $number));
+        return $integer ? (int)round($number) : $number;
     }
 
 
