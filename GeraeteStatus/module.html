@@ -2141,7 +2141,7 @@
             return effectiveRange(sc.getAttribute('data-min'), sc.getAttribute('data-max'));
         }
 
-        function clampAndRound(val, min, max, step, digits) {
+        function clampAndRound(val, min, max, step) {
             let v = Number(val);
             if (!Number.isFinite(v)) v = min;
             if (max < min) { const t = min; min = max; max = t; }
@@ -2154,10 +2154,16 @@
             v = min + (rounded * step);
             if (v < min) v = min;
             if (v > max) v = max;
-            if (Number.isFinite(digits) && digits >= 0) {
-                v = Number(v.toFixed(digits));
-            }
-            return v;
+            // auf die Genauigkeit der Schrittweite runden (0,05 → 2 Stellen), nicht auf die Anzeige-Stellen
+            return Number(v.toFixed(Math.min(10, Math.max(decimalsOf(step), decimalsOf(min)))));
+        }
+
+        function decimalsOf(n) {
+            const text = String(Math.abs(Number(n)));
+            const exp = text.match(/e-(\d+)$/);
+            if (exp) return parseInt(exp[1], 10);
+            const dot = text.indexOf('.');
+            return dot < 0 ? 0 : text.length - dot - 1;
         }
 
         function updateSliderUI(sc, percent, displayText) {
@@ -2271,8 +2277,8 @@
             const digits = Number(sc.getAttribute('data-digits')) || 0;
             const stepAttr = sc.getAttribute('data-step');
             const step = (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) ? Number(stepAttr) : NaN;
-            const intended = clampAndRound(Number(pend.intended), min, max, step, digits);
-            const actualClamped = clampAndRound(Number(actual), min, max, step, digits);
+            const intended = clampAndRound(Number(pend.intended), min, max, step);
+            const actualClamped = clampAndRound(Number(actual), min, max, step);
             const tol = (Number.isFinite(step) && step > 0) ? (step / 2) : ((digits > 0) ? Math.pow(10, -digits) / 2 : 0.5);
             if (!Number.isFinite(actualClamped)) return;
             if (Math.abs(actualClamped - intended) > tol) {
@@ -2314,7 +2320,7 @@
             const percentToValue = (p) => {
                 const range = max - min;
                 const raw = min + (range * (p / 100));
-                return clampAndRound(raw, min, max, step, digits);
+                return clampAndRound(raw, min, max, step);
             };
             const valueToPercent = (v) => {
                 const range = max - min;
@@ -2382,7 +2388,7 @@
                 }
                 if (!Number.isFinite(base)) base = min;
                 const s = Number.isFinite(step) && step > 0 ? step : ((max - min) > 0 ? (max - min) / 100 : 1);
-                const next = clampAndRound(base + dir * s, min, max, s, digits);
+                const next = clampAndRound(base + dir * s, min, max, s);
                 // Optimistic UI
                 try {
                     sc.setAttribute('data-current-value', String(next));
@@ -2405,7 +2411,7 @@
                 const digits = Number(sc.getAttribute('data-digits')) || 0;
                 const stepAttr = sc.getAttribute('data-step');
                 const step = (stepAttr !== null && stepAttr !== '' && !isNaN(Number(stepAttr))) ? Number(stepAttr) : NaN;
-                const v = clampAndRound(Number(newValue), min, max, step, digits);
+                const v = clampAndRound(Number(newValue), min, max, step);
                 const range = max - min;
                 const percent = range > 0 ? Math.max(0, Math.min(100, ((v - min) / range) * 100)) : 0;
                 let display = v;
@@ -2420,7 +2426,7 @@
                     const pend = state._sliderPending && state._sliderPending[variableId];
                     if (pend) {
                         const tol = (Number.isFinite(step) && step > 0) ? (step / 2) : ((digits > 0) ? Math.pow(10, -digits) / 2 : 0.5);
-                        const intended = clampAndRound(Number(pend.intended), min, max, step, digits);
+                        const intended = clampAndRound(Number(pend.intended), min, max, step);
                         if (Math.abs(v - intended) <= tol) {
                             try { clearTimeout(pend.t); } catch (_) {}
                             try { delete state._sliderPending[variableId]; } catch (_) {}
