@@ -85,13 +85,10 @@ class UniversalDeviceTile extends IPSModule
         $this->RegisterPropertyInteger('GroupNameSize', -1);
         
         // Bildkonfiguration
-        $this->RegisterPropertyInteger("Bildauswahl", 0);
         $this->RegisterPropertyFloat("BildBreite", 20.0);
         $this->RegisterPropertyString("BildPosition", "left");
         $this->RegisterPropertyBoolean("ShowBorderLine", true);
         $this->RegisterPropertyString("ImageAlignment", "center");
-        $this->RegisterPropertyInteger("Bild_An", 0);
-        $this->RegisterPropertyInteger("Bild_Aus", 0);
         $this->RegisterPropertyBoolean('BG_Off', true);
         $this->RegisterPropertyInteger("bgImage", 0);
         $this->RegisterPropertyFloat('Bildtransparenz', 0.7);
