@@ -154,10 +154,11 @@ trait FormTrait
                 $patched[] = $line;
 
                 foreach ($groupOptions as $index => $option) {
-                    $caption = addslashes((string)($option['caption'] ?? ''));
-                    $value = addslashes((string)($option['value'] ?? ''));
+                    // var_export liefert ein korrektes einfach quotiertes Literal (addslashes machte aus " ein \")
+                    $caption = var_export((string)($option['caption'] ?? ''), true);
+                    $value = var_export((string)($option['value'] ?? ''), true);
                     $comma = ($index < ($groupOptionCount - 1)) ? ',' : '';
-                    $patched[] = "        [ 'caption' => '" . $caption . "', 'value' => '" . $value . "' ]" . $comma;
+                    $patched[] = "        [ 'caption' => " . $caption . ", 'value' => " . $value . " ]" . $comma;
                 }
 
                 $inOptions = true;
@@ -364,9 +365,8 @@ trait FormTrait
             $this->UpdateFormField($field, 'visible', $visible);
         }
         // SelectObject steht erst ab Kernel > 8.1 zur Verfügung
-        if ($displayType === 'button') {
-            $supportsSelectObject = ((float)IPS_GetKernelVersion() > 8.1);
-            $this->UpdateFormField('OpenObjectId', 'visible', $supportsSelectObject);
+        if ($displayType === 'button' && (float)IPS_GetKernelVersion() <= 8.1) {
+            $this->UpdateFormField('OpenObjectId', 'visible', false);
         }
     }
 }
