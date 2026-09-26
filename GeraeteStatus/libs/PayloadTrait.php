@@ -186,7 +186,8 @@ trait PayloadTrait
         $result['progressBarConfig'] = [
             'height' => $this->ReadPropertyInteger('ProgressBarHeight'),
             'borderRadius' => $this->ReadPropertyInteger('ProgressBarBorderRadius'),
-            'backgroundColor' => '#' . sprintf('%06X', $this->ReadPropertyInteger('ProgressBarBackgroundColor')),
+            // -1 = transparent (sprintf('%06X', -1) ergäbe #FFFFFFFFFFFFFFFF und im Frontend Weiß)
+            'backgroundColor' => $this->ReadPropertyInteger('ProgressBarBackgroundColor') < 0 ? 'transparent' : '#' . sprintf('%06X', $this->ReadPropertyInteger('ProgressBarBackgroundColor')),
             'backgroundOpacity' => $this->ReadPropertyInteger('ProgressBarBackgroundOpacity') / 100,
             'showText' => $this->ReadPropertyBoolean('ProgressBarShowText'),
             'textPadding' => $this->ReadPropertyInteger('ProgressBarTextPadding')

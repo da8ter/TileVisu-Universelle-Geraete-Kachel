@@ -1315,15 +1315,16 @@
             root.style.setProperty('--progress-bar-height', config.height + 'px');
             root.style.setProperty('--progress-bar-border-radius', config.borderRadius + 'px');
             
-            // Konvertiere Hintergrundfarbe zu rgba mit Transparenz
-            const bgColor = config.backgroundColor;
+            // Konvertiere Hintergrundfarbe zu rgba mit Transparenz; „transparent“ (-1 im Formular) bleibt durchsichtig
+            const bgColor = String(config.backgroundColor || '');
             const opacity = config.backgroundOpacity;
-            
-            // Extrahiere RGB-Werte aus Hex-Farbe
-            const r = parseInt(bgColor.substr(1, 2), 16);
-            const g = parseInt(bgColor.substr(3, 2), 16);
-            const b = parseInt(bgColor.substr(5, 2), 16);
-            const rgbaColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            let rgbaColor = 'transparent';
+            if (/^#[0-9A-Fa-f]{6}$/.test(bgColor)) {
+                const r = parseInt(bgColor.substr(1, 2), 16);
+                const g = parseInt(bgColor.substr(3, 2), 16);
+                const b = parseInt(bgColor.substr(5, 2), 16);
+                rgbaColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            }
             
             root.style.setProperty('--progress-bar-bg-color', rgbaColor);
             root.style.setProperty('--progress-bar-bg-opacity', '1'); // Opacity bereits in rgba enthalten
