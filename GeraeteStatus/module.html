@@ -1485,11 +1485,10 @@
                         }
                         break;
                     case 'image1url':
-                        // Hintergrundbild direkt per WebHook-URL setzen (Browser-Caching aktiv)
+                        // Hintergrund per WebHook-URL; '' = kein Hintergrund (auch ein entferntes Bild verschwindet)
                         try {
-                            if (typeof value === 'string' && value) {
-                                const mainDiv = document.querySelector('body');
-                                mainDiv.style.setProperty('--background-image', 'url(' + value + ')');
+                            if (typeof value === 'string') {
+                                document.querySelector('body').style.setProperty('--background-image', value ? 'url(' + value + ')' : 'none');
                                 state._bgImageFromUrl = true;
                             }
                         } catch (_) {}

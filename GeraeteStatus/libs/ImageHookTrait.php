@@ -414,6 +414,10 @@ trait ImageHookTrait
             }
         }
         $asset = isset($_GET['asset']) ? preg_replace('/[^a-z0-9_\-]/i', '', (string)$_GET['asset']) : '';
+        if ($asset === 'kachelhintergrund1') {
+            // Standardhintergrund der Kachel (liegt neben dem Platzhalter im Bibliotheksordner)
+            $streamFile(__DIR__ . '/../../imgs/kachelhintergrund1.png', 'image/png', true);
+        }
         if ($asset !== '') {
             // Support aliasing for legacy/localized filenames
             // dryer_on  -> trockner_an
