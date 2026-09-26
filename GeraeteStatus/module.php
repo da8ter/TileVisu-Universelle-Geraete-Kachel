@@ -200,10 +200,10 @@ class UniversalDeviceTile extends IPSModule
         }
         
 
-        // Sammle alle Variablen-IDs
-        $ids = [$this->ReadPropertyInteger('bgImage')];
-        // Sammle relevante Medienobjekte für Referenzen & Nachrichten (Default + Custom Images + Hintergrund)
-        $mediaIds = [];
+        // Alle Bildmedien der Kachel (Standardbild, Hintergrund, eigene Statusbilder, Bildzeilen) werden
+        // referenziert und auf Inhalts- und Dateiänderungen beobachtet
+        $mediaIds = $this->GetConfiguredMediaIds();
+        $ids = $mediaIds;
         
         // Füge Status-Variable hinzu
         $statusId = $this->ReadPropertyInteger('Status');
@@ -219,20 +219,6 @@ class UniversalDeviceTile extends IPSModule
             if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
                 $ids[] = $variable['SecondVariable'];
             }
-            // Sammle Medien für DisplayType=image
-            if ((($variable['DisplayType'] ?? 'text') === 'image')) {
-                $imageId = intval($variable['ImageMedia'] ?? 0);
-                if ($imageId > 0 && IPS_MediaExists($imageId)) {
-                    $mediaIds[] = $imageId;
-                }
-            }
-        }
-
-        // DefaultImage referenzieren und für Medien-Events vormerken
-        $defaultImageId = $this->ReadPropertyInteger('DefaultImage');
-        if ($defaultImageId > 0 && IPS_MediaExists($defaultImageId)) {
-            $ids[] = $defaultImageId;
-            $mediaIds[] = $defaultImageId;
         }
 
         
@@ -243,7 +229,7 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // Registriere neue Referenzen
-        foreach ($ids as $id) {
+        foreach (array_unique($ids) as $id) {
             if ($id > 0) {
                 $this->RegisterReference($id);
             }
