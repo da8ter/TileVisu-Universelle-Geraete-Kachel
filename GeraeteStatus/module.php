@@ -33,6 +33,7 @@ require_once __DIR__ . '/libs/PresentationTrait.php';
 require_once __DIR__ . '/libs/PayloadTrait.php';
 require_once __DIR__ . '/libs/PayloadVariablesTrait.php';
 require_once __DIR__ . '/libs/FormTrait.php';
+require_once __DIR__ . '/libs/ActionTrait.php';
 
 class UniversalDeviceTile extends IPSModule
 {
@@ -42,6 +43,7 @@ class UniversalDeviceTile extends IPSModule
     use \UDT\PayloadTrait;
     use \UDT\PayloadVariablesTrait;
     use \UDT\FormTrait;
+    use \UDT\ActionTrait;
 
     // Variablen-Zugriff und Status-Variable-ID
     
@@ -441,119 +443,12 @@ class UniversalDeviceTile extends IPSModule
         }
         
         // Nur Bedienelemente dieser Kachel: fremde Variablen und Scripts sind über die Kachel nicht erreichbar
-        $rowKinds = $this->GetRequestableIdents()[(string)$Ident] ?? null;
-        if ($rowKinds === null) {
-            $this->SendDebug(__FUNCTION__, 'Abgelehnt, keine Zeile dieser Kachel: ' . $Ident, 0);
+        $target = $this->ResolveActionTarget((string)$Ident);
+        if ($target === null) {
+            $this->SendDebug(__FUNCTION__, 'Abgelehnt, keine bedienbare Zeile dieser Kachel: ' . $Ident, 0);
             return;
         }
-
-        // Script-Buttons: Ident 'script_<ID>' → Script ausführen
-        if (strpos((string)$Ident, 'script_') === 0) {
-            $scriptId = intval(substr((string)$Ident, 7));
-            if (IPS_ScriptExists($scriptId)) {
-                try {
-                    IPS_RunScript($scriptId);
-                } catch (Throwable $e) {
-                    $this->LogCaughtThrowable(__FUNCTION__ . ':RunScriptByPrefix', $e);
-                }
-            }
-            return;
-        }
-        
-        // Nachrichten von der HTML-Darstellung schicken immer den Ident passend zur Eigenschaft und im Wert die Differenz, welche auf die Variable gerechnet werden soll
-        $variableID = (int)$Ident;
-        if (!IPS_VariableExists($variableID)) {
-            return;
-        }
-
-        // Ermittle Variablentyp für unterschiedliche Behandlung
-        $variable = IPS_GetVariable($variableID);
-        $variableType = $variable['VariableType'];
-
-        if ($variableType === VARIABLETYPE_BOOLEAN) {
-            // Boolean-Variable: Toggle-Verhalten (wie bisher)
-            $newValue = !GetValue($variableID);
-            RequestAction($variableID, $newValue);
-        } else if ($variableType === VARIABLETYPE_INTEGER) {
-            // Regler: gerastet und begrenzt; Multi-Buttons senden Zuordnungswerte, die bleiben unangetastet
-            // (zeigt eine Variable beides, entscheidet erst der Zeilen-Schlüssel des neuen Protokolls)
-            $newValue = ($rowKinds['slider'] && !$rowKinds['button']) ? $this->NormalizeSliderValue($variableID, $value, true) : intval($value);
-            RequestAction($variableID, $newValue);
-        } else if ($variableType === VARIABLETYPE_FLOAT) {
-            RequestAction($variableID, $this->NormalizeSliderValue($variableID, $value, false));
-        } else if ($variableType === VARIABLETYPE_STRING) {
-            // String-Variable: Verwende den übergebenen String-Wert direkt (für Multi-Button-Interface)
-            $newValue = strval($value);
-            RequestAction($variableID, $newValue);
-        } else {
-            // Andere Variablentypen: Fallback auf Toggle-Verhalten
-            $newValue = !GetValue($variableID);
-            RequestAction($variableID, $newValue);
-        }
-    }
-
-    /**
-     * Idents, die das Frontend per requestAction senden darf: die Variable jeder Button- und
-     * Regler-Zeile, 'script_<ID>' jedes Script-Buttons (Zeile ohne Variable); je Ident, ob er
-     * als Regler und/oder als Button in der Kachel steht.
-     */
-    private function GetRequestableIdents(): array
-    {
-        $idents = [];
-        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
-        foreach (is_array($rows) ? $rows : [] as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-            $displayType = $row['DisplayType'] ?? 'text';
-            $variableID = (int)($row['Variable'] ?? 0);
-            $scriptID = (int)($row['ScriptID'] ?? 0);
-            if ($variableID > 0 && IPS_VariableExists($variableID)) {
-                if ($displayType === 'button' || $displayType === 'slider') {
-                    $kinds = $idents[(string)$variableID] ?? ['slider' => false, 'button' => false];
-                    $kinds[$displayType] = true;
-                    $idents[(string)$variableID] = $kinds;
-                }
-            } elseif ($displayType === 'button' && $scriptID > 0) {
-                $idents['script_' . $scriptID] = ['slider' => false, 'button' => true];
-            }
-        }
-        return $idents;
-    }
-
-    /**
-     * Wert eines Reglers für $variableID: auf die Schrittweite gerastet und auf den Bereich begrenzt.
-     * Ein Maximum von 0 ist ein Maximum (-80..0); nur ohne gültigen Bereich (max <= min, etwa 0..0)
-     * gilt 0..100 wie im Frontend.
-     */
-    private function NormalizeSliderValue(int $variableID, $value, bool $integer)
-    {
-        $bounds = $this->GetProgressMinMax($variableID);
-        $min = (float)($bounds['min'] ?? 0);
-        $max = (float)($bounds['max'] ?? 100);
-        if ($max <= $min) {
-            $min = 0.0;
-            $max = 100.0;
-        }
-        $cfg = $this->GetSliderStepAndDigits($variableID);
-        $step = (float)($cfg['step'] ?? 0);
-        $digits = (int)($cfg['digits'] ?? 0);
-        if ($step <= 0) {
-            $step = $integer ? 1.0 : ($digits > 0 ? 10 ** -$digits : ($max - $min) / 100);
-        }
-        $number = is_numeric($value) ? (float)$value : $min;
-        $number = $min + round(($number - $min) / $step) * $step;
-        $number = min($max, max($min, $number));
-        // auf die Genauigkeit der Schrittweite runden (0,05 → 2 Stellen), nicht auf die Anzeige-Stellen
-        return $integer ? (int)round($number) : round($number, min(10, max(self::DecimalsOf($step), self::DecimalsOf($min))));
-    }
-
-    /** Nachkommastellen einer Zahl aus Konfiguration oder Darstellung (0.05 → 2, 1.0 → 0). */
-    private static function DecimalsOf(float $number): int
-    {
-        $text = rtrim(rtrim(sprintf('%.10F', abs($number)), '0'), '.');
-        $dot = strpos($text, '.');
-        return $dot === false ? 0 : strlen($text) - $dot - 1;
+        $this->RunActionTarget($target, $value);
     }
 
 
