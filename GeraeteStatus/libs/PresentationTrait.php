@@ -452,7 +452,7 @@ trait PresentationTrait
      * @param mixed $currentValue Aktueller Variablenwert
      * @return array|null Passende Assoziation oder null
      */
-    private function FindMatchingAssociation(array $associations, $currentValue): ?array {
+    private function FindMatchingAssociation(array $associations, mixed $currentValue): ?array {
         $match = null;
         // Zahlen: exakter Treffer, sonst die größte Zuordnung darunter (Intervall); Texte und Bool nur exakt
         $numeric = is_int($currentValue) || is_float($currentValue);

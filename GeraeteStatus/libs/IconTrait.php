@@ -137,7 +137,7 @@ trait IconTrait
      * INTERVALS/OPTIONS bei numerischen Variablen — letztere dürfen ein bereits gefundenes
      * statisches Icon bewusst überschreiben. Liefert '' wenn nichts gefunden.
      */
-    private function resolveIconFromPresentation(array $customPresentation, array $variable, $Value, int $id): string
+    private function resolveIconFromPresentation(array $customPresentation, array $variable, mixed $Value, int $id): string
     {
         $icon = "";
 
@@ -263,7 +263,7 @@ trait IconTrait
      * erst wertgenaue/bereichsbasierte ValueMappings, dann das Default-Icon der Darstellung.
      * Liefert '' wenn nichts gefunden oder IPS_GetVariableVisualization nicht verfügbar ist.
      */
-    private function resolveIconFromVisualization(int $id, $Value, string $debugContext): string
+    private function resolveIconFromVisualization(int $id, mixed $Value, string $debugContext): string
     {
         if (!function_exists('IPS_GetVariableVisualization')) {
             return '';
@@ -329,7 +329,7 @@ trait IconTrait
      * erst die wertgenaue Association, dann das Profil-Standard-Icon.
      * Liefert '' wenn nichts gefunden oder das Profil nicht existiert.
      */
-    private function resolveIconFromClassicProfile(string $profile, $Value): string
+    private function resolveIconFromClassicProfile(string $profile, mixed $Value): string
     {
         if ($profile === '' || !IPS_VariableProfileExists($profile)) {
             return '';
@@ -352,7 +352,7 @@ trait IconTrait
      * Ermittelt das Icon der aktuell aktiven Association für Bool/Integer/String Variablen.
      * Nutzt die bestehende Association-Auflösung (Profile/OPTIONS/TEMPLATE/PRESENTATION).
      */
-    private function GetAssociationIconForCurrentValue(int $variableId, int $variableType, $currentValue): string
+    private function GetAssociationIconForCurrentValue(int $variableId, int $variableType, mixed $currentValue): string
     {
         if (!in_array($variableType, [VARIABLETYPE_BOOLEAN, VARIABLETYPE_INTEGER, VARIABLETYPE_STRING], true)) {
             return '';

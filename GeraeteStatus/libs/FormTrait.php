@@ -98,7 +98,7 @@ trait FormTrait
         return $options;
     }
 
-    private function UpdateGroupSelectOptionsInForm(&$element, array $groupOptions): void
+    private function UpdateGroupSelectOptionsInForm(mixed &$element, array $groupOptions): void
     {
         if (!is_array($element)) {
             return;
@@ -115,7 +115,7 @@ trait FormTrait
         }
     }
 
-    private function UpdateGroupOptionsInDynamicFormScript(&$element, array $groupOptions): void
+    private function UpdateGroupOptionsInDynamicFormScript(mixed &$element, array $groupOptions): void
     {
         if (!is_array($element)) {
             return;
@@ -189,7 +189,7 @@ trait FormTrait
      * @param array &$form Das Form-Array (per Referenz)
      * @param array $groupNames Die konfigurierten Gruppennamen
      */
-    private function populateGroupNameColumn(&$form, $groupNames): void
+    private function populateGroupNameColumn(array &$form, array $groupNames): void
     {
         // Lade die aktuellen VariablesList-Daten
         $currentVariables = $this->ReadVariablesList();
@@ -214,7 +214,7 @@ trait FormTrait
      * @param array &$form Das Form-Array (per Referenz)
      * @param array $updatedVariables Die aktualisierten Variablen-Daten
      */
-    private function updateVariablesListInForm(&$form, $updatedVariables): void
+    private function updateVariablesListInForm(array &$form, array $updatedVariables): void
     {
         $this->findAndUpdateVariablesList($form, $updatedVariables);
     }
@@ -224,7 +224,7 @@ trait FormTrait
      * @param array &$element Das aktuelle Element (per Referenz)
      * @param array $updatedVariables Die aktualisierten Variablen-Daten
      */
-    private function findAndUpdateVariablesList(&$element, $updatedVariables): void
+    private function findAndUpdateVariablesList(mixed &$element, array $updatedVariables): void
     {
         if (is_array($element)) {
             // Prüfe, ob dies die VariablesList ist
@@ -246,7 +246,7 @@ trait FormTrait
      * @param array $groupNames Die konfigurierten Gruppennamen
      * @return string Der Anzeigename
      */
-    private function getGroupDisplayName($technicalGroup, $groupNames): string
+    private function getGroupDisplayName(mixed $technicalGroup, array $groupNames): string
     {
         $technicalGroup = (string)$technicalGroup;
         if ($technicalGroup === 'keine Gruppe') {

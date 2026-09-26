@@ -9,7 +9,7 @@ namespace UDT;
  */
 final class Helpers
 {
-    public static function decodeJsonArray($value, string $context): ?array
+    public static function decodeJsonArray(mixed $value, string $context): ?array
     {
         if (is_array($value)) {
             return $value;

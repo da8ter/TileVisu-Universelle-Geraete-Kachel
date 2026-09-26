@@ -36,7 +36,7 @@ trait ActionTrait
     }
 
     /** Führt die Bedienung auf dem Ziel aus: Script starten oder den Wert an die Variable geben. */
-    private function RunActionTarget(array $target, $value): void
+    private function RunActionTarget(array $target, mixed $value): void
     {
         [$kind, $id, $displayType] = $target;
         if ($kind === 'script') {
@@ -79,7 +79,7 @@ trait ActionTrait
      * Ein Maximum von 0 ist ein Maximum (-80..0); nur ohne gültigen Bereich (max <= min, etwa 0..0)
      * gilt 0..100 wie im Frontend.
      */
-    private function NormalizeSliderValue(int $variableID, $value, bool $integer)
+    private function NormalizeSliderValue(int $variableID, mixed $value, bool $integer): int|float
     {
         $bounds = $this->GetProgressMinMax($variableID);
         $min = (float)($bounds['min'] ?? 0);
