@@ -10,8 +10,24 @@ namespace UDT;
  */
 trait PayloadTrait
 {
-    // Generiere eine Nachricht, die alle Elemente in der HTML-Darstellung aktualisiert
-    private function GetFullUpdateMessage() {
+    /** Das vollständige Payload als JSON (Erstaufbau in GetVisualizationTile). */
+    private function GetFullUpdateMessage(): string
+    {
+        return $this->EncodeTileMessage($this->BuildFullPayload());
+    }
+
+    /**
+     * JSON für die Kachel: ungültiges UTF-8 (etwa in einem String-Wert) wird ersetzt, statt die ganze
+     * Nachricht zu verlieren; < und > werden maskiert, weil der Erstaufbau in einem <script> steht.
+     */
+    private function EncodeTileMessage(array $message): string
+    {
+        return (string)json_encode($message, JSON_INVALID_UTF8_SUBSTITUTE | JSON_HEX_TAG | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    }
+
+    /** Das vollständige Payload: Status, Zeilen und Kachelteil (Kachel geöffnet, Konfiguration gespeichert). */
+    private function BuildFullPayload(): array
+    {
         $result = [];
 
         // Frontend-Sichttexte zentral aus locale.json
@@ -28,7 +44,7 @@ trait PayloadTrait
         $this->appendTilePayload($result);
         $this->RememberSentRows($result['variables'] ?? []);
 
-        return json_encode($result);
+        return $result;
     }
 
     /**

@@ -52,7 +52,7 @@ trait UpdateTrait
             $message['rows'] = $built;
         }
         if ($message !== []) {
-            $this->UpdateVisualizationValue(json_encode($message));
+            $this->UpdateVisualizationValue($this->EncodeTileMessage($message));
         }
     }
 
@@ -84,7 +84,7 @@ trait UpdateTrait
             $message['rows'] = $built;
         }
         if ($message !== []) {
-            $this->UpdateVisualizationValue(json_encode($message));
+            $this->UpdateVisualizationValue($this->EncodeTileMessage($message));
         }
     }
 
@@ -114,7 +114,7 @@ trait UpdateTrait
         $changed = [];
         foreach ($rows as $row) {
             $key = (string)$row['key'];
-            $hash = md5((string)json_encode($row));
+            $hash = md5($this->EncodeTileMessage($row));
             if (($sent[$key] ?? null) !== $hash) {
                 $changed[] = $row;
                 $sent[$key] = $hash;
@@ -130,7 +130,7 @@ trait UpdateTrait
         $sent = [];
         foreach ($rows as $row) {
             if (is_array($row) && isset($row['key'])) {
-                $sent[(string)$row['key']] = md5((string)json_encode($row));
+                $sent[(string)$row['key']] = md5($this->EncodeTileMessage($row));
             }
         }
         $this->SetBuffer('SentRows', json_encode($sent));

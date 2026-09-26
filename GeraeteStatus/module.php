@@ -270,19 +270,12 @@ class UniversalDeviceTile extends IPSModule
         }
 
         // Schicke eine komplette Update-Nachricht an die Darstellung, da sich ja Parameter geändert haben können
-        $fullUpdateMessageJson = $this->GetFullUpdateMessage(); // Gibt bereits JSON-String zurück
-        $fullUpdateMessage = \UDT\Helpers::decodeJsonArray($fullUpdateMessageJson, __FUNCTION__ . ':GetFullUpdateMessage');
-        if (!is_array($fullUpdateMessage)) {
-            $fullUpdateMessage = [];
-        }
-        
-        // Füge Asset-Update hinzu für Custom Images und Fallback-Assets
+        $fullUpdateMessage = $this->BuildFullPayload();
         $assets = $this->GenerateAssets();
         if (!empty($assets)) {
             $fullUpdateMessage['assets'] = $assets;
         }
-        
-        $this->UpdateVisualizationValue(json_encode($fullUpdateMessage));
+        $this->UpdateVisualizationValue($this->EncodeTileMessage($fullUpdateMessage));
     }
 
     public function Destroy()
