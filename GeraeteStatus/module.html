@@ -1954,10 +1954,11 @@
                     // Update button content based on display configuration
                     let buttonContentParts = [];
                     
-                    // Icon
+                    // Icon: wie im Erstaufbau das der Zuordnung, sonst das der Variable
                     let hasIcon = false;
-                    if (variable.showIcon && association?.icon && association.icon !== 'Transparent') {
-                        const iconClass = prepareIconForDisplay(association.icon);
+                    const iconToUse = (association?.icon && association.icon !== 'Transparent') ? association.icon : variable.icon;
+                    if (variable.showIcon && iconToUse && iconToUse !== 'Transparent') {
+                        const iconClass = prepareIconForDisplay(iconToUse);
                         if (iconClass) {
                             const iconMargin = (!variable.showLabel && !variable.showValue) ? '' : 'margin-right: 4px;';
                             buttonContentParts.push(`<i class="${esc(iconClass)}" style="${iconMargin}"></i>`);
