@@ -158,18 +158,53 @@ trait ImageHookTrait
         $token = $this->ReadAttributeString('HookToken');
         $base = '/hook/udtimages/' . $this->InstanceID;
         $q = 'asset=' . $safe;
+        $file = $this->GetAssetFile((string)$safe);
+        if ($file !== '') {
+            // Version = Dateistand: ein Modul-Update ergibt eine neue Adresse, der Browser darf lange cachen
+            $q .= '&v=' . (int)@filemtime($file);
+        }
         if ($token !== '') {
             $q .= '&token=' . rawurlencode($token);
         }
         return $base . '?' . $q;
     }
 
+    /** Datei eines mitgelieferten Assets: Standardhintergrund im Bibliotheksordner, sonst assets/ (mit alten Namen). */
+    private function GetAssetFile(string $name): string
+    {
+        $name = (string)preg_replace('/[^a-z0-9_\-]/i', '', $name);
+        if ($name === 'kachelhintergrund1') {
+            $file = __DIR__ . '/../../imgs/kachelhintergrund1.png';
+            return is_file($file) ? $file : '';
+        }
+        $names = [$name];
+        if ($name === 'dryer_on') {
+            $names[] = 'trockner_an';
+        } elseif ($name === 'dryer_off') {
+            $names[] = 'trockner_aus';
+        }
+        foreach ($names as $candidate) {
+            foreach (['webp', 'png', 'jpg', 'jpeg', 'gif'] as $ext) {
+                $file = __DIR__ . '/../assets/' . $candidate . '.' . $ext;
+                if ($candidate !== '' && is_file($file)) {
+                    return $file;
+                }
+            }
+        }
+        return '';
+    }
+
+    /** Kopfzeile der Hook-Antwort; eigene Methode, damit der Prüfstand die Kopfzeilen sieht. */
+    protected function SendHookHeader(string $header): void
+    {
+        header($header);
+    }
+
     // Symcon ruft Hooks über „class HookInstance extends <Modulklasse>“ auf; bei IPSModuleStrict mit „: void“
     // (bei IPSModule ohne Rückgabetyp, siehe N20): der Rückgabetyp folgt der Basisklasse.
     protected function ProcessHookData(): void
     {
-        // Pfade relativ zum Modulordner (diese Datei liegt in libs/)
-        $assetsDir = __DIR__ . '/../assets';
+        // Pfad relativ zum Modulordner (diese Datei liegt in libs/)
         $placeholder = __DIR__ . '/../../imgs/transparent.webp';
         $instT = $this->ReadAttributeString('HookToken');
         $token = isset($_GET['token']) ? (string)$_GET['token'] : '';
@@ -186,7 +221,7 @@ trait ImageHookTrait
         if (function_exists('ob_get_level')) {
             while (ob_get_level() > 0) { ob_end_clean(); }
         }
-        header('X-Accel-Buffering: no');
+        $this->SendHookHeader('X-Accel-Buffering: no');
         if (function_exists('ignore_user_abort')) { ignore_user_abort(true); }
         if (function_exists('set_time_limit')) {
             try {
@@ -203,17 +238,20 @@ trait ImageHookTrait
             $ifNoneMatch = isset($_SERVER['HTTP_IF_NONE_MATCH']) ? trim($_SERVER['HTTP_IF_NONE_MATCH']) : '';
             $ifModifiedSince = isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) ? strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']) : 0;
             if ($etag !== '' && $ifNoneMatch === $etag) {
-                header('ETag: ' . $etag);
+                $this->SendHookHeader('ETag: ' . $etag);
                 http_response_code(304);
                 exit;
             }
             if ($lastMod > 0 && $ifModifiedSince && $ifModifiedSince >= $lastMod) {
-                header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $lastMod) . ' GMT');
+                $this->SendHookHeader('Last-Modified: ' . gmdate('D, d M Y H:i:s', $lastMod) . ' GMT');
                 http_response_code(304);
                 exit;
             }
         };
-        $streamFile = function(string $file, string $mime, bool $longCache = false) use ($MAX_SIZE, $sendNotModified, $placeholder, $detectMime) {
+        // Lange cachen nur, wenn die Adresse die aktuelle Version trägt; sonst jedes Mal nachfragen (ETag/304).
+        $version = isset($_GET['v']) ? (string)$_GET['v'] : '';
+        $revalidate = 'public, max-age=0, must-revalidate';
+        $streamFile = function(string $file, string $mime, string $cache) use ($MAX_SIZE, $sendNotModified, $placeholder, $detectMime, $revalidate) {
             if (!is_file($file) || !is_readable($file)) {
                 http_response_code(404);
                 $this->LogMessage('UDTImagesHook: File not found or unreadable: ' . $file, KL_ERROR);
@@ -235,20 +273,16 @@ trait ImageHookTrait
                 $file = $placeholder;
                 $size = (int)filesize($placeholder);
                 $mime = $detectMime((string)file_get_contents($placeholder, false, null, 0, 12));
-                $longCache = false;
+                $cache = $revalidate;
             }
             $mtime = filemtime($file) ?: time();
             $etag = 'W/"' . dechex($size) . '-' . dechex($mtime) . '"';
-            if ($longCache) {
-                header('Cache-Control: public, max-age=31536000, immutable');
-            } else {
-                header('Cache-Control: public, max-age=0, must-revalidate');
-            }
-            header('ETag: ' . $etag);
-            header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
+            $this->SendHookHeader('Cache-Control: ' . $cache);
+            $this->SendHookHeader('ETag: ' . $etag);
+            $this->SendHookHeader('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
             $sendNotModified($etag, $mtime);
-            header('Content-Type: ' . $mime);
-            header('Content-Length: ' . $size);
+            $this->SendHookHeader('Content-Type: ' . $mime);
+            $this->SendHookHeader('Content-Length: ' . $size);
             $fh = fopen($file, 'rb');
             if ($fh === false) {
                 http_response_code(500);
@@ -266,6 +300,8 @@ trait ImageHookTrait
             exit;
         };
         if ($mid > 0 && IPS_MediaExists($mid)) {
+            // Medien können privat sein (Kamera, Fotos): lange nur im Browser, nie in geteilten Caches
+            $current = $version !== '' && $version === $this->GetMediaVersion($mid);
             $m = IPS_GetMedia($mid);
             if ($m['MediaType'] === MEDIATYPE_IMAGE) {
                 if (!empty($m['MediaFile']) && is_file($m['MediaFile'])) {
@@ -278,7 +314,7 @@ trait ImageHookTrait
                         $hdr = fread($fh, 12);
                         fclose($fh);
                         $mime = $detectMime($hdr ?: '');
-                        $streamFile($m['MediaFile'], $mime, false);
+                        $streamFile($m['MediaFile'], $mime, $current ? 'private, max-age=31536000, immutable' : 'private, max-age=0, must-revalidate');
                     }
                 }
                 $b64 = IPS_GetMediaContent($mid);
@@ -296,11 +332,16 @@ trait ImageHookTrait
                 $decodedLen = (int)floor($len / 4) * 3 - $padding;
                 if ($decodedLen > $MAX_SIZE) {
                     $this->ReportOversizeImage($mid, $decodedLen, $MAX_SIZE);
-                    $streamFile($placeholder, 'image/webp', false);
+                    $streamFile($placeholder, 'image/webp', $revalidate);
                 }
-                header('Cache-Control: no-store');
-                header('Content-Type: ' . $mime);
-                header('Content-Length: ' . max(0, $decodedLen));
+                $this->SendHookHeader('Cache-Control: ' . ($current ? 'private, max-age=31536000, immutable' : 'no-store'));
+                if ($current) {
+                    $etag = '"' . $version . '"';
+                    $this->SendHookHeader('ETag: ' . $etag);
+                    $sendNotModified($etag);
+                }
+                $this->SendHookHeader('Content-Type: ' . $mime);
+                $this->SendHookHeader('Content-Length: ' . max(0, $decodedLen));
                 $out = fopen('php://output', 'wb');
                 if ($out === false) {
                     http_response_code(500);
@@ -328,46 +369,20 @@ trait ImageHookTrait
                 return;
             }
         }
-        $asset = isset($_GET['asset']) ? preg_replace('/[^a-z0-9_\-]/i', '', (string)$_GET['asset']) : '';
-        if ($asset === 'kachelhintergrund1') {
-            // Standardhintergrund der Kachel (liegt neben dem Platzhalter im Bibliotheksordner)
-            $streamFile(__DIR__ . '/../../imgs/kachelhintergrund1.png', 'image/png', true);
-        }
-        if ($asset !== '') {
-            // Support aliasing for legacy/localized filenames
-            // dryer_on  -> trockner_an
-            // dryer_off -> trockner_aus
-            $namesToTry = [$asset];
-            if ($asset === 'dryer_on') {
-                $namesToTry[] = 'trockner_an';
-            } elseif ($asset === 'dryer_off') {
-                $namesToTry[] = 'trockner_aus';
-            }
-            foreach ($namesToTry as $name) {
-                $candidates = [
-                    $assetsDir . '/' . $name . '.webp',
-                    $assetsDir . '/' . $name . '.png',
-                    $assetsDir . '/' . $name . '.jpg',
-                    $assetsDir . '/' . $name . '.jpeg',
-                    $assetsDir . '/' . $name . '.gif',
-                ];
-                foreach ($candidates as $file) {
-                    if (is_file($file)) {
-                        $fh = fopen($file, 'rb');
-                        if ($fh === false) { continue; }
-                        $hdr = fread($fh, 12);
-                        fclose($fh);
-                        $mime = $detectMime($hdr ?: '');
-                        $streamFile($file, $mime, true);
-                    }
-                }
-            }
+        $asset = isset($_GET['asset']) ? (string)preg_replace('/[^a-z0-9_\-]/i', '', (string)$_GET['asset']) : '';
+        $assetFile = $asset !== '' ? $this->GetAssetFile($asset) : '';
+        if ($assetFile !== '') {
+            $fh = fopen($assetFile, 'rb');
+            $hdr = $fh !== false ? (string)fread($fh, 12) : '';
+            if ($fh !== false) { fclose($fh); }
+            $streamFile($assetFile, $assetFile === __DIR__ . '/../../imgs/kachelhintergrund1.png' ? 'image/png' : $detectMime($hdr),
+                $version !== '' && $version === (string)(int)@filemtime($assetFile) ? 'public, max-age=31536000, immutable' : $revalidate);
         }
         if (isset($_GET['placeholder']) && is_file($placeholder)) {
             $fh = fopen($placeholder, 'rb');
             if ($fh !== false) { $hdr = fread($fh, 12); fclose($fh); }
             $mime = $detectMime(isset($hdr) ? $hdr : '');
-            $streamFile($placeholder, $mime, true);
+            $streamFile($placeholder, $mime, $version === (string)(int)@filemtime($placeholder) ? 'public, max-age=31536000, immutable' : $revalidate);
         }
         http_response_code(404);
         $this->LogMessage('UDTImagesHook: Not found', KL_ERROR);
