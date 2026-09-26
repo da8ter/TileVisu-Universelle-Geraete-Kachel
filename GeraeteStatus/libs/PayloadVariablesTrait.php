@@ -66,10 +66,9 @@ trait PayloadVariablesTrait
                 $row = $this->buildObjectRow($variable);
             }
             return $row === null ? null : ['key' => $key] + $row;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             // Zeile auslassen statt die ganze Kachel abzubrechen
-            return null;
-        } catch (\Error $e) {
+            $this->LogCaughtThrowable(__FUNCTION__ . ':' . $key, $e);
             return null;
         }
     }
@@ -87,22 +86,11 @@ trait PayloadVariablesTrait
 
 
 
-        // PROTECTION: Try-Catch um GetIcon call, um Abstürze zu verhindern
         try {
             $icon = $this->GetIcon($variable['Variable']);
-
-
-
-
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            $this->LogCaughtThrowable(__FUNCTION__ . ':GetIcon', $e);
             $icon = '';
-
-
-
-
-        } catch (\Error $e) {
-            $icon = '';
-
         }
 
 
@@ -339,7 +327,9 @@ trait PayloadVariablesTrait
                     $scriptIcon = $this->MapIconToFontAwesome($objIcon);
                 }
             }
-        } catch (\Exception $e) { /* ignore */ }
+        } catch (\Throwable $e) {
+            $this->LogCaughtThrowable(__FUNCTION__, $e);
+        }
         // Farben/Styles wie bei anderen Buttons
         $textColor = isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000';
         $isTextColorTransparent = isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215);
@@ -388,7 +378,9 @@ trait PayloadVariablesTrait
                     $objectIcon = $this->MapIconToFontAwesome($objIcon);
                 }
             }
-        } catch (\Exception $e) { /* ignore */ }
+        } catch (\Throwable $e) {
+            $this->LogCaughtThrowable(__FUNCTION__, $e);
+        }
         $textColor = isset($variable['TextColor']) ? '#' . sprintf('%06X', $variable['TextColor']) : '#000000';
         $isTextColorTransparent = isset($variable['TextColor']) && ($variable['TextColor'] == -1 || $variable['TextColor'] == 16777215);
         return [
