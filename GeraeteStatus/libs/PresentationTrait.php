@@ -535,11 +535,13 @@ trait PresentationTrait
      */
     private function FindMatchingAssociation(array $associations, $currentValue): ?array {
         $match = null;
+        // Zahlen: exakter Treffer, sonst die größte Zuordnung darunter (Intervall); Texte und Bool nur exakt
+        $numeric = is_int($currentValue) || is_float($currentValue);
         foreach ($associations as $assoziation) {
             if (!isset($assoziation['AssoziationValue'])) continue;
             $av = $assoziation['AssoziationValue'];
             if ($av == $currentValue) return $assoziation;
-            if ($av <= $currentValue && ($match === null || $av > $match['AssoziationValue'])) {
+            if ($numeric && is_numeric($av) && $av <= $currentValue && ($match === null || $av > $match['AssoziationValue'])) {
                 $match = $assoziation;
             }
         }
