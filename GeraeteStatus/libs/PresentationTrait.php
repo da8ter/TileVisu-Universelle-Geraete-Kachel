@@ -406,33 +406,28 @@ trait PresentationTrait
             }
         }
         
-        // **Boolean: ICON_TRUE/ICON_FALSE aus aufgelöster Präsentation**
+        // **Boolean: Schalter-Darstellung (ICON_*, CAPTION_*, COLOR_*) aus aufgelöster Präsentation**
         if ($expectedVariableType === VARIABLETYPE_BOOLEAN) {
-            $iconTrueSet = isset($presentation['ICON_TRUE']) && trim($presentation['ICON_TRUE']) !== '';
-            $iconFalseSet = isset($presentation['ICON_FALSE']) && trim($presentation['ICON_FALSE']) !== '';
-            if ($iconTrueSet || $iconFalseSet) {
-                $useIconFalse = isset($presentation['USE_ICON_FALSE']) ? $presentation['USE_ICON_FALSE'] : true;
-                
-                $associations = [];
-                if ($iconFalseSet) {
-                    $associations[] = [
+            $has = static fn(string $key): bool => isset($presentation[$key]) && trim((string)$presentation[$key]) !== '';
+            if ($has('ICON_TRUE') || $has('ICON_FALSE') || $has('CAPTION_TRUE') || $has('CAPTION_FALSE')) {
+                $color = static fn($value): ?string => (is_numeric($value) && (int)$value >= 0) ? '#' . sprintf('%06X', (int)$value) : null;
+                $icon = fn(string $key): ?string => $has($key) ? $this->MapIconToFontAwesome(trim((string)$presentation[$key])) : null;
+                // USE_ICON_FALSE: eigenes Icon für „aus“, sonst gilt ICON_TRUE für beide Zustände
+                $useIconFalse = (bool)($presentation['USE_ICON_FALSE'] ?? true);
+                return [
+                    [
                         'value' => false,
-                        'name' => 'Aus',
-                        'color' => null,
-                        'icon' => $useIconFalse ? $presentation['ICON_FALSE'] : null
-                    ];
-                }
-                if ($iconTrueSet) {
-                    $associations[] = [
+                        'name' => $has('CAPTION_FALSE') ? (string)$presentation['CAPTION_FALSE'] : $this->Translate('Off'),
+                        'color' => $color($presentation['COLOR_FALSE'] ?? -1),
+                        'icon' => ($useIconFalse && $has('ICON_FALSE')) ? $icon('ICON_FALSE') : $icon('ICON_TRUE')
+                    ],
+                    [
                         'value' => true,
-                        'name' => 'An',
-                        'color' => null,
-                        'icon' => $useIconFalse ? $presentation['ICON_TRUE'] : null
-                    ];
-                }
-                if (!empty($associations)) {
-                    return $associations;
-                }
+                        'name' => $has('CAPTION_TRUE') ? (string)$presentation['CAPTION_TRUE'] : $this->Translate('On'),
+                        'color' => $color($presentation['COLOR_TRUE'] ?? -1),
+                        'icon' => $icon('ICON_TRUE')
+                    ]
+                ];
             }
         }
         
