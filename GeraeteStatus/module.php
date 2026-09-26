@@ -543,11 +543,17 @@ class UniversalDeviceTile extends IPSModule
         }
         $number = is_numeric($value) ? (float)$value : $min;
         $number = $min + round(($number - $min) / $step) * $step;
-        if (!$integer && $digits >= 0) {
-            $number = (float)number_format($number, $digits, '.', '');
-        }
         $number = min($max, max($min, $number));
-        return $integer ? (int)round($number) : $number;
+        // auf die Genauigkeit der Schrittweite runden (0,05 → 2 Stellen), nicht auf die Anzeige-Stellen
+        return $integer ? (int)round($number) : round($number, min(10, max(self::DecimalsOf($step), self::DecimalsOf($min))));
+    }
+
+    /** Nachkommastellen einer Zahl aus Konfiguration oder Darstellung (0.05 → 2, 1.0 → 0). */
+    private static function DecimalsOf(float $number): int
+    {
+        $text = rtrim(rtrim(sprintf('%.10F', abs($number)), '0'), '.');
+        $dot = strpos($text, '.');
+        return $dot === false ? 0 : strlen($text) - $dot - 1;
     }
 
 
