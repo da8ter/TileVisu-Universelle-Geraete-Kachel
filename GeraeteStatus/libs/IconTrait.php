@@ -22,7 +22,8 @@ trait IconTrait
             $variable = IPS_GetVariable($id);
             $Value = GetValue($id);
             $icon = "";
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            $this->LogCaughtThrowable(__FUNCTION__, $e);
             return 'Transparent'; // Fallback bei Fehler
         }
 
