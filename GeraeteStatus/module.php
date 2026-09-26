@@ -34,6 +34,7 @@ require_once __DIR__ . '/libs/PayloadTrait.php';
 require_once __DIR__ . '/libs/PayloadVariablesTrait.php';
 require_once __DIR__ . '/libs/FormTrait.php';
 require_once __DIR__ . '/libs/ActionTrait.php';
+require_once __DIR__ . '/libs/UpdateTrait.php';
 
 class UniversalDeviceTile extends IPSModule
 {
@@ -44,6 +45,7 @@ class UniversalDeviceTile extends IPSModule
     use \UDT\PayloadVariablesTrait;
     use \UDT\FormTrait;
     use \UDT\ActionTrait;
+    use \UDT\UpdateTrait;
 
     // Variablen-Zugriff und Status-Variable-ID
     
@@ -116,7 +118,6 @@ class UniversalDeviceTile extends IPSModule
         $this->SetVisualizationType(1);
 
         $this->RegisterAttributeString('HookToken', '');
-        $this->RegisterAttributeString('LastVarValues', '{}');
         
         // Lade das Icon-Mapping
         $this->LoadIconMapping();
@@ -185,9 +186,6 @@ class UniversalDeviceTile extends IPSModule
         if (!$this->IsKernelReady()) {
             return;
         }
-
-        // Cache zurücksetzen für frischen Zustand nach Neustart
-        $this->WriteAttributeString('LastVarValues', '{}');
 
         // Stelle sicher, dass das Icon-Mapping geladen ist
         $this->LoadIconMapping();
@@ -321,55 +319,10 @@ class UniversalDeviceTile extends IPSModule
             return;
         }
 
-        // Volles Update-Payload höchstens einmal pro MessageSink-Lauf bauen
-        // (Status-Zweig und Variablenliste können beide zutreffen, die Werte
-        // ändern sich dazwischen nicht).
-        $fullMessage = null;
-
-        // Status-Variable: minimalen Status-Payload senden.
-        // Achtung: bewusst kein return — die Status-Variable kann zusätzlich
-        // in der Variablenliste konfiguriert sein (Dedup verhindert Doppel-Updates).
-        $statusId = $this->ReadPropertyInteger('Status');
-        if ($Message === VM_UPDATE && $statusId > 0 && $SenderID === $statusId
-            && $this->hasValueChangedAndRemember($SenderID)) {
-            $fullMessage = $this->GetFullUpdateMessage();
-            $fullArray = json_decode($fullMessage, true);
-            $minimal = $this->buildMinimalStatusUpdate($fullArray);
-            if (!empty($minimal)) {
-                $this->UpdateVisualizationValue(json_encode($minimal));
-                // WICHTIG: Variablen neu schicken, damit progressbarActive/Inaktiv sofort wirkt
-                if (isset($fullArray['variables']) && is_array($fullArray['variables'])) {
-                    $this->UpdateVisualizationValue(json_encode(['variables' => $fullArray['variables']]));
-                }
-            } else {
-                // Fallback: vollständige Nachricht
-                $this->UpdateVisualizationValue($fullMessage);
-            }
-        }
-
-        // Dynamische Verarbeitung der konfigurierten Variablen (Haupt- und SecondVariable)
+        // Wertänderung: nur die betroffenen Zeilen (und bei der Statusvariable der Statusteil)
         if ($Message === VM_UPDATE) {
-            $variablesList = json_decode($this->ReadPropertyString('VariablesList'), true);
-            if (is_array($variablesList)) {
-                foreach ($variablesList as $variable) {
-                    $isMain = isset($variable['Variable']) && $SenderID === $variable['Variable'];
-                    $isSecond = !$isMain && isset($variable['SecondVariable']) && $SenderID === $variable['SecondVariable'];
-                    if (!$isMain && !$isSecond) {
-                        continue;
-                    }
-                    if (!$this->hasValueChangedAndRemember($SenderID)) {
-                        continue;
-                    }
-                    if ($fullMessage === null) {
-                        $fullMessage = $this->GetFullUpdateMessage();
-                    }
-                    $fullArray = json_decode($fullMessage, true);
-                    $minimal = $isMain
-                        ? $this->buildMinimalVarUpdateForVariable($fullArray, $SenderID)
-                        : $this->buildMinimalVarUpdateForSecondVariable($fullArray, $SenderID);
-                    $this->sendSplitMinimalUpdate($minimal, $fullMessage);
-                }
-            }
+            $this->HandleVariableUpdate((int)$SenderID, is_array($Data) ? $Data : []);
+            return;
         }
 
         // Medien-Änderungen (DefaultImage, Custom Images aus Assoziationen, Hintergrundbild)

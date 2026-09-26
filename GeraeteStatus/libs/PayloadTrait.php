@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace UDT;
 
 /**
- * Aufbau des Visualisierungs-Payloads (GetFullUpdateMessage) sowie der
- * Minimal-Updates und des Wertänderungs-Caches für MessageSink.
+ * Aufbau des vollständigen Visualisierungs-Payloads (GetFullUpdateMessage): Statusteil,
+ * Zeilen und Kachelteil.
  */
 trait PayloadTrait
 {
@@ -26,6 +26,7 @@ trait PayloadTrait
         $this->appendStatusPayload($result);
         $this->appendVariablesPayload($result);
         $this->appendTilePayload($result);
+        $this->RememberSentRows($result['variables'] ?? []);
 
         return json_encode($result);
     }
@@ -247,137 +248,6 @@ trait PayloadTrait
             $result['groupNames'] = $groupNames;
         } catch (\Throwable $e) {
             $this->LogCaughtThrowable(__FUNCTION__ . ':GetAllGroupNames', $e);
-        }
-    }
-
-    // === Minimal-Update Builder: Status ===
-    private function buildMinimalStatusUpdate(array $fullPayload): array
-    {
-        if (!is_array($fullPayload)) return [];
-        $keys = [
-            'status',
-            'statusValue',
-            'statusAlignment',
-            'statusLabel',
-            'statusShowIcon',
-            'statusIcon',
-            'statusShowLabel',
-            'statusShowValue',
-            'statusFontSize',
-            'statusBildauswahl',
-            'statusImageUrl',
-            'statusColor',
-            'isStatusColorTransparent',
-            'statusIconColor',
-            'isStatusIconColorTransparent',
-            'hideImageColumn',
-            'statusHidden'
-        ];
-        $minimal = [];
-        foreach ($keys as $k) {
-            if (array_key_exists($k, $fullPayload)) {
-                $minimal[$k] = $fullPayload[$k];
-            }
-        }
-        return $minimal;
-    }
-
-    // === Minimal-Update Builder: var_<index> für Haupt-Variable ===
-    private function buildMinimalVarUpdateForVariable(array $fullPayload, int $changedVariableId): array
-    {
-        if (!isset($fullPayload['variables']) || !is_array($fullPayload['variables'])) {
-            return [];
-        }
-        foreach ($fullPayload['variables'] as $i => $var) {
-            $vid = $var['variableId'] ?? ($var['id'] ?? 0);
-            if ($vid === $changedVariableId) {
-                $key = 'var_' . $i;
-                $payload = [];
-                // Rohwert und formatierter Wert bereitstellen
-                if (array_key_exists('rawValue', $var)) {
-                    $payload[$key . '_value'] = $var['rawValue'];
-                }
-                $payload[$key] = $var['formattedValue'] ?? '';
-                // NEU: Icon der Hauptvariable mitschicken
-                if (isset($var['icon'])) {
-                    $payload[$key . '_icon'] = $var['icon'];
-                }
-                return $payload;
-            }
-        }
-        return [];
-    }
-
-    // === Minimal-Update Builder: var_<index> für zugehörige Haupt-Variable anhand SecondVariable-ID ===
-    private function buildMinimalVarUpdateForSecondVariable(array $fullPayload, int $secondVariableId): array
-    {
-        if (!isset($fullPayload['variables']) || !is_array($fullPayload['variables'])) {
-            return [];
-        }
-        foreach ($fullPayload['variables'] as $i => $var) {
-            if (isset($var['secondVariable']) && is_array($var['secondVariable'])) {
-                $sid = $var['secondVariable']['id'] ?? 0;
-                if ($sid === $secondVariableId) {
-                    $key = 'var_' . $i;
-                    $payload = [];
-                    if (array_key_exists('rawValue', $var)) {
-                        $payload[$key . '_value'] = $var['rawValue'];
-                    }
-                    $payload[$key] = $var['formattedValue'] ?? '';
-                    // NEU: Werte und Icon der SecondVariable mitschicken
-                    if (array_key_exists('rawValue', $var['secondVariable'])) {
-                        $payload[$key . '_second_value'] = $var['secondVariable']['rawValue'];
-                    }
-                    if (array_key_exists('formattedValue', $var['secondVariable'])) {
-                        $payload[$key . '_second'] = $var['secondVariable']['formattedValue'];
-                    }
-                    if (isset($var['secondVariable']['icon'])) {
-                        $payload[$key . '_second_icon'] = $var['secondVariable']['icon'];
-                    }
-                    return $payload;
-                }
-            }
-        }
-        return [];
-    }
-
-    /**
-     * Prüft anhand des LastVarValues-Caches, ob sich der Wert der Variable geändert hat,
-     * und merkt sich den neuen Wert. Liefert false bei unverändertem Wert.
-     */
-    private function hasValueChangedAndRemember(int $senderId): bool
-    {
-        $last = json_decode($this->ReadAttributeString('LastVarValues'), true);
-        if (!is_array($last)) { $last = []; }
-        $cur = GetValue($senderId);
-        $k = strval($senderId);
-        if (array_key_exists($k, $last) && $last[$k] === $cur) {
-            return false;
-        }
-        $last[$k] = $cur;
-        $this->WriteAttributeString('LastVarValues', json_encode($last));
-        return true;
-    }
-
-    /**
-     * Sendet ein Minimal-Update in zwei Wellen (erst formatierte Werte, dann _value-Rohwerte).
-     * Fällt bei leerem Minimal-Update auf die vollständige Nachricht zurück.
-     */
-    private function sendSplitMinimalUpdate(array $minimal, string $fullMessageJson): void
-    {
-        if (empty($minimal)) {
-            $this->UpdateVisualizationValue($fullMessageJson);
-            return;
-        }
-        foreach ($minimal as $k => $v) {
-            if (substr($k, -6) !== '_value') {
-                $this->UpdateVisualizationValue(json_encode([$k => $v]));
-            }
-        }
-        foreach ($minimal as $k => $v) {
-            if (substr($k, -6) === '_value') {
-                $this->UpdateVisualizationValue(json_encode([$k => $v]));
-            }
         }
     }
 
