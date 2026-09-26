@@ -146,7 +146,7 @@ trait PayloadVariablesTrait
                         'displayType' => $variable['DisplayType'] ?? 'text',
                         'variableType' => $variableInfo['VariableType'], // Für Button-Validierung
                         'group' => $variable['Group'] ?? 'keine Gruppe', // Group-Information für Frontend-Gruppierung
-                        'showIcon' => $variable['ShowIcon'],
+                        'showIcon' => $variable['ShowIcon'] ?? true, // Vorgabe wie beim Anlegen im Formular
                         'showLabel' => $variable['ShowLabel'] ?? true,
                         'showValue' => $variable['ShowValue'] ?? true,
                         'fontSize' => $variable['FontSize'] ?? 12,
