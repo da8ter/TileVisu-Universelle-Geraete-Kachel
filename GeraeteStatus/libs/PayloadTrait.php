@@ -212,33 +212,16 @@ trait PayloadTrait
         $result['elementSpacing'] = $this->ReadPropertyInteger('ElementSpacing');
         
  
-            // Hintergrundbild verarbeiten
+        // Hintergrund: eigenes Bild oder Standardhintergrund, beides über den Bild-Hook statt als eingebettete
+        // Bytes; '' = kein Hintergrund, damit eine offene Kachel ein entferntes Bild auch entfernt
         $imageID = $this->ReadPropertyInteger('bgImage');
-        if (IPS_MediaExists($imageID)) {
-            $image = IPS_GetMedia($imageID);
-            if ($image['MediaType'] === MEDIATYPE_IMAGE) {
-                $imageFile = explode('.', $image['MediaFile']);
-                // Ermittle den Anfang der src basierend auf dem Dateitypen
-                $imageContent = \UDT\Helpers::mimePrefixFromExtension((string)end($imageFile));
-
-                // Nur fortfahren, falls Inhalt gesetzt wurde. Ansonsten ist das Bild kein unterstützter Dateityp
-                if ($imageContent) {
-                    $imageContent .= IPS_GetMediaContent($imageID);
-                    $result['image1'] = $imageContent;
-                    $result['image1Url'] = $this->BuildImageHookUrl($imageID);
-                }
-            }
+        $result['image1Url'] = '';
+        if ($imageID > 0 && IPS_MediaExists($imageID) && IPS_GetMedia($imageID)['MediaType'] === MEDIATYPE_IMAGE) {
+            $result['image1Url'] = $this->BuildImageHookUrl($imageID);
+        } elseif ($this->ReadPropertyBoolean('BG_Off')) {
+            $result['image1Url'] = $this->BuildAssetHookUrl('kachelhintergrund1');
         }
-        else{
-            $imageContent = 'data:image/png;base64,';
 
-            $imageContent .= base64_encode(file_get_contents(__DIR__ . '/../../imgs/kachelhintergrund1.png'));
-
-            if ($this->ReadPropertyBoolean('BG_Off')) {
-                $result['image1'] = $imageContent;
-            }
-        }
-        
         // Füge Instance-ID für RequestAction-Aufrufe hinzu
         $result['instanceid'] = $this->InstanceID;
         

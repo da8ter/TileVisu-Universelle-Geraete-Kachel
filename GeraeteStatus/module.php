@@ -344,7 +344,6 @@ class UniversalDeviceTile extends IPSModule
     {
         // Füge ein Skript hinzu, um beim Laden, analog zu Änderungen bei Laufzeit, die Werte zu setzen
         $initialHandling = '<script>handleMessage(' . $this->GetFullUpdateMessage() . ')</script>';
-        $bildauswahl = $this->ReadPropertyInteger('Bildauswahl');
 
 
 
@@ -356,26 +355,6 @@ class UniversalDeviceTile extends IPSModule
         // Dynamische Asset-Generierung basierend auf aktueller Konfiguration
         foreach ($generatedAssets as $assetName => $assetData) {
             $assets .= 'window.assets.' . $assetName . ' = "' . $assetData . '";' . PHP_EOL;
-        }
-        
-        // Fallback-Assets basierend auf bildauswahl für Backward-Kompatibilität
-        if($bildauswahl == '0') {
-            // Waschmaschine: Stelle sicher, dass WM-Assets verfügbar sind
-            if (!isset($generatedAssets['img_wm_an'])) {
-                $assets .= 'window.assets.img_wm_an = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_an.webp')) . '";' . PHP_EOL;
-            }
-            if (!isset($generatedAssets['img_wm_aus'])) {
-                $assets .= 'window.assets.img_wm_aus = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/wm_aus.webp')) . '";' . PHP_EOL;
-            }
-        }
-        elseif($bildauswahl == '1') {
-            // Trockner: Korrekte Asset-Namen verwenden!
-            if (!isset($generatedAssets['img_dryer_on'])) {
-                $assets .= 'window.assets.img_dryer_on = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_an.webp')) . '";' . PHP_EOL;
-            }
-            if (!isset($generatedAssets['img_dryer_off'])) {
-                $assets .= 'window.assets.img_dryer_off = "data:image/webp;base64,' . base64_encode(file_get_contents(__DIR__ . '/assets/trockner_aus.webp')) . '";' . PHP_EOL;
-            }
         }
         
         // Script-Tag schließen für das vereinheitlichte Asset-System
