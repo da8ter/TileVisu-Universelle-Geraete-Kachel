@@ -1778,6 +1778,10 @@
                         renderStatus(decodedData);
                         break;
                     case 'variables':
+                        // Zeilen-Schlüssel = Index in der Variablenliste; ältere Payloads ohne Schlüssel nach Position
+                        if (Array.isArray(value)) {
+                            value.forEach((row, i) => { if (row && typeof row === 'object' && row.key === undefined) row.key = i; });
+                        }
                         needsRerender = applyVariablesUpdate(value);
                         break;
                     case 'progressbarconfig':
@@ -3950,7 +3954,7 @@
             }
                 
             // Add data-variable-id to outer wrapper for minimal updates (text/button/image)
-            content += `<div class="${cssClasses}" style="${wrapperStyle}" data-variable-id="${esc(variable.id)}">`;
+            content += `<div class="${cssClasses}" style="${wrapperStyle}" data-variable-id="${esc(variable.id)}" data-row-key="${esc(variable.key)}">`;
 
                 // Wert je nach Darstellungstyp hinzufügen
                 if (variable.displayType === 'progress') {

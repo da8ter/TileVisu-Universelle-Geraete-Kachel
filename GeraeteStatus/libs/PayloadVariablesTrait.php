@@ -47,26 +47,25 @@ trait PayloadVariablesTrait
     }
 
     /**
-     * Eine Zeile der Variablenliste als Payload-Eintrag, null wenn sie nicht darstellbar ist.
-     * $key ist ihr Index in der Variablenliste.
+     * Eine Zeile der Variablenliste als Payload-Eintrag, null wenn sie nicht darstellbar ist. $key ist
+     * ihr Index in der Variablenliste und steht als Zeilen-Schlüssel vorn im Eintrag (nicht darstellbare
+     * Zeilen verschieben die Schlüssel der übrigen nicht).
      */
     private function buildRow(int $key, array $variable, bool $progressbarActive): ?array
     {
         try {
-            if (isset($variable['Variable']) && $variable['Variable'] > 0 && IPS_VariableExists($variable['Variable'])) {
-                return $this->buildVariableRow($variable, $progressbarActive);
-            }
+            $row = null;
             $displayType = $variable['DisplayType'] ?? 'text';
-            if ($displayType === 'image') {
-                return $this->buildImageRow($key, $variable);
+            if (isset($variable['Variable']) && $variable['Variable'] > 0 && IPS_VariableExists($variable['Variable'])) {
+                $row = $this->buildVariableRow($variable, $progressbarActive);
+            } elseif ($displayType === 'image') {
+                $row = $this->buildImageRow($key, $variable);
+            } elseif ($displayType === 'button' && intval($variable['ScriptID'] ?? 0) > 0) {
+                $row = $this->buildScriptRow($variable);
+            } elseif ($displayType === 'button' && intval($variable['OpenObjectId'] ?? 0) > 1) {
+                $row = $this->buildObjectRow($variable);
             }
-            if ($displayType === 'button' && intval($variable['ScriptID'] ?? 0) > 0) {
-                return $this->buildScriptRow($variable);
-            }
-            if ($displayType === 'button' && intval($variable['OpenObjectId'] ?? 0) > 1) {
-                return $this->buildObjectRow($variable);
-            }
-            return null;
+            return $row === null ? null : ['key' => $key] + $row;
         } catch (\Exception $e) {
             // Zeile auslassen statt die ganze Kachel abzubrechen
             return null;
