@@ -1032,154 +1032,34 @@
             return `fa-fw fa-kit fak fa-${baseName}`;
         }
         
-        // Globaler Spin-State pro Button-Ident (nur Script-Buttons)
-        state._scriptButtonSpinUntil = state._scriptButtonSpinUntil || {};
-        
-        // === Button-Icon Spin Helper ===
-        function startButtonIconSpin(buttonEl) {
-            if (!buttonEl) return;
-            // Entferne FA-Kommentare (<!-- i ... -->), die i2svg hinterlässt
-            try {
-                const childNodes = Array.from(buttonEl.childNodes);
-                for (const n of childNodes) {
-                    if (n.nodeType === 8) { // Kommentar
-                        buttonEl.removeChild(n);
-                    }
+        // Script-Buttons drehen ihr Icon 5 s lang. Der Zustand hängt am Zeilen-Schlüssel und übersteht das
+        // Ersetzen der Zeile (renderButtonContent liest ihn); danach wird die Zeile neu gerendert.
+        state._scriptButtonSpinUntil = {};
+
+        function startRowSpin(key) {
+            state._scriptButtonSpinUntil[key] = Date.now() + 5000;
+            replaceRow(key);
+            setTimeout(() => {
+                if ((state._scriptButtonSpinUntil[key] || 0) <= Date.now()) {
+                    delete state._scriptButtonSpinUntil[key];
+                    replaceRow(key);
                 }
-            } catch (_) {}
-            // Script-Buttons während des Spins optisch aktiv setzen
-            if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
-                try {
-                    // Entferne inaktiv-Status für die Spin-Dauer
-                    if (buttonEl.classList) {
-                        buttonEl.classList.remove('inactive');
-                        buttonEl.classList.add('active');
-                    }
-                } catch (_) {}
-            }
-            // Ersten vorhandenen Icon-Knoten (svg oder i) ermitteln
-            let icon = buttonEl.querySelector('i[class*="fa-"], svg[class*="fa-"]');
-            if (icon) {
-                // Ursprüngliches Icon-HTML sichern und Icon-Knoten entfernen
-                if (!buttonEl.dataset.originalIconHtml) {
-                    try { buttonEl.dataset.originalIconHtml = icon.outerHTML; } catch (_) {}
-                }
-                try { icon.remove(); } catch (_) {}
-            }
-            // Neues Spinner-Icon einfügen; verwende FA "rotate" als Glyph
-            const temp = document.createElement('i');
-            const tempBase = prepareIconForDisplay('rotate') || 'fa-fw fa-kit fak fa-rotate';
-            temp.className = `${tempBase} fa-spin`;
-            temp.setAttribute('data-temp-spinner', '1');
-            temp.style.marginRight = '6px';
-            try { buttonEl.insertBefore(temp, buttonEl.firstChild); } catch (_) { buttonEl.appendChild(temp); }
-            // Sofortige Konvertierung von <i> zu <svg>, falls FA Kit verfügbar ist
-            try {
-                if (window.FontAwesome && window.FontAwesome.dom && typeof window.FontAwesome.dom.i2svg === 'function') {
-                    window.FontAwesome.dom.i2svg({ node: temp, observeMutations: false });
-                }
-            } catch (_) {}
+            }, 5200);
         }
 
-        function stopButtonIconSpin(buttonEl) {
-            if (!buttonEl) return;
-            // Entferne Spinner (konvertiert evtl. zu <svg>) – identifiziere über fa-spin
-            try {
-                const spinIcons = buttonEl.querySelectorAll('svg.fa-spin, i.fa-spin');
-                spinIcons.forEach(node => node.remove());
-            } catch (_) {}
-            // Entferne evtl. verbliebene FA-Kommentar-Knoten
-            try {
-                const childNodes = Array.from(buttonEl.childNodes);
-                for (const n of childNodes) {
-                    if (n.nodeType === 8) {
-                        buttonEl.removeChild(n);
-                    }
-                }
-            } catch (_) {}
-            // Script-Buttons sollen optisch IMMER aktiv bleiben
-            if (buttonEl.dataset && buttonEl.dataset.scriptButton === '1') {
-                try {
-                    if (buttonEl.classList) {
-                        buttonEl.classList.remove('inactive');
-                        buttonEl.classList.add('active');
-                    }
-                } catch (_) {}
+        // Klick auf einen Button der Zeile $key: Objekt öffnen oder requestAction mit Zeilen-Schlüssel und Wunschwert
+        function handleButtonClick(buttonEl, key, value) {
+            const openObjectId = parseInt(buttonEl.dataset.openObjectId || '0', 10);
+            if (openObjectId > 1 && typeof openObject === 'function') {
+                openObject(openObjectId);
+                return;
             }
-            // Ursprüngliches Icon (falls gesichert) wiederherstellen
-            try {
-                const html = buttonEl.dataset.originalIconHtml;
-                if (html && typeof html === 'string' && html.length > 0) {
-                    const wrapper = document.createElement('div');
-                    wrapper.innerHTML = html;
-                    const restored = wrapper.firstElementChild;
-                    if (restored) {
-                        restored.style.marginRight = restored.style.marginRight || '6px';
-                        buttonEl.insertBefore(restored, buttonEl.firstChild);
-                        // Falls es ein <i> war, direkt konvertieren
-                        try {
-                            if (restored.tagName.toLowerCase() === 'i' && window.FontAwesome && window.FontAwesome.dom && typeof window.FontAwesome.dom.i2svg === 'function') {
-                                window.FontAwesome.dom.i2svg({ node: restored, observeMutations: false });
-                            }
-                        } catch (_) {}
-                    }
-                }
-                delete buttonEl.dataset.originalIconHtml;
-            } catch (_) {}
-        }
-
-        function handleButtonClick(buttonEl, ident, value) {
-            try {
-                const openObjectIdAttr = buttonEl && buttonEl.dataset ? buttonEl.dataset.openObjectId : null;
-                const openObjectId = openObjectIdAttr ? parseInt(openObjectIdAttr, 10) : 0;
-                if (openObjectId > 1 && typeof openObject === 'function') {
-                    openObject(openObjectId);
-                    return;
-                }
-            } catch (_) {}
-
-            const shouldSpin = (typeof ident === 'string' && ident.indexOf('script_') === 0);
-            if (shouldSpin) {
-                try {
-                    state._scriptButtonSpinUntil = state._scriptButtonSpinUntil || {};
-                    const spinUntil = Date.now() + 5000;
-                    state._scriptButtonSpinUntil[ident] = spinUntil;
-                    startButtonIconSpin(buttonEl);
-                    setTimeout(() => {
-                        try {
-                            if (!state._scriptButtonSpinUntil) {
-                                stopButtonIconSpin(buttonEl);
-                                return;
-                            }
-                            const current = state._scriptButtonSpinUntil[ident];
-                            if (!current || current <= Date.now()) {
-                                delete state._scriptButtonSpinUntil[ident];
-                                stopButtonIconSpin(buttonEl);
-                            }
-                        } catch (_) {}
-                    }, 5200);
-                } catch (_) {}
+            if (buttonEl.dataset.scriptButton === '1') {
+                startRowSpin(key);
             }
-            try {
-                if (typeof requestAction === 'function') {
-                    requestAction(ident, value);
-                }
-                // Optimistic UI: unmittelbar den Button-Status updaten
-                try {
-                    if (!shouldSpin) {
-                        // Kein Optimistic-Update: Anzeige erst nach Backend-Update ändern
-                    }
-                } catch (_) {}
-            } catch (_) {
+            if (typeof requestAction === 'function') {
+                requestAction('row_' + key, value);
             }
-
-            // Nach Text-Änderungen Kollisionen neu prüfen und Marker ggf. wieder einblenden
-            try {
-                const progressContainer = progressTextContainer.closest('.progress-container');
-                if (progressContainer) {
-                    updateTargetMarkerDisplay(progressContainer, variable);
-                }
-            } catch (_) {}
         }
         
         // Hilfsfunktion zur Bestimmung der Textfarbe
@@ -2331,7 +2211,7 @@
                 if (dragValue !== null && typeof requestAction === 'function') {
                     // Dataset aktualisieren, damit +/- den neuen Wert als Basis nutzt
                     try { sc.setAttribute('data-current-value', String(dragValue)); } catch (_) {}
-                    requestAction(id, dragValue);
+                    requestAction('row_' + rowKey, dragValue);
                     setSliderPending(rowKey, dragValue);
                 } else {
                     replaceRow(rowKey); // Updates während des Ziehens nachholen
@@ -2383,7 +2263,7 @@
                     updateSliderUI(sc, valueToPercent(next), next);
                 } catch (_) {}
                 if (typeof requestAction === 'function') {
-                    requestAction(id, next);
+                    requestAction('row_' + rowKey, next);
                     setSliderPending(rowKey, next);
                 }
             };
@@ -3536,7 +3416,8 @@
                         
                         // Erweiterte Bool-Wert-Erkennung
                         const isScriptButton = (typeof variable.id === 'string' && variable.id.indexOf('script_') === 0);
-                        const spinActive = (isScriptButton && state._scriptButtonSpinUntil && state._scriptButtonSpinUntil[variable.id] && Date.now() < state._scriptButtonSpinUntil[variable.id]);
+                        const spinUntil = state._scriptButtonSpinUntil[String(variable.key)] || 0;
+                        const spinActive = isScriptButton && Date.now() < spinUntil;
                         // Script-Buttons sollen optisch immer aktiv sein
                         const isActive = isScriptButton ? true : (variable.rawValue === true || variable.rawValue === 1 || variable.rawValue === '1' || variable.rawValue === 'true');
                         // Verwende den tatsächlichen Boolean-Wert für Association-Matching (nicht Integer-Konvertierung!)
@@ -3648,7 +3529,7 @@
                         content += `
                             <div class="variable-button-container" style="${buttonContainerJustify}">
                                 <div class="variable-button ${isActive ? '' : 'inactive'} ${isIconOnly ? 'icon-only' : ''}" role="button" tabindex="0"
-                                        data-request-value="1" 
+                                        data-request-value="${esc(JSON.stringify(isScriptButton ? 1 : !isActive))}" 
                                         data-variable-id="${esc(variable.id)}"
                                         data-script-button="${isScriptButton ? '1' : '0'}"
                                         data-open-object-id="${(variable.openObjectId && variable.openObjectId > 1) ? variable.openObjectId : 0}"
@@ -4187,13 +4068,17 @@
             if (!button || !button.closest('#variables-container')) {
                 return;
             }
+            const item = button.closest('.variable-item');
+            const key = item ? item.getAttribute('data-row-key') : null;
             let value;
             try {
                 value = JSON.parse(button.dataset.requestValue);
             } catch (_) {
                 return;
             }
-            handleButtonClick(button, button.dataset.variableId, value);
+            if (key !== null && key !== '') {
+                handleButtonClick(button, key, value);
+            }
         });
 
         // Tastatur: Enter und Leertaste auf einem fokussierten Button (role="button") wirken wie ein Klick
