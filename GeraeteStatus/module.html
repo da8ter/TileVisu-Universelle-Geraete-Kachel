@@ -4225,6 +4225,19 @@
             handleButtonClick(button, button.dataset.variableId, value);
         });
 
+        // Tastatur: Enter und Leertaste auf einem fokussierten Button (role="button") wirken wie ein Klick
+        document.addEventListener('keydown', function (event) {
+            if ((event.key !== 'Enter' && event.key !== ' ') || event.repeat) {
+                return;
+            }
+            const button = (event.target && event.target.closest) ? event.target.closest('.variable-button[data-request-value], .variable-multi-button[data-request-value]') : null;
+            if (!button || !button.closest('#variables-container')) {
+                return;
+            }
+            event.preventDefault(); // die Leertaste scrollt sonst die Seite
+            button.click();
+        });
+
         // Globaler Vertrag: handleMessage wird vom PHP-injizierten Initial-Skript aufgerufen.
         window.handleMessage = handleMessage;
         })();
