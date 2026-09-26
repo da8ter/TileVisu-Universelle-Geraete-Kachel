@@ -1505,128 +1505,13 @@
             state.sliderPending.set(key, { intended: Number(intended), timer: timer });
         }
 
-        // Vollständiges variables-Payload; liefert true, wenn ein Full-Re-Render nötig ist
+        // Vollständiges variables-Payload (Kachel geöffnet, Konfiguration gespeichert): bei jeder Abweichung
+        // vollständig neu aufbauen, Zeilen können hinzugekommen, entfallen oder verschoben sein. Wertänderungen
+        // kommen als rows. Liefert true, wenn neu aufgebaut werden muss.
         function applyVariablesUpdate(value) {
-            // Skip processing if incoming variables payload is IDENTICAL to the previous one
             if (state.lastVariablesData && JSON.stringify(value) === JSON.stringify(state.lastVariablesData)) {
-                return false; // Nothing changed at all
+                return false;
             }
-
-            if (state.lastVariablesData && state.variableDataCache) {
-                let hasMinimalUpdates = false;
-                let hasOtherChanges = false;
-                
-
-                
-                // 🔧 FIX DATA STRUCTURE MISMATCH + DUPLICATE VARIABLE HANDLING: 
-                // Incoming value is array-indexed (0,1,2,3...) 
-                // Cache is variable-ID indexed (33670, 27157...)
-                // Same variable can appear multiple times with different displayTypes!
-                
-                const processedEntries = new Set(); // Track processed (id + displayType) combinations
-                const minimalUpdates = []; // Collect variables that can be updated minimally
-                
-                for (const arrayIndex in value) {
-                    const newVariable = value[arrayIndex];
-                    
-                    // Find matching variable in cache by variable ID, not array index
-                    const actualVariableId = newVariable?.variableId || newVariable?.id;
-                    // Find matching old variable from previous payload by same id and displayType
-                    let oldVariable = null;
-                    try {
-                        if (state.lastVariablesData && actualVariableId) {
-                            const prev = state.lastVariablesData.find(v => (v?.variableId || v?.id) === actualVariableId && (v?.displayType || 'text') === (newVariable?.displayType || 'text'));
-                            if (prev) oldVariable = prev;
-                        }
-                    } catch (_) { oldVariable = null; }
-                    
-
-                    
-                    // 🎯 Handle duplicates by display type: process each (id + displayType) separately
-                    const displayType = newVariable?.displayType || 'text';
-                    const compositeKey = `${actualVariableId}::${displayType}`;
-                    if (processedEntries.has(compositeKey)) {
-                        continue;
-                    }
-                    processedEntries.add(compositeKey);
-
-                    // Always force a full re-render when image variables are present/updated
-                    if (displayType === 'image') {
-                        hasOtherChanges = true;
-                    }
-                    
-                    if (oldVariable && newVariable && actualVariableId) {
-                        // Prüfe ob sich nur rawValue oder formattedValue geändert hat
-                        const valueChanged = newVariable.rawValue !== oldVariable.rawValue;
-                        const formattedValueChanged = newVariable.formattedValue !== oldVariable.formattedValue;
-                        
-                        if (valueChanged || formattedValueChanged) {
-                            // Check display type and determine if minimal update is possible
-                            if (displayType === 'progress' || displayType === 'button' || displayType === 'text' || displayType === 'slider') {
-                                hasMinimalUpdates = true;
-                                minimalUpdates.push({ variableId: actualVariableId, type: displayType, variable: newVariable });
-                            } else {
-                                hasOtherChanges = true;
-                            }
-                        }
-                        // Prüfe andere Eigenschaften (but be less strict to avoid false positives)
-                        else if (JSON.stringify(newVariable) !== JSON.stringify(oldVariable)) {
-
-                            
-                            // Only mark as hasOtherChanges if it's a significant change (not just object reference)
-                            const significantChange = (
-                                newVariable.displayValue !== oldVariable.displayValue ||
-                                newVariable.unit !== oldVariable.unit ||
-                                newVariable.minValue !== oldVariable.minValue ||
-                                newVariable.maxValue !== oldVariable.maxValue
-                            );
-                            
-                            if (significantChange) {
-                                hasOtherChanges = true;
-                            }
-                        }
-                    } else {
-                        hasOtherChanges = true; // Neue oder gelöschte Variable oder missing ID
-                    }
-                }
-                
-                // Wenn nur Variable-Werte geändert haben (alle Typen), skip Full-Re-Render
-                if (hasMinimalUpdates && !hasOtherChanges) {
-                    
-                    // Führe Mini-Updates für alle geänderten Variablen durch
-                    minimalUpdates.forEach((updateData) => {
-                        const { variableId, type, variable } = updateData;
-                        
-                        // Ensure cache reflects latest values for this variable before rendering
-                        try {
-                            if (!state.variableDataCache) state.variableDataCache = {};
-                            state.variableDataCache[variableId] = variable;
-                        } catch (_) {}
-
-                        switch (type) {
-                            case 'progress':
-                                updateProgressBarValue(variableId, variable.rawValue);
-                                break;
-                            case 'button':
-                                updateButtonValue(variableId, variable);
-                                break;
-                            case 'text':
-                                updateTextValue(variableId, variable);
-                                break;
-                            case 'slider':
-                                updateSliderValue(variableId, variable.rawValue);
-                                break;
-                        }
-                    });
-                    
-                    // Update cache mit korrekter Datenstruktur
-                    updateVariableCache(value);
-                    state.lastVariablesData = value;
-                    return false; // 🚀 SKIP FULL RE-RENDER!
-                }
-            }
-            
-            // Store latest variables and rebuild the ID-indexed cache for correct diffing next time
             state.lastVariablesData = value;
             updateVariableCache(value);
             return true;
