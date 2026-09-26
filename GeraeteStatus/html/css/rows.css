@@ -1,0 +1,439 @@
+        /* ===== Variablenliste & Gruppen ========================================== */
+        /* Styles für dynamische Variablen */
+        .variables-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .variable-item {
+            margin: calc(var(--element-spacing, 8px)) 0;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung aller Inhalte */
+            justify-content: flex-start; /* Horizontale Ausrichtung */
+            width: 100%;
+            min-height: 15px; /* Reduzierte Mindesthöhe für kompaktere Darstellung */
+        }
+        
+        /* Für gruppierte Variablen: Standardmäßig nur Inhaltsbreite */
+        .variable-group-item {
+            flex: 0 0 auto; /* Nur Inhaltsbreite, kein Wachstum oder Schrumpfen */
+        }
+        
+        /* Wachstum des letzten Items wird beim Rendern inline vergeben (letztes NICHT-Bild-Item) */
+        
+        /* Progress-Balken: Auch in der Mitte können sie wachsen wenn nötig */
+        .variable-group-item:has(.progress-variable) {
+            flex: 1 1 100px; /* Mindestens 100px, kann wachsen */
+        }
+        
+        /* SPEZIAL: Für group-name-above Layout (flex-direction: column) */
+        .variable-group:has(.group-name-above) .variable-group-items {
+            width: 100% !important; /* Volle Breite für showAbove Layout */
+        }
+        
+        .variable-group:has(.group-name-above) .variable-group-item:has(.progress-variable) {
+            width: 100% !important; /* Progress-Container in showAbove Layout volle Breite */
+            flex: none; /* Kein Flex-Wachstum, sondern direkte width: 100% */
+        }
+        
+        .variable-group-item .variable-item {
+            width: auto;
+            margin-bottom: 0;
+            margin-top: 0;
+        }
+        
+        /* Bild-Variablen in Gruppen: Display flex für column layout, wachsen NICHT */
+        .variable-group-item:has(.variable-inline-image) {
+            display: flex;
+            flex: 0 0 auto; /* nur Inhaltsbreite */
+            min-width: 0; /* Überlauf durch Inhalte verhindern */
+            overflow: hidden; /* Clipping innerhalb des Items */
+        }
+        /* Wachstum des letzten Items steuern wir inline beim Rendern */
+        .variable-group-item:has(.variable-inline-image) .variable-inline-image {
+            /* Breite wird durch inline-style gesetzt (imageWidth) bzw. 100% vom Item in Gruppen */
+            height: auto !important;
+            flex: 0 0 auto !important;
+            display: block; /* Entfernt inline-Grafik-Zwischenräume */
+            max-width: 100%;
+        }
+        /* Innerer Wrapper für Bild-Gruppenelemente: Inhalte (Label/Value) unter dem Bild stapeln */
+        .variable-group-item:has(.variable-inline-image) .variable-item {
+            display: flex;
+            flex-direction: column;
+            /* align-items wird durch inline-style gesetzt basierend auf alignment */
+            width: 100%; /* Fülle Item-Breite des .variable-group-item */
+            min-width: 0; /* Inhalte dürfen innerhalb des Items schrumpfen */
+        }
+        /* Label/Value an Item-Breite binden, Überlauf vermeiden */
+        /* text-align wird durch inline-style gesetzt basierend auf alignment */
+        .variable-group-item:has(.variable-inline-image) .variable-label,
+        .variable-group-item:has(.variable-inline-image) .variable-value {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .variable-group-item:has(.variable-inline-image) .variable-value {
+            flex-grow: 0;
+        }
+        
+        /* Stretch-Gruppen: variable-item braucht volle Breite */
+        .variable-group.stretch-buttons .variable-group-item .variable-item {
+            width: 100% !important;
+        }
+        
+        /* AUSNAHME: Progress-Balken brauchen volle Breite, auch in Gruppen */
+        .variable-group-item .variable-item .progress-container {
+            width: 100%;
+        }
+        /* Slider in Gruppen: volle Breite und flexibles Wachstum */
+        .variable-group-item:has(.slider-container) {
+            flex: 1 1 200px;
+            min-width: 0;
+        }
+        .variable-group-item:has(.slider-container) .variable-item {
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+        .variable-group-item .variable-item .slider-container {
+            width: 100% !important;
+        }
+        
+        /* AUSNAHME: Progress-Bar-Container brauchen volle Breite */
+        .variable-group-item .variable-progress {
+            width: 100%;
+            min-width: 100%;
+        }
+        
+        /* KRITISCH: Progress-Variablen in Gruppen müssen sichtbar sein */
+        .variable-group-item .progress-variable {
+            display: flex !important;
+            width: 100% !important;
+            flex-direction: row;
+            flex: 1 1 200px; /* Wachsen mit verfügbarem Platz, aber min 200px */
+        }
+        
+        /* SPEZIFISCHER: Progress-Container in gruppierten Variablen braucht volle Container-Breite */
+        .variable-group-item .progress-variable .progress-container {
+            width: 100% !important;
+            min-width: 100% !important;
+            flex: none !important;
+        }
+        
+        /* Sicherstelle dass Progress-Container in Gruppen korrekt angezeigt werden */
+        .variable-group-item .progress-variable .variable-progress {
+            display: flex !important;
+            width: 100% !important;
+        }
+        
+        /* Für gruppierte Variablen: Kein min-width bei Labels für kompakte Darstellung */
+        .variable-group-item .variable-label {
+            min-width: auto;
+        }
+
+        .variable-icon {
+            margin-right: 5px;
+            margin-top: calc(var(--element-spacing, 8px));
+            margin-bottom: calc(var(--element-spacing, 8px));
+            display: inline-block;
+            vertical-align: baseline;
+            flex-shrink: 0;
+        }
+
+        .variable-label {
+            font-weight: bold;
+            min-width: 0px;  /* Feste Breite für Labels */
+            flex-shrink: 0;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Labels */
+            margin: calc(var(--element-spacing, 8px)) 0; /* Einheitlicher Abstand wie bei variable-text */
+        }
+
+        .variable-value {
+            flex-grow: 1;
+            text-align: left;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Values */
+        }
+
+        img.variable-inline-image {
+            margin-top: 5px;
+            margin-bottom: 5px;
+        }
+
+        /* Fortschrittsbalken-Styles - verwende zentrale Konfiguration */
+        /* ===== Fortschrittsbalken & Target-Marker ================================ */
+        .progress-container {
+            margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            margin-top: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            width: 100%;
+            background-color: var(--progress-bar-bg-color, rgba(135, 135, 135, 0.3));
+            border-radius: var(--progress-bar-border-radius, 10px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: var(--progress-bar-border-radius, 10px) 0 0 var(--progress-bar-border-radius, 10px);
+            transition: width 3s ease-in-out;
+            background: linear-gradient(to right, var(--progress-color1), var(--progress-color2));
+            /* Prefer OKLCH interpolation where supported for smoother, perceptually uniform gradients */
+            background: linear-gradient(to right in oklch, var(--progress-color1), var(--progress-color2));
+            min-height: var(--progress-bar-height, 20px);
+        }
+
+        /* ===== Schieberegler ===================================================== */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+        }
+        .slider-track {
+            position: relative;
+            flex: 1 1 auto;
+            height: var(--slider-height, 5px);
+            background: var(--progress-bar-bg-color, rgba(135, 135, 135, 0.25));
+            border-radius: var(--slider-radius, 9999px);
+            overflow: visible; /* allow thumb to protrude so it's fully circular */
+            touch-action: none;
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 20%, transparent);
+        }
+        .slider-track::after {
+            content: "";
+            position: absolute;
+            left: 0; top: 0; right: 0; bottom: 0;
+            background-image: radial-gradient(circle, var(--slider-dots-color, var(--progress-color1)) var(--slider-dot-radius, 1px), transparent var(--slider-dot-radius, 1px));
+            background-size: var(--slider-step-px, 12px) var(--slider-step-px, 12px);
+            background-position: calc(var(--slider-step-px, 12px) / 2) 50%;
+            background-repeat: repeat-x;
+            z-index: 1;
+            pointer-events: none;
+        }
+        .slider-fill {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            /* Fallback for browsers without OKLCH gradient support */
+            background: linear-gradient(to right, var(--progress-color1), var(--progress-color2));
+            /* Prefer OKLCH interpolation where supported for smoother, perceptually uniform gradients */
+            background: linear-gradient(to right in oklch, var(--progress-color1), var(--progress-color2));
+            border-radius: inherit;
+            z-index: 2;
+        }
+        .slider-thumb {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: var(--slider-thumb-size, 22px);
+            height: var(--slider-thumb-size, 22px);
+            background: var(--slider-thumb-color, var(--progress-color2));
+            border-radius: 50%;
+            aspect-ratio: 1 / 1;
+            box-sizing: content-box;
+            pointer-events: auto; /* ensure clicks on protruding half are captured */
+            touch-action: none;
+            cursor: pointer;
+            z-index: 2; /* ensure thumb sits above fill */
+        }
+        .slider-value {
+            flex: 0 0 var(--slider-value-width, 48px);
+            width: var(--slider-value-width, 48px);
+            text-align: right;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        .slider-value:empty { display: none; }
+        .slider-step-btn {
+            flex: 0 0 auto;
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: transparent;
+            color: var(--progress-color1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px; /* doubled */
+            line-height: 1;
+            padding: 0;
+            border-radius: 0;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            font-weight: 400;
+        }
+        .slider-step-btn[data-dir="-1"] { color: var(--progress-color1); }
+        .slider-step-btn[data-dir="1"] { color: var(--progress-color1); }
+        .slider-step-btn:hover { transform: scale(1.0); opacity: 1; }
+
+        .progress-text {
+            position: absolute;
+            top: 1px;
+            left: 0;
+            right: 0;
+            bottom: 0px;
+            z-index: 2;
+            display: var(--progress-bar-show-text, flex);
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 var(--progress-bar-text-padding, 12px);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        /* Target SOC marker overlay (mirrors Wallbox zielsoc marker) */
+        .progress-container .target-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: calc(var(--target-percent, -1000%) - 4px);
+            width: 8px;
+            pointer-events: none;
+            z-index: 1;
+            background: none;
+        }
+        .progress-container .soc-triangle {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 3px solid transparent;
+            border-right: 3px solid transparent;
+            opacity: 0.3;
+        }
+        .progress-container .soc-triangle-top {
+            top: 0;
+            border-bottom: 0;
+            border-top: 3px solid #000;
+        }
+        .progress-container .soc-triangle-bottom {
+            bottom: 0;
+            border-top: 0;
+            border-bottom: 3px solid #000;
+        }
+        .progress-container .target-marker-text {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            left: calc(var(--target-percent, 0%) + 5px);
+            color: inherit;
+            z-index: 2;
+            font-size: var(--balkenschriftgroesse, inherit);
+            line-height: 1em;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 5px;
+            white-space: nowrap;
+            visibility: visible;
+        }
+        .progress-container .target-marker-text.position-before-bar {
+            left: auto;
+            right: calc(100% - var(--target-percent, 0%) + 5px);
+        }
+
+        .progress-main-text {
+            flex: 1;
+            text-align: left;
+            margin-right: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .progress-second-variable {
+            flex-shrink: 0;
+            text-align: right;
+            margin-left: 8px;
+        }
+
+        /* Spezielle Ausrichtung für Icons in Progress-Balken */
+        .progress-text .variable-icon {
+            vertical-align: text-bottom;
+            align-self: center;
+            display: inline-flex;
+            align-items: center;
+            transform: translateY(-1px); /* Icon 1px höher */
+            margin-top: 0 !important; /* Überschreibe allgemeine Icon-Margins */
+            margin-bottom: 0 !important; /* Überschreibe allgemeine Icon-Margins */
+        }
+        /* Gleiche Ausrichtung auch für Marker-Text-Icons anwenden */
+        .progress-container .target-marker-text .variable-icon {
+            vertical-align: text-bottom;
+            align-self: center;
+            display: inline-flex;
+            align-items: center;
+            transform: translateY(-1px);
+            font-size: 1em;
+            width: 1em;
+            height: 1em;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            margin-right: 4px; /* kleiner Abstand vor Label */
+        }
+        .progress-container .target-marker-text svg[class*="fa-"] {
+            width: 1em;
+            height: 1em;
+        }
+        
+        /* Labels in Progress-Bars: Keine störenden Margins */
+        .progress-text .variable-label {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        .no-wrap {
+            white-space: nowrap;
+        }
+
+        /* Spezielle Styles für verschiedene Variablentypen */
+        .variable-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: calc(var(--element-spacing, 8px) ) 0;
+        }
+        
+        /* Text-Variablen: 5px mehr Top- und Bottom-Margin als andere Darstellungen */
+        .variable-text {
+            margin: calc(var(--element-spacing, 8px) ) 0;
+        }
+        
+        /* Optionale Grenzlinie unter Textvariablen */
+        .variable-item.with-border-line {
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-bottom: 0px;
+            margin-bottom: 0px;
+        }
+
+        
+        /* Linie unter Gruppen wenn showLine aktiviert ist */
+        .group-line {
+            width: 100%;
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            margin-top: 0px;
+            margin-bottom: 8px;
+        }
+        
+        /* Stretch-Modus für Gruppen-Buttons - Robuste CSS-Lösung */
+        
+        /* Container-Level: Stretch-Gruppen brauchen volle Breite */
+        .variable-group.stretch-buttons {
+            width: 100% !important;
+            display: flex !important;
+        }
+        
+        /* Items-Container: Flex-Layout mit korrektem Gap */
+        .variable-group.stretch-buttons .variable-group-items {
+            display: flex !important;
+            width: 100% !important;
+            gap: 16px !important;
+            flex-wrap: nowrap !important;
+            column-gap: 16px !important;
+            row-gap: calc(var(--element-spacing, 8px)) !important;
+            align-items: flex-start; /* Inline-Styles können Ausrichtung bei Bedarf überschreiben */
+        }
+        
