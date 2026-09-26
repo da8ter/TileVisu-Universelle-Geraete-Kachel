@@ -5,34 +5,23 @@ declare(strict_types=1);
 namespace UDT;
 
 /**
- * Bedienung aus der Kachel: requestAction-Idents auf das Ziel einer Zeile auflösen und nur dort wirken.
- * Zeilen-Schlüssel 'row_<key>' (Index in der Variablenliste) bestimmen Zeile und Darstellungsart genau;
- * übergangsweise gelten auch die Variablen-ID und 'script_<ID>' einer bedienbaren Zeile.
+ * Bedienung aus der Kachel: das Frontend sendet requestAction('row_<key>', Wunschwert); der Zeilen-
+ * Schlüssel (Index in der Variablenliste) bestimmt Zeile und Darstellungsart, gewirkt wird nur auf ihr Ziel.
  */
 trait ActionTrait
 {
     /**
-     * Ziel eines Idents als [Art, ID, Darstellungsart] mit Art 'script' oder 'variable';
-     * null, wenn er keine bedienbare Zeile dieser Kachel trifft.
+     * Ziel eines Idents als [Art, ID, Darstellungsart] mit Art 'script' oder 'variable'; null, wenn er
+     * keine bedienbare Zeile dieser Kachel trifft (fremde Variablen, Scripts, alte Idents, Text- und Bildzeilen).
      */
     private function ResolveActionTarget(string $ident): ?array
     {
-        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
-        $rows = is_array($rows) ? $rows : [];
-        if (preg_match('/^row_(0|[1-9][0-9]{0,4})$/', $ident, $m) === 1) {
-            $row = $rows[(int)$m[1]] ?? null;
-            return is_array($row) ? $this->RowActionTarget($row) : null;
-        }
-        // Übergang, bis das Frontend Zeilen-Schlüssel sendet: Regler-Werte nur rasten, wenn die Variable
-        // ausschließlich als Regler dasteht (Multi-Buttons senden Zuordnungswerte)
-        $kinds = $this->GetRequestableIdents()[$ident] ?? null;
-        if ($kinds === null) {
+        if (preg_match('/^row_(0|[1-9][0-9]{0,4})$/', $ident, $m) !== 1) {
             return null;
         }
-        if (strpos($ident, 'script_') === 0) {
-            return ['script', (int)substr($ident, 7), 'button'];
-        }
-        return ['variable', (int)$ident, ($kinds['slider'] && !$kinds['button']) ? 'slider' : 'button'];
+        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
+        $row = is_array($rows) ? ($rows[(int)$m[1]] ?? null) : null;
+        return is_array($row) ? $this->RowActionTarget($row) : null;
     }
 
     /** Bedienbares Ziel einer Zeile: Variable einer Button- oder Regler-Zeile, Script eines Script-Buttons. */
@@ -45,28 +34,6 @@ trait ActionTrait
         }
         $scriptID = (int)($row['ScriptID'] ?? 0);
         return ($displayType === 'button' && $scriptID > 0) ? ['script', $scriptID, 'button'] : null;
-    }
-
-    /**
-     * Alte Idents (Übergang): die Variable jeder Button- und Regler-Zeile, 'script_<ID>' jedes
-     * Script-Buttons; je Ident, ob er als Regler und/oder als Button in der Kachel steht.
-     */
-    private function GetRequestableIdents(): array
-    {
-        $idents = [];
-        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
-        foreach (is_array($rows) ? $rows : [] as $row) {
-            $target = is_array($row) ? $this->RowActionTarget($row) : null;
-            if ($target === null) {
-                continue;
-            }
-            [$kind, $id, $displayType] = $target;
-            $ident = $kind === 'script' ? 'script_' . $id : (string)$id;
-            $kinds = $idents[$ident] ?? ['slider' => false, 'button' => false];
-            $kinds[$displayType] = true;
-            $idents[$ident] = $kinds;
-        }
-        return $idents;
     }
 
     /** Führt die Bedienung auf dem Ziel aus: Script starten oder den Wert an die Variable geben. */
@@ -88,7 +55,13 @@ trait ActionTrait
         }
         switch (IPS_GetVariable($id)['VariableType']) {
             case VARIABLETYPE_BOOLEAN:
-                RequestAction($id, !GetValue($id));
+                // Wunschwert (der Zustand nach dem Klick), nicht umschalten: ein Doppelklick schaltet nicht zurück
+                $wish = is_bool($value) ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($wish === null) {
+                    $this->SendDebug(__FUNCTION__, 'Kein Bool-Wunschwert: ' . json_encode($value), 0);
+                    return;
+                }
+                RequestAction($id, $wish);
                 break;
             case VARIABLETYPE_INTEGER:
                 RequestAction($id, $displayType === 'slider' ? $this->NormalizeSliderValue($id, $value, true) : intval($value));
