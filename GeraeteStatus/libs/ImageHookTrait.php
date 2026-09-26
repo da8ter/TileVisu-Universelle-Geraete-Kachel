@@ -205,14 +205,31 @@ trait ImageHookTrait
             $mediaId, $size, $limit), KL_WARNING);
     }
 
+    /**
+     * Inhaltsversion eines Mediums für seine Bild-URL: neuer Inhalt ergibt eine neue URL, die offene Kachel
+     * lädt das Bild neu (MediaCRC, sonst MediaUpdated).
+     */
+    private function GetMediaVersion(int $mediaId): string
+    {
+        try {
+            $media = IPS_GetMedia($mediaId);
+        } catch (\Throwable $e) {
+            $this->LogCaughtThrowable(__FUNCTION__, $e);
+            return '0';
+        }
+        $crc = (string)($media['MediaCRC'] ?? '');
+        return $crc !== '' ? $crc : (string)(int)($media['MediaUpdated'] ?? 0);
+    }
+
     private function BuildImageHookUrl(int $mediaId): string
     {
         $base = '/hook/udtimages/' . $this->InstanceID;
         $token = $this->ReadAttributeString('HookToken');
         if ($mediaId > 0) {
-            $q = 'mid=' . (int)$mediaId;
+            $q = 'mid=' . (int)$mediaId . '&v=' . rawurlencode($this->GetMediaVersion($mediaId));
         } else {
-            $q = 'placeholder=1&ts=' . time();
+            // feste Adresse (Version = Dateistand), damit gleiche Zeilen gleich bleiben
+            $q = 'placeholder=1&v=' . (int)@filemtime(__DIR__ . '/../../imgs/transparent.webp');
         }
         if ($token !== '') {
             $q .= '&token=' . rawurlencode($token);
