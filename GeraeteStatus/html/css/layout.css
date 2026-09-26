@@ -1,0 +1,196 @@
+        /* Grundlegende Stildefinitionen für die neue dynamische Variablenliste */
+
+        /* ===== Basis & Layout-Variablen ========================================== */
+        :root {
+            --bildbreite: 40%;
+            --bildtransparenz: 1;
+            --hintergrundfarbe: rgba(255, 255, 255, 0.95);
+            --element-spacing: 8px; /* Einheitlicher vertikaler Abstand zwischen allen Elementen */
+        }
+
+        html {
+            background-color: var(--hintergrundfarbe);
+            overflow: hidden;
+        }
+
+        body:before {
+            content: '';
+            display: block;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background-repeat: no-repeat;
+            background-size: cover;
+            opacity: var(--bildtransparenz);
+            background: var(--background-image, none) center / cover no-repeat;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .visible {
+            display: block;
+        }
+
+        /* ===== Kachel-Layout (Bildspalte div1 / Inhalt div2, Bildposition) ======= */
+        .main_container {
+            width: 100%;
+            max-width: 100%;
+            display: flex;
+            flex-wrap: nowrap;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        .div1 {
+            box-sizing: border-box;
+            border-right: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-right: 10px;
+        }
+
+        .div1 img {
+            width: var(--bildbreite);
+        }
+        
+        /* CRITICAL FIX: Verhindere div1 Kollaps durch robuste CSS-Lösung */
+        .main_container .div1 {
+            /* Mindestbreite für div1 auch ohne Bild */
+            min-width: 50px !important;
+        }
+        
+        /* Transparenter Platzhalter NUR für leere Bilder - iOS FIX */
+        .main_container .div1 img:not([src]), 
+        .main_container .div1 img[src=""] {
+            /* 1x1 transparentes PNG als Hintergrundbild */
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABBJREFUeNpi+P//PwNAgAEACPwC/tuiTRYAAAAASUVORK5CYII=') !important;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            /* Mindestgröße mit höherer Priorität */
+            min-width: 40px !important;
+            min-height: 40px !important;
+            width: var(--bildbreite) !important;
+            display: block !important;
+            /* Fallback für leere src */
+            content: '' !important;
+            color: transparent !important;
+        }
+        
+        /* Normale img-Elemente: Nur Basis-Styling ohne background-image Override */
+        .main_container .div1 img {
+            width: var(--bildbreite) !important;
+            min-width: var(--bildbreite) !important;
+            max-width: var(--bildbreite) !important;
+            height: auto !important; /* Preserve aspect ratio */
+            object-fit: contain;     /* Keep image inside its box without stretching */
+            display: block;
+            box-sizing: border-box;
+        }
+
+        .div2 {
+            flex: 1;
+            box-sizing: border-box;
+            margin: 0px 0px 0px 0px;
+            border-radius: 0px;
+        }
+
+        /* Bildposition: Links (Standard) */
+        .main_container.image-left {
+            flex-direction: row;
+            gap: 10px;
+        }
+
+        /* Bei links/rechts: Bild in der linken/rechten Spalte oben ausrichten */
+        .main_container.image-left .div1,
+        .main_container.image-right .div1 {
+            display: flex;
+            align-items: flex-start; /* oben */
+        }
+
+        /* Bildposition: Rechts */
+        .main_container.image-right {
+            flex-direction: row-reverse;
+            gap: 10px;
+        }
+        
+        .main_container.image-right .div1 {
+            border-right: none;
+            border-left: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-left: 10px; 
+        }
+
+        /* Bildposition: Oben */
+        .main_container.image-top {
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .main_container.image-top .div1 {
+            width: 100% !important;
+            min-width: 100%;
+            max-width: 100%;
+            border-right: none;
+            border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            padding-right: 0;
+            padding-bottom: 20px;
+            display: flex;
+            justify-content: center; /* Standard: Zentriert */
+            align-items: center;      /* Verhindert vertikales Strecken von img */
+        }
+        
+        .main_container.image-top .div1 img {
+            width: var(--bildbreite);
+            max-width: var(--bildbreite);
+            height: auto;           /* Preserve aspect ratio */
+            object-fit: contain;    /* Avoid stretching when container grows */
+            display: block;
+        }
+
+        /* Bildposition: Unten */
+        .main_container.image-bottom {
+            flex-direction: column-reverse;
+            gap: 20px;
+        }
+        
+        .main_container.image-bottom .div1 {
+            width: 100% !important;
+            min-width: 100%;
+            max-width: 100%;
+            border-right: none;
+            border-top: 1px solid color-mix(in srgb, var(--accent-color) 50%, transparent);
+            border-bottom: none;
+            padding-right: 0;
+            padding-top: 20px;
+            display: flex;
+            justify-content: center; /* Standard: Zentriert */
+            align-items: center;      /* Verhindert vertikales Strecken von img */
+        }
+        
+        .main_container.image-bottom .div1 img {
+            width: var(--bildbreite);
+            max-width: var(--bildbreite);
+            height: auto;           /* Preserve aspect ratio */
+            object-fit: contain;    /* Avoid stretching when container grows */
+            display: block;
+        }
+        
+        .main_container.image-bottom .div2 {
+            width: 100%;
+        }
+        
+        /* Trennlinie ausblenden */
+        .main_container.hide-border-line .div1 {
+            border: none !important;
+        }
+        
+        
+
+

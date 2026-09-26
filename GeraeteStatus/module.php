@@ -35,6 +35,7 @@ require_once __DIR__ . '/libs/PayloadVariablesTrait.php';
 require_once __DIR__ . '/libs/FormTrait.php';
 require_once __DIR__ . '/libs/ActionTrait.php';
 require_once __DIR__ . '/libs/UpdateTrait.php';
+require_once __DIR__ . '/libs/TileHtmlTrait.php';
 
 class UniversalDeviceTile extends IPSModule
 {
@@ -46,6 +47,7 @@ class UniversalDeviceTile extends IPSModule
     use \UDT\FormTrait;
     use \UDT\ActionTrait;
     use \UDT\UpdateTrait;
+    use \UDT\TileHtmlTrait;
 
     // Darstellung „Legacy“: Symcon verweist damit auf das klassische Variablenprofil
     private const LEGACY_PRESENTATION_GUID = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
@@ -354,8 +356,8 @@ class UniversalDeviceTile extends IPSModule
         // Script-Tag schließen für das vereinheitlichte Asset-System
         $assets .= '</script>';
 
-        // Füge statisches HTML aus Datei hinzu
-        $module = file_get_contents(__DIR__ . '/module.html');
+        // HTML der Kachel: Gerüst module.html mit den Teilen aus html/
+        $module = $this->AssembleModuleHtml();
 
         // Gebe alles zurück.
         // Wichtig: $initialHandling nach hinten, da die Funktion handleMessage erst im HTML definiert wird

@@ -1,0 +1,289 @@
+        /* === REINE BOOL-GRUPPEN: Gleichmäßige Verteilung === */
+        
+        /* Reine Bool-Gruppen: Items gleichmäßig verteilen */
+        .variable-group.stretch-buttons:not(:has(.variable-multi-button-container)) .variable-group-item {
+            flex: 1 !important;
+            display: flex !important;
+            min-width: 0 !important;
+        }
+        
+        /* Reine Bool-Gruppen: Button-Container volle Breite */
+        .variable-group.stretch-buttons:not(:has(.variable-multi-button-container)) .variable-group-item .variable-button-container {
+            width: 100% !important;
+            display: flex !important;
+            /* Margins beibehalten für konsistente vertikale Abstände */
+        }
+
+        /* Reine Bool-Gruppen: Buttons volle Container-Breite */
+        .variable-group.stretch-buttons:not(:has(.variable-multi-button-container)) .variable-group-item .variable-button-container .variable-button {
+            width: 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        /* Fallback ohne :has() Unterstützung – immer volle Breite für Bool-Buttons in Stretch-Gruppen */
+        .variable-group.stretch-buttons .variable-group-item .variable-button-container {
+            width: 100% !important;
+            display: flex !important;
+        }
+        .variable-group.stretch-buttons .variable-group-item .variable-button-container .variable-button {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            flex: 1 1 0% !important; /* Ensure buttons fill width */
+        }
+        
+        
+        /* === GEMISCHTE GRUPPEN: Bool feste Breite, Integer restlicher Platz === */
+        
+        /* Gemischte Gruppen: Bool-Button Items feste Breite */
+        .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item:has(.variable-button-container) {
+            display: flex !important;
+        }
+        /* Gemischte Gruppen: Bool-Button Container */
+        .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item .variable-button-container {
+            display: flex !important;
+            /* Margins beibehalten für konsistente vertikale Abstände */
+            /* Keine width: 100% - Button behält seine konfigurierte Breite */
+        }
+        
+        /* Gemischte Gruppen: Bool-Buttons behalten buttonWidth */
+        .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item .variable-button-container .variable-button {
+            /* Bool-Button behält seine eingestellte Button Width - explizit keine Überschreibung der width */
+            /* width wird durch Inline-Styles aus buttonWidth gesetzt - nicht überschreiben */
+            max-width: none !important;
+        }
+        
+        /* Gemischte Gruppen: Integer/String Items nutzen restlichen Platz */
+        .variable-group.stretch-buttons:has(.variable-multi-button-container) .variable-group-item:has(.variable-multi-button-container) {
+            flex: 1 !important;
+            display: flex !important;
+            min-width: 0 !important;
+        }
+        
+        /* Multi-Button-Container für Integer/String-Variablen */
+        .variable-group.stretch-buttons .variable-group-item .variable-multi-button-container {
+            width: 100% !important;
+            display: flex !important;
+            align-items: stretch !important; /* ensure buttons fill height */
+            /* Margins beibehalten für konsistente vertikale Abstände */
+        }
+        
+        /* Multi-Buttons: Gleichmäßige Verteilung innerhalb des Containers */
+        .variable-group.stretch-buttons .variable-group-item .variable-multi-button-container .variable-multi-button {
+            /* Equal distribution across container; flex-basis:0 for Safari/WebKit */
+            flex: 1 1 0% !important;
+            min-width: 0 !important;
+            width: auto !important;
+            display: flex !important; /* avoid inline-flex + abs overlay quirks */
+            align-items: center !important;
+        }
+        
+
+        
+        /* Spezifische Regel für gruppierte Text-Variablen: Überschreibt die 0-Margin-Regel */
+        .variable-group-item .variable-item.text-variable {
+            display: inline-flex; /* Sicherstellen, dass Elemente in einer Zeile bleiben */
+            flex-direction: row;
+            margin-bottom: 0px; /* +5px mehr Abstand auch für gruppierte */
+            margin-top: 0px; /* +5px mehr Abstand auch für gruppierte */
+            white-space: nowrap; /* Icon, Label, Value in einer Zeile halten */
+            width: auto; /* Nur Inhaltsbreite einnehmen, darf schrumpfen */
+            gap: 0px; /* Abstand über Icon-Margin, identisch zu ungruppierten Texten */
+            align-items: baseline; /* Zahlen auf Basislinie zum Label */
+        }
+        .variable-group-item .variable-item.text-variable .variable-icon,
+        .variable-group-item .variable-item.text-variable .variable-label,
+        .variable-group-item .variable-item.text-variable .variable-value {
+            display: inline-flex; /* Kinder ebenfalls inline darstellen */
+            white-space: nowrap; /* Sicherheit: keine Zeilenumbrüche */
+            margin: 0; /* Keine vertikalen Margins innerhalb der Zeile */
+        }
+        .variable-group-item .variable-item.text-variable .variable-value {
+            flex: 0 0 auto; /* Wachstum verhindern */
+            min-width: 0; /* Schrumpfen zulassen */
+        }
+        /* Gleicher Icon-Abstand wie ungruppiert: nur rechts 5px, keine vertikalen Margins */
+        .variable-group-item .variable-item.text-variable .variable-icon {
+            margin-right: 5px;
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        .variable-progress {
+            width: 100%;
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Progress-Balken */
+            justify-content: center; /* Horizontale Zentrierung */
+        }
+
+        .variable-button-container {
+            margin-bottom: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            margin-top: var(--element-spacing, 8px); /* Einheitlicher vertikaler Abstand */
+            display: flex;
+            align-items: center; /* Vertikale Zentrierung für Button-Container */
+            width: 100%;
+        }
+
+        /* Button-Styles für Bool-Variablen */
+        /* ===== Schalter (Einzel- & Multi-Buttons) ================================ */
+        .variable-button {
+            display: inline-flex;
+            align-items: center;
+            height: var(--button-height, 25px);
+            padding: 0 12px;
+            border: none;
+            border-radius: var(--progress-bar-border-radius, 10px);
+            background-color: #f8f9fa;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: inherit;
+            font-weight: 500;
+            user-select: none;
+            min-width: 80px;
+            justify-content: center;
+            box-sizing: border-box;
+            position: relative; /* needed for ::after overlay */
+            overflow: hidden;  /* clip overlay to rounded corners */
+            z-index: 0; /* establish stacking context below overlay */
+            /* iOS/WebKit: ensure custom background covers full button area */
+            -webkit-appearance: none;
+            appearance: none;
+            -moz-appearance: none;
+               background-clip: padding-box;
+        }
+
+        .variable-button.icon-only,
+        .variable-multi-button.icon-only {
+            justify-content: center;
+            padding: 0;
+        }
+
+        /* Multi-Button-Container für Integer-Variablen */
+        .variable-multi-button-container {
+            display: flex;
+            gap: 1px; /* Reduzierter Abstand für Button-Gruppierung */
+            align-items: center;
+            width: 100%;
+        }
+
+        /* Einzelne Buttons in Multi-Button-Container */
+        .variable-multi-button {
+            display: inline-flex;
+            align-items: center;
+            height: var(--button-height, 25px);
+            padding: 0 8px;
+            border: none;
+            border-radius: var(--progress-bar-border-radius, 10px);
+            background-color: #f8f9fa;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: inherit;
+            font-weight: 500;
+            user-select: none;
+            min-width: 60px;
+            justify-content: center;
+            box-sizing: border-box;
+            flex: 0 0 auto; /* Verhindere automatisches Stretching, respektiere explizite Breite */
+            position: relative; /* needed for ::after overlay */
+            overflow: hidden;  /* clip overlay to rounded corners */
+            z-index: 0; /* establish stacking context below overlay */
+            /* iOS/WebKit: ensure custom background covers full button area */
+            -webkit-appearance: none;
+            appearance: none;
+            -moz-appearance: none;
+            -webkit-tap-highlight-color: transparent;
+            background-clip: padding-box;
+        }
+
+        .variable-multi-button:hover {
+            opacity: 0.8;
+        }
+
+        .variable-multi-button.active {
+            font-weight: 600;
+        }
+
+        /* Explicit inactive state overlay to force full-surface dimming on mobile/webviews */
+        .variable-button.inactive::after,
+        .variable-multi-button.inactive::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: inherit;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Button-Gruppierung: Spezielle Border-Radius für zusammenhängende Button-Gruppe */
+        .variable-multi-button.first-button {
+            border-radius: var(--progress-bar-border-radius, 10px) 0 0 var(--progress-bar-border-radius, 10px); /* Nur links rund */
+        }
+
+        .variable-multi-button.middle-button {
+            border-radius: 0; /* Keine runden Ecken */
+        }
+
+        .variable-multi-button.last-button {
+            border-radius: 0 var(--progress-bar-border-radius, 10px) var(--progress-bar-border-radius, 10px) 0; /* Nur rechts rund */
+        }
+
+        .variable-multi-button.single-button {
+            border-radius: var(--progress-bar-border-radius, 10px); /* Alle Ecken rund wenn nur ein Button */
+        }
+
+        
+        /* ===== Statusbereich & Icons ============================================= */
+        /* Status-Bereich Styles */
+        .status-container {
+            margin-bottom: var(--element-spacing, 8px);
+            padding: 0px 0;
+        }
+
+        .status-label {
+            font-weight: bold;
+            margin-right: 0px;
+        }
+
+        .status-value {
+            color: var(--status-color, #000000);
+        }
+
+        .status-icon {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+        }
+
+        .status-image {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* FontAwesome Icon Styles */
+        .fontawesome-icon-container {
+            display: flex;
+            align-items: center;
+            /* WICHTIG: Container darf nicht volle Breite einnehmen, damit .div1 justify-content wirkt */
+            flex: 0 0 auto;
+            width: auto;
+            color: var(--content-color, #000000);
+        }
+
+        .fontawesome-icon-container i[class*="fa-"],
+        .fontawesome-icon-container svg[class*="fa-"] {
+            color: inherit;
+            display: inline-block;
+            line-height: 1;
+        }
+
+        /* Icon size anpassbar basierend auf Container */
+        .div1 .fontawesome-icon-container i[class*="fa-"],
+        .div1 .fontawesome-icon-container svg[class*="fa-"] {
+            font-size: var(--bildbreite, 48px);
+            width: var(--bildbreite, 48px);
+            height: var(--bildbreite, 48px);
+        }
