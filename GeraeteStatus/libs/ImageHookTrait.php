@@ -5,27 +5,12 @@ declare(strict_types=1);
 namespace UDT;
 
 /**
- * Bildauslieferung über den WebHook /hook/udtimages/<InstanceID>:
- * Hook-Registrierung im WebHook Control, Token-geschützte Auslieferung von
- * Medienobjekten und mitgelieferten Assets sowie Asset-/URL-Generierung.
+ * Bildauslieferung über den nativen Hook /hook/udtimages/<InstanceID> (RegisterHook in Create):
+ * Token-geschützte Auslieferung konfigurierter Medienobjekte und mitgelieferter Assets sowie
+ * Asset-/URL-Generierung.
  */
 trait ImageHookTrait
 {
-    private function GetWebhookControlInstanceId(): int
-    {
-        if (!function_exists('IPS_GetInstanceListByModuleID')) {
-            return 0;
-        }
-
-        $webhookModuleId = self::WEBHOOK_CONTROL_GUID;
-        $ids = IPS_GetInstanceListByModuleID($webhookModuleId);
-        if (!is_array($ids) || count($ids) === 0) {
-            return 0;
-        }
-
-        return (int)$ids[0];
-    }
-
     // Hilfsmethode zur Asset-Generierung für Custom Images und Fallback-Assets
     private function GenerateAssets(): array {
         $assets = [];
@@ -66,88 +51,19 @@ trait ImageHookTrait
         return $assets;
     }
 
-    private function RegisterUDTImageHook(string $hookPath): void
+    /** Token der Bild-URLs: einmal erzeugt und in einem Attribut gehalten. */
+    private function EnsureHookToken(): void
     {
-        $whId = $this->GetWebhookControlInstanceId();
-        if ($whId <= 0) {
-            $this->LogMessage('WebHook Control not found. Skipping hook registration.', KL_WARNING);
+        if ($this->ReadAttributeString('HookToken') !== '') {
             return;
         }
-
-        $instToken = $this->ReadAttributeString('HookToken');
-        if ($instToken === '') {
-            try {
-                $instToken = bin2hex(random_bytes(16));
-            } catch (\Throwable $e) {
-                $instToken = substr(sha1(uniqid('', true)), 0, 32);
-                $this->LogCaughtThrowable(__FUNCTION__ . ':tokenFallback', $e);
-            }
-            $this->WriteAttributeString('HookToken', $instToken);
+        try {
+            $token = bin2hex(random_bytes(16));
+        } catch (\Throwable $e) {
+            $token = substr(sha1(uniqid('', true)), 0, 32);
+            $this->LogCaughtThrowable(__FUNCTION__ . ':tokenFallback', $e);
         }
-
-        $hooksRaw = IPS_GetProperty($whId, 'Hooks');
-        $hooks = Helpers::decodeJsonArray($hooksRaw, __FUNCTION__ . ':Hooks');
-        if (!is_array($hooks)) {
-            if (trim((string)$hooksRaw) !== '') {
-                $this->LogMessage('Invalid webhook hooks JSON. Registration skipped to avoid overwriting hooks.', KL_ERROR);
-                return;
-            }
-            $hooks = [];
-        }
-        $found = false;
-        foreach ($hooks as &$h) {
-            if (isset($h['Hook']) && $h['Hook'] === $hookPath) {
-                $h['TargetID'] = $this->InstanceID;
-                $found = true;
-                break;
-            }
-        }
-        if (!$found) {
-            $hooks[] = [
-                'Hook' => $hookPath,
-                'TargetID' => $this->InstanceID
-            ];
-        }
-
-        IPS_SetProperty($whId, 'Hooks', json_encode(array_values($hooks)));
-        IPS_ApplyChanges($whId);
-    }
-
-    private function UnregisterUDTImageHook(string $hookPath): void
-    {
-        $whId = $this->GetWebhookControlInstanceId();
-        if ($whId <= 0) {
-            return;
-        }
-
-        $hooksRaw = IPS_GetProperty($whId, 'Hooks');
-        $hooks = Helpers::decodeJsonArray($hooksRaw, __FUNCTION__ . ':Hooks');
-        if (!is_array($hooks)) {
-            return;
-        }
-
-        $changed = false;
-        $filteredHooks = [];
-        foreach ($hooks as $hook) {
-            if (!is_array($hook)) {
-                continue;
-            }
-
-            $isCurrentHook = (($hook['Hook'] ?? '') === $hookPath);
-            if ($isCurrentHook) {
-                $changed = true;
-                continue;
-            }
-
-            $filteredHooks[] = $hook;
-        }
-
-        if (!$changed) {
-            return;
-        }
-
-        IPS_SetProperty($whId, 'Hooks', json_encode(array_values($filteredHooks)));
-        IPS_ApplyChanges($whId);
+        $this->WriteAttributeString('HookToken', $token);
     }
 
     /**
@@ -248,9 +164,9 @@ trait ImageHookTrait
         return $base . '?' . $q;
     }
 
-    // Ohne Rückgabetyp: Symcon ruft Hooks über „class HookInstance extends <Modulklasse>“ auf und deklariert
-    // ProcessHookData dort bei IPSModule ohne Rückgabetyp; ein „: void“ hier macht jeden Aufruf zum Fatal.
-    protected function ProcessHookData()
+    // Symcon ruft Hooks über „class HookInstance extends <Modulklasse>“ auf; bei IPSModuleStrict mit „: void“
+    // (bei IPSModule ohne Rückgabetyp, siehe N20): der Rückgabetyp folgt der Basisklasse.
+    protected function ProcessHookData(): void
     {
         // Pfade relativ zum Modulordner (diese Datei liegt in libs/)
         $assetsDir = __DIR__ . '/../assets';

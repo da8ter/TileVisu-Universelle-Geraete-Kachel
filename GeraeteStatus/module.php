@@ -37,7 +37,7 @@ require_once __DIR__ . '/libs/ActionTrait.php';
 require_once __DIR__ . '/libs/UpdateTrait.php';
 require_once __DIR__ . '/libs/TileHtmlTrait.php';
 
-class UniversalDeviceTile extends IPSModule
+class UniversalDeviceTile extends IPSModuleStrict
 {
     use \UDT\ImageHookTrait;
     use \UDT\IconTrait;
@@ -51,12 +51,11 @@ class UniversalDeviceTile extends IPSModule
 
     // Darstellung „Legacy“: Symcon verweist damit auf das klassische Variablenprofil
     private const LEGACY_PRESENTATION_GUID = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
-    private const WEBHOOK_CONTROL_GUID = '{015A6EB8-D6E5-4B93-B496-0D3F77AE9FE1}';
 
     // Variablen-Zugriff und Status-Variable-ID
     
     
-    public function Create()
+    public function Create(): void
     {
         // Nie diese Zeile löschen!
         parent::Create();
@@ -121,6 +120,9 @@ class UniversalDeviceTile extends IPSModule
         $this->SetVisualizationType(1);
 
         $this->RegisterAttributeString('HookToken', '');
+
+        // Bild-Hook nativ (Symcon 8.1+): flüchtig, deshalb bei jedem Create, also jedem Systemstart
+        $this->RegisterHook('udtimages/' . $this->InstanceID);
         
         // Lade das Icon-Mapping
         $this->LoadIconMapping();
@@ -133,7 +135,7 @@ class UniversalDeviceTile extends IPSModule
      * Gibt die Konfigurationsform zurück
      * @return string JSON-String der Konfigurationsform
      */
-    public function GetConfigurationForm()
+    public function GetConfigurationForm(): string
     {
         $groupNames = $this->GetAllGroupNames();
         $formPath = __DIR__ . '/form.json';
@@ -183,7 +185,7 @@ class UniversalDeviceTile extends IPSModule
     
 
     
-    public function ApplyChanges()
+    public function ApplyChanges(): void
     {
         parent::ApplyChanges();
 
@@ -196,8 +198,8 @@ class UniversalDeviceTile extends IPSModule
         // Stelle sicher, dass das Icon-Mapping geladen ist
         $this->LoadIconMapping();
 
-        // WebHook für Bildauslieferung registrieren
-        $this->RegisterUDTImageHook('/hook/udtimages/' . $this->InstanceID);
+        // Token der Bild-URLs (der Hook selbst ist nativ, RegisterHook in Create)
+        $this->EnsureHookToken();
 
         // Dynamische Referenzen und Nachrichten für konfigurierte Variablen
         $variablesList = $this->ReadVariablesList();
@@ -234,7 +236,7 @@ class UniversalDeviceTile extends IPSModule
         // Registriere neue Referenzen
         foreach (array_unique($ids) as $id) {
             if ($id > 0) {
-                $this->RegisterReference($id);
+                $this->RegisterReference((int)$id);
             }
         }
 
@@ -255,11 +257,11 @@ class UniversalDeviceTile extends IPSModule
         // Registriere Nachrichten für konfigurierte Variablen
         foreach ($variablesList as $variable) {
             if (isset($variable['Variable']) && $variable['Variable'] > 0) {
-                $this->RegisterMessage($variable['Variable'], VM_UPDATE);
+                $this->RegisterMessage((int)$variable['Variable'], VM_UPDATE);
             }
             // Registriere auch SecondVariable falls vorhanden
             if (isset($variable['SecondVariable']) && $variable['SecondVariable'] > 0) {
-                $this->RegisterMessage($variable['SecondVariable'], VM_UPDATE);
+                $this->RegisterMessage((int)$variable['SecondVariable'], VM_UPDATE);
             }
         }
 
@@ -281,12 +283,9 @@ class UniversalDeviceTile extends IPSModule
         $this->UpdateVisualizationValue($this->EncodeTileMessage($fullUpdateMessage));
     }
 
-    public function Destroy()
+    public function Destroy(): void
     {
-        if ($this->IsKernelReady()) {
-            $this->UnregisterUDTImageHook('/hook/udtimages/' . $this->InstanceID);
-        }
-
+        // der native Hook verschwindet mit der Instanz
         parent::Destroy();
     }
 
@@ -294,7 +293,7 @@ class UniversalDeviceTile extends IPSModule
     
     
 
-    public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
+    public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
         if ($Message === IPS_KERNELSTARTED) {
             $this->ApplyChanges();
@@ -319,10 +318,11 @@ class UniversalDeviceTile extends IPSModule
      * @param string $Ident Der Identifier der Aktion
      * @param mixed $value Der Wert der Aktion
      */
-    public function RequestAction($Ident, $value) {
+    public function RequestAction(string $Ident, mixed $Value): void
+    {
         // Prüfe zuerst auf spezielle Aktionen
         if ($Ident === 'UpdateDisplayTypeFields') {
-            $this->UpdateDisplayTypeVisibility((string)$value, $this->InstanceID);
+            $this->UpdateDisplayTypeVisibility((string)$Value, $this->InstanceID);
             return;
         }
         
@@ -332,11 +332,11 @@ class UniversalDeviceTile extends IPSModule
             $this->SendDebug(__FUNCTION__, 'Abgelehnt, keine bedienbare Zeile dieser Kachel: ' . $Ident, 0);
             return;
         }
-        $this->RunActionTarget($target, $value);
+        $this->RunActionTarget($target, $Value);
     }
 
 
-    public function GetVisualizationTile()
+    public function GetVisualizationTile(): string
     {
         // Füge ein Skript hinzu, um beim Laden, analog zu Änderungen bei Laufzeit, die Werte zu setzen
         $initialHandling = '<script>handleMessage(' . $this->GetFullUpdateMessage() . ')</script>';
