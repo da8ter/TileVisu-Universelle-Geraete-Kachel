@@ -289,7 +289,7 @@ trait PresentationTrait
         $presentation = $this->resolvePresentationArray((int)$variableId, __FUNCTION__ . ':GetVariablePresentation');
         
         // Sonderfall: VARIABLE_PRESENTATION_LEGACY -> Profil verwenden, Präsentation ignorieren
-        $legacyGuid = '4153A8D4-5C33-C65F-C1F3-7B61AAF99B1C';
+        $legacyGuid = self::LEGACY_PRESENTATION_GUID;
         $isLegacy = false;
         if (isset($presentation['PRESENTATION'])) {
             $presentGuidTrim = trim((string)$presentation['PRESENTATION'], '{} ');
