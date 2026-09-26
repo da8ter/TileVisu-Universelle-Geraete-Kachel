@@ -232,7 +232,9 @@ trait ImageHookTrait
         return $base . '?' . $q;
     }
 
-    protected function ProcessHookData(): void
+    // Ohne Rückgabetyp: Symcon ruft Hooks über „class HookInstance extends <Modulklasse>“ auf und deklariert
+    // ProcessHookData dort bei IPSModule ohne Rückgabetyp; ein „: void“ hier macht jeden Aufruf zum Fatal.
+    protected function ProcessHookData()
     {
         // Pfade relativ zum Modulordner (diese Datei liegt in libs/)
         $assetsDir = __DIR__ . '/../assets';
