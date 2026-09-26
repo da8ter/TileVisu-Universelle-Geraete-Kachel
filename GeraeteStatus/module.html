@@ -1235,6 +1235,11 @@
             if (decodedData.hasOwnProperty('statusBildauswahl')) {
                 state.currentBildauswahl = decodedData.statusBildauswahl;
             }
+            // Bildspalte vor dem Rendern übernehmen: sonst rendert renderStatus mit dem alten Wert (eine offene
+            // Kachel zeigte nach dem Einblenden der Spalte weiter das alte Bild statt des neuen Icons)
+            if (decodedData.hasOwnProperty('hideImageColumn')) {
+                state.hideImageColumn = decodedData.hideImageColumn;
+            }
 
             // Build a minimal comparable snapshot of all status-relevant props
             const currentStatusSnapshot = {
