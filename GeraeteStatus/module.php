@@ -194,10 +194,7 @@ class UniversalDeviceTile extends IPSModule
         $this->RegisterUDTImageHook('/hook/udtimages/' . $this->InstanceID);
 
         // Dynamische Referenzen und Nachrichten für konfigurierte Variablen
-        $variablesList = \UDT\Helpers::decodeJsonArray($this->ReadPropertyString('VariablesList'), __FUNCTION__ . ':VariablesList');
-        if (!is_array($variablesList)) {
-            $variablesList = [];
-        }
+        $variablesList = $this->ReadVariablesList();
         
 
         // Alle Bildmedien der Kachel (Standardbild, Hintergrund, eigene Statusbilder, Bildzeilen) werden

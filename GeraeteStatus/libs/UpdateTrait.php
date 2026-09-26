@@ -20,8 +20,7 @@ trait UpdateTrait
         if (($data[1] ?? true) === false) {
             return;
         }
-        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
-        $rows = is_array($rows) ? $rows : [];
+        $rows = $this->ReadVariablesList();
         $keys = [];
         foreach ($rows as $key => $row) {
             if (is_array($row) && ((int)($row['Variable'] ?? 0) === $senderID || (int)($row['SecondVariable'] ?? 0) === $senderID)) {
@@ -71,7 +70,7 @@ trait UpdateTrait
         if ($mediaID === $this->ReadPropertyInteger('bgImage')) {
             $message['image1Url'] = $this->BuildImageHookUrl($mediaID);
         }
-        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
+        $rows = $this->ReadVariablesList();
         $progressbarActive = $this->IsProgressbarActive();
         $built = [];
         foreach (is_array($rows) ? $rows : [] as $key => $row) {

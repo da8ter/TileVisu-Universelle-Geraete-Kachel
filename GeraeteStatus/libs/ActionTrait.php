@@ -19,8 +19,7 @@ trait ActionTrait
         if (preg_match('/^row_(0|[1-9][0-9]{0,4})$/', $ident, $m) !== 1) {
             return null;
         }
-        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
-        $row = is_array($rows) ? ($rows[(int)$m[1]] ?? null) : null;
+        $row = $this->ReadVariablesList()[(int)$m[1]] ?? null;
         return is_array($row) ? $this->RowActionTarget($row) : null;
     }
 

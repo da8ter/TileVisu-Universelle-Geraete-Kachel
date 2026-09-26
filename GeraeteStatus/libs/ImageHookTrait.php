@@ -163,9 +163,8 @@ trait ImageHookTrait
                 $ids[] = (int)($association['EigenesBild'] ?? 0);
             }
         }
-        $rows = json_decode($this->ReadPropertyString('VariablesList'), true);
-        foreach (is_array($rows) ? $rows : [] as $row) {
-            if (is_array($row) && ($row['DisplayType'] ?? 'text') === 'image') {
+        foreach ($this->ReadVariablesList() as $row) {
+            if (($row['DisplayType'] ?? 'text') === 'image') {
                 $ids[] = (int)($row['ImageMedia'] ?? 0);
             }
         }

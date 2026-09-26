@@ -220,9 +220,9 @@ trait IconTrait
                     // Icon-Feld ermitteln (IconValue bevorzugt, sonst Icon)
                     $optIcon = null;
                     if (isset($option['IconValue']) && trim((string)$option['IconValue']) !== '') {
-                        $optIcon = $option['IconValue'];
+                        $optIcon = (string)$option['IconValue'];
                     } elseif (isset($option['Icon']) && trim((string)$option['Icon']) !== '') {
-                        $optIcon = $option['Icon'];
+                        $optIcon = (string)$option['Icon'];
                     }
                     if ($optIcon === null) {
                         continue;
