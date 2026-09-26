@@ -1248,6 +1248,7 @@
                 statusLabel: decodedData.statusLabel,
                 statusIcon: decodedData.statusIcon,
                 statusBildauswahl: decodedData.statusBildauswahl,
+                statusImageUrl: decodedData.statusImageUrl,
                 statusIconColor: decodedData.statusIconColor,
                 isStatusIconColorTransparent: decodedData.isStatusIconColorTransparent,
                 statusColor: decodedData.statusColor,
@@ -1429,34 +1430,6 @@
             }
         }
 
-        // Backend-Minimal-Update für Bild-Variablen (imageVarUpdate)
-        function applyImageVarUpdates(value) {
-            // Minimal-Update vom Backend für Variablen mit displayType 'image'
-            try {
-                const updates = Array.isArray(value) ? value : [];
-                for (const u of updates) {
-                    const id = u?.id;
-                    const hookUrl = u?.imageUrl || '';
-                    if (!id) continue;
-                    const wrapper = document.querySelector(`.variable-item[data-variable-id="${CSS.escape(String(id))}"]`);
-                    if (!wrapper) continue;
-                    const img = wrapper.querySelector('img.variable-inline-image');
-                    if (!img) continue;
-                    img.style.display = 'none';
-                    img.onload = function() { this.style.display = ''; };
-                    img.onerror = function() { this.style.display = 'none'; };
-                    try { img.decoding = 'async'; } catch (_) {}
-                    try { img.loading = 'eager'; } catch (_) {}
-                    if (hookUrl) { img.src = hookUrl; }
-                    try {
-                        if (img.complete && img.naturalWidth > 0) {
-                            img.style.display = '';
-                        }
-                    } catch (_) {}
-                }
-            } catch (_) {}
-        }
-
         function handleMessage(data) {
             let decodedData;
             if (typeof data === 'string') {
@@ -1594,9 +1567,6 @@
                         break;
                     case 'assets':
                         applyAssets(value);
-                        break;
-                    case 'imageVarUpdate':
-                        applyImageVarUpdates(value);
                         break;
                     case 'groupnames':
                         // Nur aktualisieren und re-rendern, wenn sich die Gruppennamen geändert haben
