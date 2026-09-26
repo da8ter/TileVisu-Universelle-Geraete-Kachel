@@ -115,8 +115,6 @@ trait PayloadVariablesTrait
 
 
 
-        // Extrahiere Button-Farben aus Profil/Darstellung für Bool-Variablen
-        $buttonColors = $this->GetButtonColors($variable['Variable']);
 
         // Extrahiere Variable-Associations für Button-Erstellung (Integer + String)
         $variableAssociations = null;

@@ -1518,7 +1518,6 @@
                     case 'statusvalue':
                     case 'statuscolor':
                     case 'statusalignment':
-                    case 'statusBildauswahl':  
                         applyStatusKeys(decodedData);
                         break;
                     case 'hideimagecolumn':
@@ -3083,73 +3082,6 @@
                         content += `
                             <div class="variable-button-container" style="${multiButtonContainerJustify}">
                                 <div class="variable-multi-button-container" style="${multiButtonContainerJustify}">
-                                    ${buttonsHtml}
-                                </div>
-                            </div>
-                        `;
-                        
-                    } else if (variable.variableType === 3 && variable.stringAssociations && variable.stringAssociations.length > 0) {
-                        // String-Variable: Multi-Button für jede Association
-                        
-                        // ButtonWidth aus Variablenkonfiguration verwenden (wie bei Boolean-Buttons)
-                        const buttonWidth = variable.buttonWidth || 80; // Etwas schmaler für Multi-Buttons
-                        
-                        let buttonsHtml = '';
-                        const currentValue = String(variable.rawValue); // String-Wert als String behandeln
-                        
-                        variable.stringAssociations.forEach((association, index) => {
-                            const isActive = currentValue === String(association.value);
-                            const buttonColor = association.color || 'var(--accent-color)';
-                            const opacity = isActive ? '1' : '0.5';
-                            
-                            // Button-Gruppierung: Bestimme CSS-Klasse basierend auf Position
-                            let positionClass = '';
-                            const totalButtons = variable.stringAssociations.length;
-                            
-                            if (totalButtons === 1) {
-                                positionClass = 'single-button'; // Nur ein Button: alle Ecken rund
-                            } else if (index === 0) {
-                                positionClass = 'first-button'; // Erster Button: nur links rund
-                            } else if (index === totalButtons - 1) {
-                                positionClass = 'last-button'; // Letzter Button: nur rechts rund
-                            } else {
-                                positionClass = 'middle-button'; // Mittlere Buttons: keine runden Ecken
-                            }
-                            
-                            // Button-Text: Beschriftung (variable.label) hat Vorrang, sonst Association-Name/Value
-                            let buttonText = esc((typeof variable.label === 'string' && variable.label.trim() !== '') ? variable.label : (association.name || String(association.value)));
-                            
-                            // Icon hinzufügen falls vorhanden, mit Fallback auf Standard-Icon
-                            let iconToUse = association.icon;
-                            if (!iconToUse || iconToUse === 'Transparent' || iconToUse === null) {
-                                iconToUse = variable.icon; // Fallback auf Standard-Icon der Variable
-                            }
-                            
-                            let isStrIconOnly = false;
-                            if (iconToUse && iconToUse !== 'Transparent') {
-                                const iconClass = prepareIconForDisplay(iconToUse);
-                                if (iconClass) {
-                                    const iconMargin = (!variable.showLabel && !variable.showValue) ? '' : 'margin-right: 4px;';
-                                    buttonText = `<i class="${esc(iconClass)}" style="${iconMargin}"></i>${(!variable.showLabel && !variable.showValue) ? '' : buttonText}`;
-                                    isStrIconOnly = variable.showIcon && !variable.showLabel && !variable.showValue;
-                                }
-                            }
-                            
-                            buttonsHtml += `
-                                <div class="variable-multi-button ${positionClass} ${isActive ? 'active' : ''} ${isActive ? '' : 'inactive'} ${isStrIconOnly ? 'icon-only' : ''}" role="button" tabindex="0"
-                                        data-request-value="${esc(JSON.stringify(String(association.value)))}" 
-                                        data-variable-id="${esc(variable.id)}"
-                                        data-association-value="${esc(association.value)}"
-                                        style="background-color: ${esc(buttonColor)} !important; color: ${getTextColor(variable)} !important; ${isGroupStretched ? '' : `width: ${buttonWidth}px; min-width: ${buttonWidth}px;`}">
-                                    ${buttonText}
-                                </div>`;
-                        });
-                        
-                        // Für ungruppierte String-Multi-Buttons: horizontale Ausrichtung des Containers entsprechend Einstellung
-                        const stringMultiButtonContainerJustify = (!isGrouped) ? `display: flex; justify-content: ${justifyMap}; width: 100%;` : '';
-                        content += `
-                            <div class="variable-button-container" style="${stringMultiButtonContainerJustify}">
-                                <div class="variable-multi-button-container" style="${stringMultiButtonContainerJustify}">
                                     ${buttonsHtml}
                                 </div>
                             </div>
