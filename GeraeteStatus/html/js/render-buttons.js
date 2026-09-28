@@ -74,7 +74,7 @@
                             }
                         } else if (spinActive) {
                             // Kein Icon konfiguriert, aber Spin aktiv → temporären Spinner darstellen
-                            const spinBase = prepareIconForDisplay('rotate') || 'fa-fw fa-kit fak fa-rotate';
+                            const spinBase = prepareIconForDisplay('rotate') || 'fa-fw fa-light fa-rotate';
                             iconHtml = `<i class="${spinBase} fa-spin" style="margin-right: 6px;"></i>`;
                         }
                         let textParts = [];

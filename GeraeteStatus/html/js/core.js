@@ -92,8 +92,8 @@
                 }
             }
 
-            // Fallback: bevorzuge Kit, ansonsten Solid
-            return `fa-fw fa-kit fak fa-${baseName}`;
+            // Rueckfall ohne FontAwesome: Symcons icons.js liefert nur den Light-Schnitt, jeder andere bliebe leer
+            return `fa-fw fa-light fa-${baseName}`;
         }
         
         // Script-Buttons drehen ihr Icon 5 s lang. Der Zustand hängt am Zeilen-Schlüssel und übersteht das
