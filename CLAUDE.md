@@ -1,0 +1,37 @@
+# Universelle Geräte-Kachel (Bibliothek „Universal Device Tile“)
+
+Symcon-HTML-Kachel, die ein Gerät aus frei konfigurierbaren Zeilen zeigt und bedient: Text, Balken, Regler, Buttons, Bilder, Gruppen, dazu ein Statusteil mit Bild und Farbe. Öffentliches Repo `da8ter/TileVisu-Universelle-Geraete-Kachel`.
+
+Projektwissen: **`docs/README.md`**. Betriebsdaten und der lokale Prüfstand: `CLAUDE.local.md` (nicht eingecheckt).
+
+## Aufbau
+
+- **`GeraeteStatus/`** (Präfix `UDST`, Klasse `UniversalDeviceTile`, `IPSModuleStrict`, ab Symcon 8.1). `module.php` ist schlank; die Logik liegt in Traits unter `libs/` (Namensraum `UDT`): `PayloadTrait`/`PayloadVariablesTrait` (Kachelstand), `UpdateTrait` (Zeilen-Protokoll), `ActionTrait` (Bedienung), `ImageHookTrait` (Bilder), `PresentationTrait`, `IconTrait`, `FormTrait`, `TileHtmlTrait`.
+- **`module.html` ist nur das Gerüst.** CSS und JS liegen in `html/css/` und `html/js/`; `TileHtmlTrait` setzt sie beim Ausliefern an den Zeilen `/*__UDT_PART <datei>__*/` ein. Neue Teile dort eintragen.
+- **Zeilen-Protokoll:** Jede Zeile hat einen Schlüssel (Index in der Variablenliste). Updates schicken `{"rows": [...]}` mit den betroffenen Zeilen vollständig; Bedienung kommt als `requestAction('row_<key>', Wunschwert)` und wirkt nur auf das Ziel dieser Zeile.
+- **Bilder** über den nativen Hook `/hook/udtimages/<ID>` (in `Create()`), nur für Medien dieser Kachel, mit Platzhalter über der Ausgabegrenze.
+- `README.md` (Wurzel) und `GeraeteStatus/README.md` sind zwei Fassungen der Nutzerdoku mit Changelog.
+
+## Prüfen
+
+```bash
+php -l GeraeteStatus/module.php GeraeteStatus/libs/*.php
+tests/run.sh [--streng]     # nur mit lokalem Prüfstand, siehe unten
+```
+
+Der Prüfstand (`tests/`) ist **nicht** Teil dieses Repos: `.gitignore` schließt `tests/` aus, er ist ein eigenes, unveröffentlichtes Git. Wo er vorhanden ist: `tests/run.sh` prüft Syntax, JSON, Modul auf SymconStubs und das Frontend in Headless Chrome (~30 s); `--streng` endet rot, solange ein Review-Befund offen ist. Golden Master nur absichtlich neu schreiben.
+
+## Regeln
+
+- **Commits:** nach jeder abgeschlossenen Änderung, ein Thema je Commit, deutsche Botschaft, **ohne** Co-Authored-By-Zeile. Prüfstand vorher.
+- **Nie** `git checkout`/`git restore` auf Dateien: die Arbeitskopie kann nicht committete Arbeit enthalten.
+- **Push nur auf Zuruf.** Arbeitszweig ist `refactor/modularisierung`; auf GitHub wird `symcon-beta` nachgezogen (`git push origin HEAD:symcon-beta`), `main` und `release/*` nur auf ausdrücklichen Zuruf. Vorher `git log HEAD..origin/<Zweig>` prüfen, nie force-pushen.
+- **Release:** `version`, `build` und `date` in `library.json` hochsetzen, Changelog in beiden READMEs.
+- **Öffentliches Repo:** keine IP-Adressen, Ports, Instanz-IDs, Token, Pfade unter `/Users/` – auch nicht in Snapshots oder Doku.
+- **Keine Befehle an echte Geräte** aus Proben ohne Zusage des Nutzers.
+- **Symcon-Hausregeln:** `declare(strict_types=1)`, typisierte Signaturen, kein Heavy Work vor `KR_READY`, Darstellungen statt Variablenprofilen für eigene Variablen, neue Nutzertexte sagen „Symcon“.
+
+## Weiteres Wissen
+
+- Symcon-Plattformwissen (Hooks und `HookInstance`-Fatal, Ausgabegrenze, Module Strict, Kacheln und Icons): https://github.com/da8ter/SymDo-Family-Organizer/tree/SymDo-Beta/docs/plattform, lokal `../List/docs/plattform/`.
+- Muster für sparsame Kachel-Updates: https://github.com/da8ter/SymDo-Family-Organizer/blob/SymDo-Beta/docs/entscheidungen/kacheln-ressourcen.md
