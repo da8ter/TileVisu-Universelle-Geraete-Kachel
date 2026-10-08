@@ -2,7 +2,7 @@
 
 Symcon-HTML-Kachel, die ein Gerät aus frei konfigurierbaren Zeilen zeigt und bedient: Text, Balken, Regler, Buttons, Bilder, Gruppen, dazu ein Statusteil mit Bild und Farbe. Öffentliches Repo `da8ter/TileVisu-Universelle-Geraete-Kachel`.
 
-Projektwissen: **`docs/README.md`**. Betriebsdaten und der lokale Prüfstand: `CLAUDE.local.md` (nicht eingecheckt).
+Projektwissen: **`.claude/docs/README.md`**. Betriebsdaten und der lokale Prüfstand: `CLAUDE.local.md` (nicht eingecheckt).
 
 ## Aufbau
 
@@ -33,5 +33,5 @@ Der Prüfstand (`tests/`) ist **nicht** Teil dieses Repos: `.gitignore` schließ
 
 ## Weiteres Wissen
 
-- Symcon-Plattformwissen (Hooks und `HookInstance`-Fatal, Ausgabegrenze, Module Strict, Kacheln und Icons): https://github.com/da8ter/SymDo-Family-Organizer/tree/SymDo-Beta/docs/plattform, lokal `../List/docs/plattform/`.
-- Muster für sparsame Kachel-Updates: https://github.com/da8ter/SymDo-Family-Organizer/blob/SymDo-Beta/docs/entscheidungen/kacheln-ressourcen.md
+- Symcon-Plattformwissen (Hooks und `HookInstance`-Fatal, Ausgabegrenze, Module Strict, Kacheln und Icons): https://github.com/da8ter/SymDo-Family-Organizer/tree/SymDo-Beta/.claude/docs/plattform, lokal `../List/.claude/docs/plattform/`.
+- Muster für sparsame Kachel-Updates: https://github.com/da8ter/SymDo-Family-Organizer/blob/SymDo-Beta/.claude/docs/entscheidungen/kacheln-ressourcen.md
