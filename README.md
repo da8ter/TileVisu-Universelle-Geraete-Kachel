@@ -159,6 +159,16 @@ Die Funktionalität erfolgt über die Instanz-Konfiguration und den Editor. Für
 - `UDST_GetUserTemplates(int $InstanzID): string` – die eigenen Vorlagen, wie sie in dieser Kachel liegen, als JSON.
 - `UDST_SyncUserTemplates(int $InstanzID, string $Vorlagen): bool` – die Liste der eigenen Vorlagen dieser Kachel ersetzen; der Editor verteilt damit eine geänderte Liste an alle Kacheln.
 
+`UDST_RunSelfTest(int $InstanzID): string`: prüft alle Zeilen, ohne etwas zu ändern, und liefert einen kurzen Text mit den gefundenen Problemen (fehlende Objekte und Bilder, nicht verfügbare Bilddateien, fehlgeschlagene Skripte, unbekannte Darstellungsarten und Gruppen, Variablen vom falschen Typ, Buttons ohne Assoziationen, Schalter ohne Aktion), Hinweisen (Balken oder Regler ohne eigenen Bereich) und den bedienbaren Zeilen samt Schlüssel.
+
+`UDST_GetSelfTestReport(int $InstanzID): string`: liefert dieselben Befunde als Text für Anwender, mit Position und Name der Zeile. Das zeigt auch der Knopf „Selbsttest“ im Formular.
+
+`UDST_GetConfigurationHelp(int $InstanzID): string`: liefert die Hinweise für KI-Assistenten und Skripte aus dem Formular als Text und ändert nichts.
+
+Fehlt ein verknüpftes Objekt oder ist es nicht nutzbar (gelöschte Variable, gelöschtes Skript oder Bild, nicht verfügbare Bilddatei, beim letzten Lauf fehlgeschlagenes Skript, ungültige Bildwahl), steht die Instanz sofort auf Fehlerstatus 201. Die Kachel bleibt bedienbar, der Knopf „Selbsttest“ im Formular nennt die betroffene Zeile. Nach einer Reparatur die Konfiguration speichern; bekommt ein Bild eine neue Datei, geht der Status von selbst zurück. Das gilt auch, wenn eine Zeile nach dem Löschen ihrer Variable auf ihr Skript oder Klickziel ausweicht. Eine Variable ohne Aktion setzt den Status nicht, der Selbsttest nennt sie trotzdem. Ebenso wenig zählen eine noch leere Auswahl, etwa ein eigenes Statusbild ohne gewähltes Bild, und ein Skript, das die Zeile gar nicht startet, weil ihr Klick ein Objekt öffnet. Eine außerhalb von Symcon gelöschte Bilddatei bemerkt Symcon nicht, sie setzt den Status also auch nicht.
+
+Eine Aktion, die die Kachel nicht ausführen kann, meldet `IPS_RequestAction` als Warnung mit dem Grund: eine Kennung ohne bedienbare Zeile, ein fehlendes Skript oder ein ungültiger Wert (beim Schalter weder true noch false, bei Zahlenvariablen keine Zahl).
+
 ## Changelog
 - **3.1.0** (Beta)
   - Neu: visueller Editor mit Live-Vorschau der echten Kachel, geöffnet über „Editor öffnen“ im Formular. Zeilen, Gruppen und das Statusbild per Ziehen und Ablegen, frei ziehbare Vorschaugröße, Eigenschaften je Anzeigetyp, Objektauswahl mit Suche, Status simulieren und Testwerte nur in der Vorschau, Vorlagen sowie Export und Import, Zeilen aus einem Gerät mit vorgeschlagenem Anzeigetyp, Mehrfachauswahl, Tastatursteuerung, Rückgängig und Wiederholen. Gespeichert wird erst auf Klick, mit Rückfrage, wenn die Konfiguration inzwischen anderswo gespeichert wurde.

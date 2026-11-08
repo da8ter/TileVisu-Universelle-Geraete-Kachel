@@ -25,6 +25,15 @@ if (!defined('MM_UPDATE')) {
     // IPS_BASE (10000) + IPS_MEDIAMESSAGE (900) + 5
     define('MM_UPDATE', 10905);
 }
+if (!defined('MM_AVAILABLE')) {
+    define('MM_AVAILABLE', 10904);
+}
+if (!defined('OM_UNREGISTER')) {
+    define('OM_UNREGISTER', 10402);
+}
+if (!defined('SM_BROKEN')) {
+    define('SM_BROKEN', 10704);
+}
 
 require_once __DIR__ . '/libs/CommonHelpers.php';
 require_once __DIR__ . '/libs/SettingsAccessTrait.php';
@@ -35,6 +44,7 @@ require_once __DIR__ . '/libs/PayloadTrait.php';
 require_once __DIR__ . '/libs/PayloadVariablesTrait.php';
 require_once __DIR__ . '/libs/FormTrait.php';
 require_once __DIR__ . '/libs/ActionTrait.php';
+require_once __DIR__ . '/libs/SelfTestTrait.php';
 require_once __DIR__ . '/libs/UpdateTrait.php';
 require_once __DIR__ . '/libs/TileHtmlTrait.php';
 require_once __DIR__ . '/libs/EditorSchema.php';
@@ -53,6 +63,7 @@ class UniversalDeviceTile extends IPSModuleStrict
     use \UDT\PayloadVariablesTrait;
     use \UDT\FormTrait;
     use \UDT\ActionTrait;
+    use \UDT\SelfTestTrait;
     use \UDT\UpdateTrait;
     use \UDT\TileHtmlTrait;
     use \UDT\EditorTreeTrait;
@@ -232,7 +243,7 @@ class UniversalDeviceTile extends IPSModuleStrict
         $ids = $mediaIds;
         
         // Füge Status-Variable hinzu
-        $statusId = $this->ReadPropertyInteger('Status');
+        $statusId = \UDT\EditorSchema::ObjectRef($this->ReadPropertyInteger('Status'));
         if ($statusId > 0) {
             $ids[] = $statusId;
         }
@@ -246,6 +257,10 @@ class UniversalDeviceTile extends IPSModuleStrict
                 $ids[] = $variable['SecondVariable'];
             }
         }
+
+        // Skripte und Klickziele der Buttons gehören ebenso in die Referenzen
+        $buttonTargets = $this->ButtonTargets($variablesList);
+        $ids = array_merge($ids, $buttonTargets['scripts'], $buttonTargets['objects']);
 
         
         // Entferne alle alten Referenzen
@@ -292,10 +307,29 @@ class UniversalDeviceTile extends IPSModuleStrict
                 // Aktualisierung und Dateiänderung beobachten
                 $this->RegisterMessage($mid, MM_UPDATE);
                 $this->RegisterMessage($mid, MM_CHANGEFILE);
+                $this->RegisterMessage($mid, MM_AVAILABLE);
             }
         }
 
+        // Verknüpfte Objekte beobachten: Verschwinden oder Unbrauchbarwerden setzt den Status der Kachel um
+        foreach (array_unique($ids) as $id) {
+            if ($id > 0 && IPS_ObjectExists((int)$id)) {
+                $this->RegisterMessage((int)$id, OM_UNREGISTER);
+            }
+        }
+        foreach ($buttonTargets['scripts'] as $scriptId) {
+            $this->RegisterMessage($scriptId, SM_BROKEN);
+        }
+
+        $this->UpdateLinkStatus();
+
         // Schicke eine komplette Update-Nachricht an die Darstellung, da sich ja Parameter geändert haben können
+        $this->SendFullUpdate();
+    }
+
+    /** Schickt den kompletten Kachelstand samt Assets an die Darstellung. */
+    private function SendFullUpdate(): void
+    {
         $fullUpdateMessage = $this->BuildFullPayload();
         $assets = $this->GenerateAssets();
         if (!empty($assets)) {
@@ -327,8 +361,26 @@ class UniversalDeviceTile extends IPSModuleStrict
             return;
         }
 
-        // Medien-Änderungen: Bildzeilen, Statusbild, Hintergrund (Zeilen-Protokoll)
-        if ($Message === MM_UPDATE || $Message === MM_CHANGEFILE) {
+        if (!$this->IsKernelReady()) {
+            return;
+        }
+
+        // Objekt verschwunden: Zeilen können wegfallen, das geht nur mit vollem Aufbau
+        if ($Message === OM_UNREGISTER) {
+            $this->UpdateLinkStatus();
+            $this->SendFullUpdate();
+            return;
+        }
+
+        // Skript fehlgeschlagen: an der Kachel ändert sich nichts
+        if ($Message === SM_BROKEN) {
+            $this->UpdateLinkStatus();
+            return;
+        }
+
+        // Medien-Änderungen: Bildzeilen, Statusbild, Hintergrund (Zeilen-Protokoll); eine neue Datei kann den Status reparieren
+        if ($Message === MM_UPDATE || $Message === MM_CHANGEFILE || $Message === MM_AVAILABLE) {
+            $this->UpdateLinkStatus();
             $this->HandleMediaUpdate((int)$SenderID);
         }
 }
@@ -350,7 +402,7 @@ class UniversalDeviceTile extends IPSModuleStrict
         // Nur Bedienelemente dieser Kachel: fremde Variablen und Scripts sind über die Kachel nicht erreichbar
         $target = $this->ResolveActionTarget((string)$Ident);
         if ($target === null) {
-            $this->SendDebug(__FUNCTION__, 'Abgelehnt, keine bedienbare Zeile dieser Kachel: ' . $Ident, 0);
+            $this->RejectIdent($Ident);
             return;
         }
         $this->RunActionTarget($target, $Value);
