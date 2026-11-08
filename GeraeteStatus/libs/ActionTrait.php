@@ -23,16 +23,51 @@ trait ActionTrait
         return is_array($row) ? $this->RowActionTarget($row) : null;
     }
 
-    /** Bedienbares Ziel einer Zeile: Variable einer Button- oder Regler-Zeile, Script eines Script-Buttons. */
-    private function RowActionTarget(array $row): ?array
+    /**
+     * Was eine Zeile ist: variable, image, script, object oder none. Die einzige Stelle mit dieser
+     * Entscheidung, Kachel, Bedienung und Selbsttest lesen sie von hier.
+     */
+    private function RowKind(array $row): string
     {
         $displayType = $row['DisplayType'] ?? 'text';
         $variableID = (int)($row['Variable'] ?? 0);
         if ($variableID > 0 && IPS_VariableExists($variableID)) {
-            return ($displayType === 'button' || $displayType === 'slider') ? ['variable', $variableID, $displayType] : null;
+            return 'variable';
         }
-        $scriptID = (int)($row['ScriptID'] ?? 0);
-        return ($displayType === 'button' && $scriptID > 0) ? ['script', $scriptID, 'button'] : null;
+        if ($displayType === 'image') {
+            return 'image';
+        }
+        if ($displayType === 'button' && (int)($row['ScriptID'] ?? 0) > 0) {
+            return 'script';
+        }
+        return ($displayType === 'button' && (int)($row['OpenObjectId'] ?? 0) > 1) ? 'object' : 'none';
+    }
+
+    /**
+     * Öffnet ein Klick auf die Zeile ein Objekt statt zu schalten? Das Frontend wertet OpenObjectId nur am
+     * Bool-Button aus, den auch Script- und Objektzeilen benutzen; Mehrfach-Buttons und Regler ignorieren es.
+     */
+    private function RowClickOpensObject(array $row): bool
+    {
+        if ((int)($row['OpenObjectId'] ?? 0) <= 1) {
+            return false;
+        }
+        $kind = $this->RowKind($row);
+        if ($kind === 'variable') {
+            return ($row['DisplayType'] ?? 'text') === 'button' && IPS_GetVariable((int)$row['Variable'])['VariableType'] === VARIABLETYPE_BOOLEAN;
+        }
+        return $kind === 'script' || $kind === 'object';
+    }
+
+    /** Bedienbares Ziel einer Zeile: Variable einer Button- oder Regler-Zeile, Script eines Script-Buttons. */
+    private function RowActionTarget(array $row): ?array
+    {
+        $kind = $this->RowKind($row);
+        if ($kind === 'script') {
+            return ['script', (int)$row['ScriptID'], 'button'];
+        }
+        $displayType = $row['DisplayType'] ?? 'text';
+        return ($kind === 'variable' && ($displayType === 'button' || $displayType === 'slider')) ? ['variable', (int)$row['Variable'], $displayType] : null;
     }
 
     /** Führt die Bedienung auf dem Ziel aus: Script starten oder den Wert an die Variable geben. */
@@ -46,32 +81,84 @@ trait ActionTrait
                 } catch (\Throwable $e) {
                     $this->LogCaughtThrowable(__FUNCTION__, $e);
                 }
+            } else {
+                trigger_error(sprintf($this->Translate('Action failed: script %d of this row does not exist. Select another script for the row.'), $id), E_USER_WARNING);
             }
             return;
         }
         if (!IPS_VariableExists($id)) {
+            trigger_error(sprintf($this->Translate('Action failed: variable %d of this row does not exist. Select another variable for the row.'), $id), E_USER_WARNING);
             return;
         }
         switch (IPS_GetVariable($id)['VariableType']) {
             case VARIABLETYPE_BOOLEAN:
                 // Wunschwert (der Zustand nach dem Klick), nicht umschalten: ein Doppelklick schaltet nicht zurück
-                $wish = is_bool($value) ? $value : filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                $wish = self::BoolWish($value);
                 if ($wish === null) {
-                    $this->SendDebug(__FUNCTION__, 'Kein Bool-Wunschwert: ' . json_encode($value), 0);
+                    $this->RejectValue($value, $this->Translate('Action rejected: %s is not a valid value for a switch. Send true or false.'));
                     return;
                 }
                 RequestAction($id, $wish);
                 break;
             case VARIABLETYPE_INTEGER:
+                if (!self::IsNumberWish($value)) {
+                    $this->RejectValue($value, $this->Translate('Action rejected: %s is not a valid value for this row. Send a number.'));
+                    return;
+                }
                 RequestAction($id, $displayType === 'slider' ? $this->NormalizeSliderValue($id, $value, true) : intval($value));
                 break;
             case VARIABLETYPE_FLOAT:
+                if (!self::IsNumberWish($value)) {
+                    $this->RejectValue($value, $this->Translate('Action rejected: %s is not a valid value for this row. Send a number.'));
+                    return;
+                }
                 RequestAction($id, $this->NormalizeSliderValue($id, $value, false));
                 break;
             case VARIABLETYPE_STRING:
                 RequestAction($id, strval($value));
                 break;
         }
+    }
+
+    /** Bool-Wunschwert oder null. Leerer Text und null wären für filter_var ein gültiges false. */
+    private static function BoolWish(mixed $value): ?bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return null;
+        }
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    }
+
+    /** Zahl oder Zahlentext im Integer-Bereich; der Vergleich schließt auch NAN und INF aus. */
+    private static function IsNumberWish(mixed $value): bool
+    {
+        return is_numeric($value) && abs((float)$value) < PHP_INT_MAX;
+    }
+
+    /** Meldet einen Ident ohne bedienbare Zeile. */
+    private function RejectIdent(string $ident): void
+    {
+        $shown = self::ShortText($ident);
+        $this->SendDebug(__FUNCTION__, 'Abgelehnt, keine bedienbare Zeile dieser Kachel: ' . $shown, 0);
+        trigger_error(sprintf($this->Translate('Action rejected: "%s" is not an operable row of this tile. Read the row keys with UDST_RunSelfTest or switch the source variable directly.'), $shown), E_USER_WARNING);
+    }
+
+    /** Text vom Aufrufer für das Meldungsprotokoll: gültiges UTF-8, ohne Steuerzeichen, höchstens 40 Zeichen. */
+    private static function ShortText(string $text): string
+    {
+        $clean = (string)preg_replace('/\p{Cc}+/u', ' ', mb_scrub($text, 'UTF-8'));
+        return mb_strlen($clean) > 40 ? mb_substr($clean, 0, 40) . '…' : $clean;
+    }
+
+    /** Meldet einen abgelehnten Wunschwert; $message enthält %s für den Wert. */
+    private function RejectValue(mixed $value, string $message): void
+    {
+        $shown = self::ShortText(is_float($value) && !is_finite($value) ? var_export($value, true) : (string)json_encode($value, JSON_INVALID_UTF8_SUBSTITUTE));
+        $this->SendDebug(__FUNCTION__, 'Ungültiger Wunschwert: ' . $shown, 0);
+        trigger_error(sprintf($message, $shown), E_USER_WARNING);
     }
 
     /**
@@ -94,7 +181,7 @@ trait ActionTrait
         if ($step <= 0) {
             $step = $integer ? 1.0 : ($digits > 0 ? 10 ** -$digits : ($max - $min) / 100);
         }
-        $number = is_numeric($value) ? (float)$value : $min;
+        $number = (float)$value;
         $number = $min + round(($number - $min) / $step) * $step;
         $number = min($max, max($min, $number));
         // auf die Genauigkeit der Schrittweite runden (0,05 → 2 Stellen), nicht auf die Anzeige-Stellen

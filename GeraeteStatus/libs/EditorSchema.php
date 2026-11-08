@@ -14,10 +14,13 @@ final class EditorSchema
     public const MAX_ROWS = 200;
     public const MAX_ASSOCIATIONS = 200;
     public const GROUP_COUNT = 10;
+    /** Symcon vergibt IDs ab 10000; kleinere Werte heißen „kein Objekt“ (ältere Stände speichern 1 für „kein Bild“). */
+    public const MIN_OBJECT_ID = 10000;
     private const MAX_TEXT = 200;
 
     private const ALIGN = ['left', 'center', 'right'];
-    private const IMAGE_CHOICES = ['none', 'custom', 'wm_aus', 'wm_an', 'dryer_off', 'dryer_on', 'symcon_icon'];
+    public const DISPLAY_TYPES = ['text', 'progress', 'slider', 'button', 'image'];
+    public const IMAGE_CHOICES = ['none', 'custom', 'wm_aus', 'wm_an', 'dryer_off', 'dryer_on', 'symcon_icon'];
 
     /** Einzelwerte: Name => [Typ, …]. Typen: int (min, max), float (min, max), bool, string (Länge), enum, color, ref (Art). */
     private const PROPERTIES = [
@@ -56,7 +59,7 @@ final class EditorSchema
         'Variable' => ['ref', 'variable'],
         'ScriptID' => ['ref', 'script'],
         'OpenObjectId' => ['ref', 'object'],
-        'DisplayType' => ['enum', ['text', 'progress', 'slider', 'button', 'image']],
+        'DisplayType' => ['enum', self::DISPLAY_TYPES],
         'ShowIcon' => ['bool'],
         'ShowLabel' => ['bool'],
         'ShowValue' => ['bool'],
@@ -159,6 +162,14 @@ final class EditorSchema
     public static function IsList(string $name): bool
     {
         return isset(self::LISTS[$name]);
+    }
+
+    /** Ist der Wert für dieses Zeilenfeld gültig? Für Felder ohne Objektbezug. */
+    public static function RowFieldValid(string $field, mixed $value): bool
+    {
+        $errors = [];
+        self::Value($value, self::ROW[$field], $field, static fn (): bool => true, $errors);
+        return $errors === [];
     }
 
     /**
@@ -286,8 +297,8 @@ final class EditorSchema
                 if (!is_int($value) || $value < 0) {
                     return $fail('object ID expected');
                 }
-                if ($value < 10000) {
-                    return 0; // Symcon-IDs beginnen bei 10000; ältere Stände speichern 1 für „kein Bild“, die Kachel zeigt dann keins
+                if ($value < self::MIN_OBJECT_ID) {
+                    return 0; // die Kachel zeigt dann kein Bild
                 }
                 return ($value === 0 || $refOk($rule[1], $value)) ? $value : $fail('object #' . $value . ' is not a suitable ' . $rule[1]);
         }

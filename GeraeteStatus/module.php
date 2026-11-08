@@ -35,6 +35,7 @@ require_once __DIR__ . '/libs/PayloadTrait.php';
 require_once __DIR__ . '/libs/PayloadVariablesTrait.php';
 require_once __DIR__ . '/libs/FormTrait.php';
 require_once __DIR__ . '/libs/ActionTrait.php';
+require_once __DIR__ . '/libs/SelfTestTrait.php';
 require_once __DIR__ . '/libs/UpdateTrait.php';
 require_once __DIR__ . '/libs/TileHtmlTrait.php';
 require_once __DIR__ . '/libs/EditorSchema.php';
@@ -53,6 +54,7 @@ class UniversalDeviceTile extends IPSModuleStrict
     use \UDT\PayloadVariablesTrait;
     use \UDT\FormTrait;
     use \UDT\ActionTrait;
+    use \UDT\SelfTestTrait;
     use \UDT\UpdateTrait;
     use \UDT\TileHtmlTrait;
     use \UDT\EditorTreeTrait;
@@ -350,7 +352,7 @@ class UniversalDeviceTile extends IPSModuleStrict
         // Nur Bedienelemente dieser Kachel: fremde Variablen und Scripts sind über die Kachel nicht erreichbar
         $target = $this->ResolveActionTarget((string)$Ident);
         if ($target === null) {
-            $this->SendDebug(__FUNCTION__, 'Abgelehnt, keine bedienbare Zeile dieser Kachel: ' . $Ident, 0);
+            $this->RejectIdent($Ident);
             return;
         }
         $this->RunActionTarget($target, $Value);
