@@ -823,6 +823,33 @@
             }
             ,
             {
+              "caption": "Color from presentation",
+              "name": "ValueColor",
+              "width": "160px",
+              "save": true,
+              "add": "off",
+              "visible": false,
+              "edit": {
+                "type": "Select",
+                "options": [
+                  { "caption": "Off", "value": "off" },
+                  { "caption": "Color the value", "value": "text" },
+                  { "caption": "Value as colored box", "value": "badge" }
+                ]
+              }
+            }
+            ,
+            {
+              "caption": "Tap opens the variable",
+              "name": "OpenOnTap",
+              "width": "120px",
+              "save": true,
+              "add": false,
+              "visible": false,
+              "edit": { "type": "CheckBox" }
+            }
+            ,
+            {
               "caption": "Media object",
               "name": "ImageMedia",
               "width": "180px",
@@ -942,6 +969,12 @@
     "    [ 'caption' => 'left',   'value' => 'left'   ]",
     "], 'save' => true, 'add' => 'left', 'visible' => $visible('VerticalAlignment') ];",
     "$form[] = [ 'caption' => 'Separator line', 'name' => 'ShowBorderLine', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => $visible('ShowBorderLine') ];",
+    "$form[] = [ 'caption' => 'Color from presentation', 'name' => 'ValueColor', 'type' => 'Select', 'width' => '100%', 'options' => [",
+    "    [ 'caption' => 'Off', 'value' => 'off' ],",
+    "    [ 'caption' => 'Color the value', 'value' => 'text' ],",
+    "    [ 'caption' => 'Value as colored box', 'value' => 'badge' ]",
+    "], 'save' => true, 'add' => 'off', 'visible' => $visible('ValueColor') ];",
+    "$form[] = [ 'caption' => 'Tap opens the variable (e.g. its chart)', 'name' => 'OpenOnTap', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => $visible('OpenOnTap') ];",
     "",
     "return $form;"
   ]

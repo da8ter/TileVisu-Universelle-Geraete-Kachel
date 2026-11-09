@@ -452,4 +452,21 @@
             row-gap: calc(var(--element-spacing, 8px)) !important;
             align-items: flex-start; /* Inline-Styles können Ausrichtung bei Bedarf überschreiben */
         }
-        
+
+        /* Wert als farbiges Feld (Farbe aus der Darstellung), wie in der Kachel-Visualisierung */
+        .variable-value.value-badge {
+            padding: 0.15em 0.6em;
+            border-radius: 6px;
+            line-height: 1.4;
+        }
+
+        /* Zeile öffnet beim Tippen die Variable */
+        .variable-item.tap-open {
+            cursor: pointer;
+        }
+        .variable-item.tap-open:focus-visible {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+            border-radius: 6px;
+        }
+

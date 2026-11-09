@@ -94,6 +94,9 @@
         if (show('FontSize')) sizes.push(f.number(E.t('Font size'), get('FontSize'), set('FontSize'), { min: -1, max: 100, suffix: 'px', empty: -1 }));
         if (show('TextColor')) sizes.push(f.color(E.t('Text color'), get('TextColor'), set('TextColor')));
         if (sizes.length) look.push(f.row(...sizes));
+        if (show('ValueColor')) look.push(f.select(E.t('Color from presentation'), get('ValueColor'), set('ValueColor'),
+            [['off', E.t('Off')], ['text', E.t('Color the value')], ['badge', E.t('Value as colored box')]]));
+        if (show('OpenOnTap')) look.push(f.checkbox(E.t('Tap opens the variable (e.g. its chart)'), get('OpenOnTap'), set('OpenOnTap')));
         parts.push(f.section(E.t('Appearance'), ...look));
 
         const colors = [];

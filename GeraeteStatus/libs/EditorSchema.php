@@ -72,6 +72,8 @@ final class EditorSchema
         'SliderColor1' => ['color'],
         'SliderColor2' => ['color'],
         'InactiveDisplay' => ['enum', ['dash', 'value', 'hide']],
+        'ValueColor' => ['enum', ['off', 'text', 'badge']],
+        'OpenOnTap' => ['bool'],
         'SecondVariable' => ['ref', 'variable'],
         'UseSecondVariableAsTarget' => ['bool'],
         'SecondVariableLabel' => ['string', self::MAX_TEXT],
@@ -128,7 +130,7 @@ final class EditorSchema
         'SecondVariable' => 0, 'UseSecondVariableAsTarget' => false, 'SecondVariableLabel' => '',
         'SecondVariableShowIcon' => true, 'SecondVariableShowLabel' => true, 'SecondVariableShowValue' => true,
         'boolButtonColor' => -1, 'ButtonWidth' => 120, 'VerticalAlignment' => 'left', 'ShowBorderLine' => false,
-        'ImageMedia' => 0, 'ImageWidth' => 40, 'ImageBorderRadius' => 6,
+        'ImageMedia' => 0, 'ImageWidth' => 40, 'ImageBorderRadius' => 6, 'ValueColor' => 'off', 'OpenOnTap' => false,
     ];
 
     /** Gespeicherte Objekt-Referenz: Symcon vergibt IDs ab 10000, alles darunter (0, Altwert 1) heißt „nichts gewählt“ und wird 0. */

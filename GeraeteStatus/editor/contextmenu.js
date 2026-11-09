@@ -11,7 +11,7 @@
 
     // Darstellung einer Zeile (für „Darstellung kopieren/einfügen“): alles außer Ziel, Beschriftung, Typ und Gruppe
     const STYLE = ['ShowIcon', 'ShowLabel', 'ShowValue', 'FontSize', 'TextColor', 'ProgressColor1', 'ProgressColor2', 'SliderColor1',
-        'SliderColor2', 'boolButtonColor', 'ButtonWidth', 'VerticalAlignment', 'ShowBorderLine', 'ImageWidth', 'ImageBorderRadius'];
+        'SliderColor2', 'boolButtonColor', 'ButtonWidth', 'VerticalAlignment', 'ShowBorderLine', 'ImageWidth', 'ImageBorderRadius', 'ValueColor', 'OpenOnTap'];
 
     const close = () => { root.hidden = true; root.replaceChildren(); };
 

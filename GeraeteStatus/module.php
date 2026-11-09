@@ -40,6 +40,7 @@ require_once __DIR__ . '/libs/SettingsAccessTrait.php';
 require_once __DIR__ . '/libs/ImageHookTrait.php';
 require_once __DIR__ . '/libs/IconTrait.php';
 require_once __DIR__ . '/libs/PresentationTrait.php';
+require_once __DIR__ . '/libs/ValueColorTrait.php';
 require_once __DIR__ . '/libs/PayloadTrait.php';
 require_once __DIR__ . '/libs/PayloadVariablesTrait.php';
 require_once __DIR__ . '/libs/FormTrait.php';
@@ -59,6 +60,7 @@ class UniversalDeviceTile extends IPSModuleStrict
     use \UDT\ImageHookTrait;
     use \UDT\IconTrait;
     use \UDT\PresentationTrait;
+    use \UDT\ValueColorTrait;
     use \UDT\PayloadTrait;
     use \UDT\PayloadVariablesTrait;
     use \UDT\FormTrait;
@@ -460,7 +462,7 @@ class UniversalDeviceTile extends IPSModuleStrict
             'ShowBorderLine' => true, 'VerticalAlignment' => true,
             'OpenObjectId' => false,
             'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
-            'InactiveDisplay' => false,
+            'InactiveDisplay' => false, 'ValueColor' => true, 'OpenOnTap' => true,
         ],
         'image' => [
             'ShowIcon' => false, 'ShowLabel' => false, 'ShowValue' => false,
@@ -476,7 +478,7 @@ class UniversalDeviceTile extends IPSModuleStrict
             'ShowBorderLine' => false, 'VerticalAlignment' => true,
             'OpenObjectId' => false,
             'ImageMedia' => true, 'ImageWidth' => true, 'ImageBorderRadius' => true,
-            'InactiveDisplay' => false,
+            'InactiveDisplay' => false, 'ValueColor' => false, 'OpenOnTap' => false,
         ],
         'progress' => [
             'ShowIcon' => true, 'ShowLabel' => true, 'ShowValue' => true,
@@ -492,7 +494,7 @@ class UniversalDeviceTile extends IPSModuleStrict
             'ShowBorderLine' => false, 'VerticalAlignment' => false,
             'OpenObjectId' => false,
             'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
-            'InactiveDisplay' => true,
+            'InactiveDisplay' => true, 'ValueColor' => false, 'OpenOnTap' => false,
         ],
         'slider' => [
             'ShowIcon' => true, 'ShowLabel' => true, 'ShowValue' => true,
@@ -508,7 +510,7 @@ class UniversalDeviceTile extends IPSModuleStrict
             'ShowBorderLine' => false, 'VerticalAlignment' => true,
             'OpenObjectId' => false,
             'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
-            'InactiveDisplay' => false,
+            'InactiveDisplay' => false, 'ValueColor' => false, 'OpenOnTap' => false,
         ],
         'button' => [
             'ShowIcon' => true, 'ShowLabel' => true, 'ShowValue' => true,
@@ -524,7 +526,7 @@ class UniversalDeviceTile extends IPSModuleStrict
             'ShowBorderLine' => false, 'VerticalAlignment' => true,
             'OpenObjectId' => true,
             'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
-            'InactiveDisplay' => false,
+            'InactiveDisplay' => false, 'ValueColor' => false, 'OpenOnTap' => false,
         ],
         'default' => [
             'ShowIcon' => false, 'ShowLabel' => false, 'ShowValue' => false,
@@ -539,7 +541,7 @@ class UniversalDeviceTile extends IPSModuleStrict
             'ShowBorderLine' => false, 'VerticalAlignment' => false,
             'OpenObjectId' => false,
             'ImageMedia' => false, 'ImageWidth' => false, 'ImageBorderRadius' => false,
-            'InactiveDisplay' => false,
+            'InactiveDisplay' => false, 'ValueColor' => false, 'OpenOnTap' => false,
         ],
     ];
 

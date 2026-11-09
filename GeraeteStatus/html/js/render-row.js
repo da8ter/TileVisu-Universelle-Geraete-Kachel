@@ -57,7 +57,11 @@
             }
                 
             // Add data-variable-id to outer wrapper for minimal updates (text/button/image)
-            content += `<div class="${cssClasses}" style="${wrapperStyle}" data-variable-id="${esc(variable.id)}" data-row-key="${esc(variable.key)}">`;
+            // Tippen öffnet die Variable (Symcon zeigt dort z. B. ihr Diagramm)
+            const tapOpen = (variable.openOnTap && variable.displayType === 'text' && Number(variable.id) > 1)
+                ? ` role="button" tabindex="0" data-open-variable="${esc(variable.id)}"` : '';
+            if (tapOpen) cssClasses += ' tap-open';
+            content += `<div class="${cssClasses}" style="${wrapperStyle}" data-variable-id="${esc(variable.id)}" data-row-key="${esc(variable.key)}"${tapOpen}>`;
 
                 // Wert je nach Darstellungstyp hinzufügen
                 if (variable.displayType === 'progress') {
@@ -86,13 +90,9 @@
                         textParts.push(`<span class="variable-label" style="color: ${getTextColor(variable)};">${labelText}</span>`);
                     }
                     
-                    if (variable.showValue) {
-                        textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${esc(variable.formattedValue)}</span>`);
-                    }
-                    
-                    // Falls nichts konfiguriert ist, zeige Wert als Fallback
-                    if (!variable.showIcon && !variable.showLabel && !variable.showValue) {
-                        textParts.push(`<span class="variable-value variable-text" style="flex: 0 0 auto;">${esc(variable.formattedValue)}</span>`);
+                    // Wert, ggf. in der Farbe aus der Darstellung (Text oder farbiges Feld)
+                    if (variable.showValue || (!variable.showIcon && !variable.showLabel)) {
+                        textParts.push(`<span class="${valueClasses(variable)}" style="flex: 0 0 auto;${valueColorStyle(variable)}">${esc(variable.formattedValue)}</span>`);
                     }
                     
                     // Für ungruppierte Text-Variablen: Container richtet bereits aus
@@ -172,6 +172,36 @@
         }
         
         // Hilfsfunktion für Progress-Bar-Update
+
+        /** Klassen des Werts: farbiges Feld, wenn die Darstellung eine Farbe liefert. */
+        function valueClasses(variable) {
+            return 'variable-value variable-text' + (variable.valueColorMode === 'badge' && variable.valueColor ? ' value-badge' : '');
+        }
+
+        /** Farbe aus der Darstellung: Textfarbe oder Hintergrund mit lesbarer Schrift (hell/dunkel nach Helligkeit). */
+        function valueColorStyle(variable) {
+            const c = typeof variable.valueColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(variable.valueColor) ? variable.valueColor : '';
+            if (!c) return '';
+            if (variable.valueColorMode !== 'badge') return ` color: ${c};`;
+            const n = parseInt(c.slice(1), 16);
+            const luma = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+            return ` background: ${c}; color: ${luma > 160 ? '#1d1d1f' : '#ffffff'};`;
+        }
+
+        // Zeilen mit „Tippen öffnet die Variable“: Klick, Enter oder Leertaste öffnen sie in der Visualisierung
+        function openTappedVariable(event) {
+            const row = (event.target && event.target.closest) ? event.target.closest('[data-open-variable]') : null;
+            if (!row || !row.closest('#variables-container') || typeof openObject !== 'function') return false;
+            const id = parseInt(row.getAttribute('data-open-variable') || '0', 10);
+            if (id > 1) openObject(id);
+            return id > 1;
+        }
+        document.addEventListener('click', openTappedVariable);
+        document.addEventListener('keydown', function (event) {
+            if ((event.key === 'Enter' || event.key === ' ') && !event.repeat && event.target && event.target.matches && event.target.matches('[data-open-variable]')) {
+                if (openTappedVariable(event)) event.preventDefault();
+            }
+        });
 
         // Buttons der Kachel: ein Listener für alle; Ziel (data-variable-id) und Wert (data-request-value, JSON) stehen am Button
         document.addEventListener('click', function (event) {

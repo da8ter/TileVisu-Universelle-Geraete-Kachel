@@ -228,6 +228,15 @@ trait PayloadVariablesTrait
             'scriptId' => intval($variable['ScriptID'] ?? 0),
             'openObjectId' => intval($variable['OpenObjectId'] ?? 0),
         ];
+        // Text-Zeilen: Farbe aus der Darstellung und „Tippen öffnet die Variable“ (nur wenn eingestellt, sonst bleibt der Stand gleich)
+        $valueColor = (string)($variable['ValueColor'] ?? 'off');
+        if ($variableData['displayType'] === 'text' && in_array($valueColor, ['text', 'badge'], true)) {
+            $variableData['valueColorMode'] = $valueColor;
+            $variableData['valueColor'] = $this->ValueColor((int)$variable['Variable']);
+        }
+        if ($variableData['displayType'] === 'text' && !empty($variable['OpenOnTap'])) {
+            $variableData['openOnTap'] = true;
+        }
 
         // Bild (Symcon Medienobjekt) als eigene Darstellungsart
         if (($variable['DisplayType'] ?? 'text') === 'image') {
