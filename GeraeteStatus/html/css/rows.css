@@ -455,9 +455,17 @@
 
         /* Wert als farbiges Feld (Farbe aus der Darstellung), wie in der Kachel-Visualisierung */
         .variable-value.value-badge {
-            padding: 0.15em 0.6em;
+            padding: 0.2em 0.6em 0.1em; /* Poppins hat viel Platz für Unterlängen: unten weniger, sonst sitzt der Text zu hoch */
             border-radius: 6px;
-            line-height: 1.4;
+            line-height: 1.3;
+        }
+        /* Wo möglich, auf Versal- und Grundlinie beschneiden: dann steht der Text exakt mittig */
+        @supports (text-box: trim-both cap alphabetic) {
+            .variable-value.value-badge {
+                padding: 0.4em 0.6em;
+                line-height: 1.4;
+                text-box: trim-both cap alphabetic;
+            }
         }
 
         /* Zeile öffnet beim Tippen die Variable */
