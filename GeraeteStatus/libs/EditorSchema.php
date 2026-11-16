@@ -72,7 +72,7 @@ final class EditorSchema
         'SliderColor1' => ['color'],
         'SliderColor2' => ['color'],
         'InactiveDisplay' => ['enum', ['dash', 'value', 'hide']],
-        'ValueColor' => ['enum', ['off', 'text', 'badge']],
+        'ValueColor' => ['enum', ['off', 'text', 'badge', 'both']],
         'OpenOnTap' => ['bool'],
         'SecondVariable' => ['ref', 'variable'],
         'UseSecondVariableAsTarget' => ['bool'],

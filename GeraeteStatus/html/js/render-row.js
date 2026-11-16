@@ -173,24 +173,29 @@
         
         // Hilfsfunktion für Progress-Bar-Update
 
-        /** Klassen des Werts: farbiges Feld, wenn die Darstellung eine Farbe liefert. */
+        /** Klassen des Werts: farbiges Feld, wenn die Darstellung eine Hintergrundfarbe liefert. */
         function valueClasses(variable) {
-            return 'variable-value variable-text' + (variable.valueColorMode === 'badge' && variable.valueColor ? ' value-badge' : '');
+            const box = (variable.valueColorMode === 'badge' || variable.valueColorMode === 'both') && variable.valueColor;
+            return 'variable-value variable-text' + (box ? ' value-badge' : '');
         }
 
         /**
-         * Farbe aus der Darstellung. Text: Farbe (sonst Inhaltsfarbe) als Schriftfarbe. Feld: Farbe als Hintergrund,
-         * Schrift in der Inhaltsfarbe, ohne sie hell/dunkel nach Helligkeit des Hintergrunds.
+         * Farbe aus der Darstellung (Farbe und Inhaltsfarbe der Variable).
+         * text: Schrift in der Inhaltsfarbe, sonst in der Farbe. badge: Feld in der Farbe, Schrift hell/dunkel nach
+         * Helligkeit. both: Feld in der Farbe, Schrift in der Inhaltsfarbe (ohne sie wie badge).
          */
         function valueColorStyle(variable) {
             const hex = v => (typeof v === 'string' && /^#[0-9A-Fa-f]{6}$/.test(v) ? v : '');
             const c = hex(variable.valueColor);
             const content = hex(variable.valueContentColor);
-            if (variable.valueColorMode !== 'badge') return (c || content) ? ` color: ${c || content};` : '';
-            if (!c) return content ? ` color: ${content};` : '';
+            const mode = variable.valueColorMode;
+            if (mode === 'text') return (content || c) ? ` color: ${content || c};` : '';
+            if (mode !== 'badge' && mode !== 'both') return '';
+            if (!c) return (mode === 'both' && content) ? ` color: ${content};` : '';
             const n = parseInt(c.slice(1), 16);
             const luma = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
-            return ` background: ${c}; color: ${content || (luma > 160 ? '#1d1d1f' : '#ffffff')};`;
+            const auto = luma > 160 ? '#1d1d1f' : '#ffffff';
+            return ` background: ${c}; color: ${mode === 'both' && content ? content : auto};`;
         }
 
         // Zeilen mit „Tippen öffnet die Variable“: Klick, Enter oder Leertaste öffnen sie in der Visualisierung

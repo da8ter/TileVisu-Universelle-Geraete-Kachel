@@ -230,7 +230,7 @@ trait PayloadVariablesTrait
         ];
         // Text-Zeilen: Farbe aus der Darstellung und „Tippen öffnet die Variable“ (nur wenn eingestellt, sonst bleibt der Stand gleich)
         $valueColor = (string)($variable['ValueColor'] ?? 'off');
-        if ($variableData['displayType'] === 'text' && in_array($valueColor, ['text', 'badge'], true)) {
+        if ($variableData['displayType'] === 'text' && in_array($valueColor, ['text', 'badge', 'both'], true)) {
             $variableData['valueColorMode'] = $valueColor;
             $colors = $this->ValueColors((int)$variable['Variable']);
             $variableData['valueColor'] = $colors['color'];

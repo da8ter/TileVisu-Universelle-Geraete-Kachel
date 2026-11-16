@@ -833,8 +833,9 @@
                 "type": "Select",
                 "options": [
                   { "caption": "Off", "value": "off" },
-                  { "caption": "Color the value", "value": "text" },
-                  { "caption": "Value as colored box", "value": "badge" }
+                  { "caption": "Text color", "value": "text" },
+                  { "caption": "Background", "value": "badge" },
+                  { "caption": "Background and text color", "value": "both" }
                 ]
               }
             }
@@ -971,8 +972,9 @@
     "$form[] = [ 'caption' => 'Separator line', 'name' => 'ShowBorderLine', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => $visible('ShowBorderLine') ];",
     "$form[] = [ 'caption' => 'Color from presentation', 'name' => 'ValueColor', 'type' => 'Select', 'width' => '100%', 'options' => [",
     "    [ 'caption' => 'Off', 'value' => 'off' ],",
-    "    [ 'caption' => 'Color the value', 'value' => 'text' ],",
-    "    [ 'caption' => 'Value as colored box', 'value' => 'badge' ]",
+    "    [ 'caption' => 'Text color', 'value' => 'text' ],",
+    "    [ 'caption' => 'Background', 'value' => 'badge' ],",
+    "    [ 'caption' => 'Background and text color', 'value' => 'both' ]",
     "], 'save' => true, 'add' => 'off', 'visible' => $visible('ValueColor') ];",
     "$form[] = [ 'caption' => 'Tap opens the variable (e.g. its chart)', 'name' => 'OpenOnTap', 'type' => 'CheckBox', 'save' => true, 'add' => false, 'visible' => $visible('OpenOnTap') ];",
     "",
@@ -1111,7 +1113,7 @@
   {
     "type": "Label",
     "visible": false,
-    "caption": "GroupNamesList is a JSON list of 10 groups, the position decides the number (first entry = Gruppe 1): GroupName, Groupicon (icon name), ShowGroupName, ShowAbove (name above the group), line (line below the group), stretch (elements use the full width). In VariablesList, InactiveDisplay sets what a progress row shows while it is inactive: dash (grey with a dash), value (current value), hide (row hidden). Text rows also take ValueColor (off, text: color the value, badge: value in a colored box; the color comes from the presentation of the variable) and OpenOnTap (true: tapping the row opens the variable, Symcon shows e.g. its chart there)."
+    "caption": "GroupNamesList is a JSON list of 10 groups, the position decides the number (first entry = Gruppe 1): GroupName, Groupicon (icon name), ShowGroupName, ShowAbove (name above the group), line (line below the group), stretch (elements use the full width). In VariablesList, InactiveDisplay sets what a progress row shows while it is inactive: dash (grey with a dash), value (current value), hide (row hidden). Text rows also take ValueColor (off; text: text color; badge: colored background; both: background and text color; the colors come from the presentation of the variable: color and content color) and OpenOnTap (true: tapping the row opens the variable, Symcon shows e.g. its chart there)."
   },
   {
     "type": "Label",
