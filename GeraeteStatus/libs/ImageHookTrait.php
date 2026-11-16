@@ -25,8 +25,8 @@ trait ImageHookTrait
             foreach ($profilAssoziazionen as $assoziation) {
                 $bildauswahl = $assoziation['Bildauswahl'] ?? 'none';
                 
-                if ($bildauswahl === 'custom' && isset($assoziation['EigenesBild']) && $assoziation['EigenesBild'] > 0) {
-                    $mediaId = (int)$assoziation['EigenesBild'];
+                if ($bildauswahl === 'custom') {
+                    $mediaId = EditorSchema::ObjectRef($assoziation['EigenesBild'] ?? 0);
                     if ($mediaId > 0 && IPS_MediaExists($mediaId)) {
                         $assets['img_custom_' . $mediaId] = $this->BuildImageHookUrl($mediaId);
                     }
@@ -141,6 +141,9 @@ trait ImageHookTrait
     {
         $base = '/hook/udtimages/' . $this->InstanceID;
         $token = $this->ReadAttributeString('HookToken');
+        if ($mediaId > 0 && !IPS_MediaExists($mediaId)) {
+            $mediaId = 0; // gelöschtes Medium: IPS_GetMedia würde eine Warnung in die Kachel schreiben
+        }
         if ($mediaId > 0) {
             $q = 'mid=' . (int)$mediaId . '&v=' . rawurlencode($this->GetMediaVersion($mediaId));
         } else {
