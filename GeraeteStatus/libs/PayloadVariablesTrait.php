@@ -232,7 +232,9 @@ trait PayloadVariablesTrait
         $valueColor = (string)($variable['ValueColor'] ?? 'off');
         if ($variableData['displayType'] === 'text' && in_array($valueColor, ['text', 'badge'], true)) {
             $variableData['valueColorMode'] = $valueColor;
-            $variableData['valueColor'] = $this->ValueColor((int)$variable['Variable']);
+            $colors = $this->ValueColors((int)$variable['Variable']);
+            $variableData['valueColor'] = $colors['color'];
+            $variableData['valueContentColor'] = $colors['content'];
         }
         if ($variableData['displayType'] === 'text' && !empty($variable['OpenOnTap'])) {
             $variableData['openOnTap'] = true;

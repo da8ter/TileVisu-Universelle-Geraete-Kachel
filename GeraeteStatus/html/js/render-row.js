@@ -178,14 +178,19 @@
             return 'variable-value variable-text' + (variable.valueColorMode === 'badge' && variable.valueColor ? ' value-badge' : '');
         }
 
-        /** Farbe aus der Darstellung: Textfarbe oder Hintergrund mit lesbarer Schrift (hell/dunkel nach Helligkeit). */
+        /**
+         * Farbe aus der Darstellung. Text: Farbe (sonst Inhaltsfarbe) als Schriftfarbe. Feld: Farbe als Hintergrund,
+         * Schrift in der Inhaltsfarbe, ohne sie hell/dunkel nach Helligkeit des Hintergrunds.
+         */
         function valueColorStyle(variable) {
-            const c = typeof variable.valueColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(variable.valueColor) ? variable.valueColor : '';
-            if (!c) return '';
-            if (variable.valueColorMode !== 'badge') return ` color: ${c};`;
+            const hex = v => (typeof v === 'string' && /^#[0-9A-Fa-f]{6}$/.test(v) ? v : '');
+            const c = hex(variable.valueColor);
+            const content = hex(variable.valueContentColor);
+            if (variable.valueColorMode !== 'badge') return (c || content) ? ` color: ${c || content};` : '';
+            if (!c) return content ? ` color: ${content};` : '';
             const n = parseInt(c.slice(1), 16);
             const luma = 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
-            return ` background: ${c}; color: ${luma > 160 ? '#1d1d1f' : '#ffffff'};`;
+            return ` background: ${c}; color: ${content || (luma > 160 ? '#1d1d1f' : '#ffffff')};`;
         }
 
         // Zeilen mit „Tippen öffnet die Variable“: Klick, Enter oder Leertaste öffnen sie in der Visualisierung
