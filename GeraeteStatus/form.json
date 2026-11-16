@@ -1111,7 +1111,7 @@
   {
     "type": "Label",
     "visible": false,
-    "caption": "GroupNamesList is a JSON list of 10 groups, the position decides the number (first entry = Gruppe 1): GroupName, Groupicon (icon name), ShowGroupName, ShowAbove (name above the group), line (line below the group), stretch (elements use the full width). In VariablesList, InactiveDisplay sets what a progress row shows while it is inactive: dash (grey with a dash), value (current value), hide (row hidden)."
+    "caption": "GroupNamesList is a JSON list of 10 groups, the position decides the number (first entry = Gruppe 1): GroupName, Groupicon (icon name), ShowGroupName, ShowAbove (name above the group), line (line below the group), stretch (elements use the full width). In VariablesList, InactiveDisplay sets what a progress row shows while it is inactive: dash (grey with a dash), value (current value), hide (row hidden). Text rows also take ValueColor (off, text: color the value, badge: value in a colored box; the color comes from the presentation of the variable) and OpenOnTap (true: tapping the row opens the variable, Symcon shows e.g. its chart there)."
   },
   {
     "type": "Label",
